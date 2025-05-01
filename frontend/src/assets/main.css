@@ -1,0 +1,328 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        /* 默认不添加dark类，使用浅色主题 */
+        @apply bg-background text-foreground;
+    }
+
+    :root {
+        /* 基础配色 - 明亮主题 */
+        --background: 220 20% 97%;
+        --foreground: 222 47% 10%;
+
+        --border: 214 32% 91%;
+        --input: 214 32% 91%;
+        --ring: 222 47% 10%;
+
+        /* 霓虹蓝色主题色 */
+        --primary: 210 100% 50%;
+        --primary-foreground: 210 40% 98%;
+        --primary-focus: 210 100% 55%;
+        --primary-glow: 210 100% 60%;
+
+        --secondary: 210 40% 94%;
+        --secondary-foreground: 222 47% 11%;
+
+        --muted: 210 40% 94%;
+        --muted-foreground: 215 16% 45%;
+
+        --accent: 210 40% 94%;
+        --accent-foreground: 222 47% 11%;
+        --accent-cyan: 190 95% 40%;
+        --accent-purple: 265 89% 70%;
+
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 210 40% 98%;
+
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 10%;
+        --card-hovered: 210 20% 98%;
+
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 47% 10%;
+
+        /* 终端主题 */
+        --terminal-background: 225 25% 9%;
+        --terminal-foreground: 180 5% 85%;
+        --terminal-success: 142 76% 46%;
+        --terminal-error: 0 84% 60%;
+        --terminal-command: 210 100% 60%;
+        --terminal-prompt: 65 92% 45%;
+
+        --success: 142 76% 46%;
+
+        --radius: 0.5rem;
+    }
+
+    .dark {
+        /* 基础配色 - 深色主题 */
+        --background: 225 25% 9%;
+        --foreground: 210 40% 98%;
+
+        --border: 216 32% 18%;
+        --input: 216 32% 18%;
+        --ring: 212 97% 78%;
+
+        /* 霓虹蓝色主题色 */
+        --primary: 210 100% 60%;
+        --primary-foreground: 222 47% 10%;
+        --primary-focus: 210 100% 65%;
+        --primary-glow: 210 100% 70%;
+
+        --secondary: 216 32% 18%;
+        --secondary-foreground: 210 40% 98%;
+
+        --muted: 216 32% 18%;
+        --muted-foreground: 215 20% 65%;
+
+        --accent: 216 32% 18%;
+        --accent-foreground: 210 40% 98%;
+        --accent-cyan: 190 95% 50%;
+        --accent-purple: 265 89% 78%;
+
+        --destructive: 0 63% 31%;
+        --destructive-foreground: 210 40% 98%;
+
+        --card: 225 24% 10%;
+        --card-foreground: 210 40% 98%;
+        --card-hovered: 225 24% 12%;
+
+        --popover: 225 24% 10%;
+        --popover-foreground: 210 40% 98%;
+
+        /* 终端主题保持不变 */
+        --terminal-background: 225 25% 9%;
+        --terminal-foreground: 180 5% 85%;
+        --terminal-success: 142 76% 46%;
+        --terminal-error: 0 84% 60%;
+        --terminal-command: 210 100% 60%;
+        --terminal-prompt: 65 92% 45%;
+
+        --success: 142 76% 46%;
+    }
+
+    html,
+    body {
+        height: 100vh;
+        width: 100vw;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    #app {
+        height: 100vh;
+        width: 100vw;
+        display: flex;
+        flex-direction: column;
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground antialiased;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+
+    /* 导入高级等宽字体 */
+    @font-face {
+        font-family: 'JetBrains Mono';
+        src: url('https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono/web/woff2/JetBrainsMono-Regular.woff2') format('woff2');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+    }
+
+    /* 定义全局滚动条样式 */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        @apply bg-transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        @apply bg-secondary/80 rounded-full;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        @apply bg-secondary;
+    }
+}
+
+/* 终端相关样式 */
+.terminal-output {
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.3;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.terminal-cursor {
+    @apply animate-blink;
+}
+
+.terminal-border {
+    background: linear-gradient(45deg, hsl(var(--primary)) 0%, hsl(var(--accent-cyan)) 50%, hsl(var(--accent-purple)) 100%);
+    background-size: 200% 200%;
+    animation: dataflow 8s ease infinite alternate;
+    @apply p-[1.5px] rounded-xl shadow-glow;
+}
+
+/* AI助手边框样式 */
+.ai-assistant-border {
+    position: relative;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    box-shadow: 0 0 15px rgba(var(--accent-cyan), 0.2);
+}
+
+.ai-assistant-border::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+    margin: -1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, hsl(var(--accent-purple)) 0%, hsl(var(--accent-cyan)) 100%);
+}
+
+/* 消息气泡样式 */
+.message-user {
+    position: relative;
+    border-radius: 1rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, rgba(var(--primary), 0.15), rgba(var(--primary), 0.05));
+    border-left: 2px solid rgba(var(--primary), 0.5);
+    margin-left: 2rem;
+    margin-right: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    animation: slideInRight 0.3s ease-out;
+}
+
+.message-assistant {
+    position: relative;
+    border-radius: 1rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, rgba(var(--accent-purple), 0.08), rgba(var(--accent-cyan), 0.08));
+    border-left: 2px solid rgba(var(--accent-cyan), 0.3);
+    margin-right: 2rem;
+    margin-left: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    animation: slideInLeft 0.3s ease-out;
+}
+
+/* 自定义按钮样式 */
+.btn-glow {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-glow:hover {
+    box-shadow: 0 0 10px rgba(var(--primary), 0.5);
+}
+
+.btn-glow:active {
+    transform: translateY(1px);
+}
+
+/* 自定义输入框样式 */
+.input-glow {
+    @apply transition-shadow duration-300;
+}
+
+.input-glow:focus {
+    box-shadow: 0 0 0 2px rgba(var(--primary), 0.25);
+    border-color: rgba(var(--primary), 0.5);
+}
+
+/* 自定义动画延迟 */
+.animation-delay-200 {
+    animation-delay: 0.2s;
+}
+
+.animation-delay-400 {
+    animation-delay: 0.4s;
+}
+
+/* AI思考动画 */
+.thinking-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: rgba(var(--accent-cyan), 0.7);
+}
+
+/* 玻璃态效果 */
+.glass-effect {
+    @apply bg-card/40 backdrop-blur-md border border-white/20 shadow-lg;
+}
+
+/* 设置特定组件的玻璃态效果变体 */
+.ai-assistant-border.glass-effect {
+    @apply bg-card/40 backdrop-blur-md shadow-lg;
+    border: 1.5px solid rgba(var(--accent-cyan), 0.3);
+}
+
+@layer utilities {
+
+    /* 阴影发光效果 */
+    .shadow-glow-sm {
+        box-shadow: 0 0 4px rgba(var(--primary), 0.5);
+    }
+
+    .shadow-glow {
+        box-shadow: 0 0 15px rgba(var(--primary), 0.3);
+    }
+
+    /* 添加渐变动画 */
+    @keyframes dataflow {
+        0% {
+            background-position: 0% 50%;
+        }
+
+        100% {
+            background-position: 100% 50%;
+        }
+    }
+
+    /* 滑入动画 */
+    @keyframes slideInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+}

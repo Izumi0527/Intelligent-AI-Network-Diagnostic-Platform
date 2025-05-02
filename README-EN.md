@@ -1,4 +1,4 @@
-# Intelligent-AI-Network-Diagnostic-Platform
+# AI-Powered Network Fault Analysis Platform
 
 This project is an intelligent platform combining AI and network management, designed to connect network devices and provide AI-assisted fault analysis. The system supports multiple large language models (Claude, GPT, Deepseek, etc.) for intelligent analysis, offers streaming response interfaces, and enables real-time network device connections and command execution.
 

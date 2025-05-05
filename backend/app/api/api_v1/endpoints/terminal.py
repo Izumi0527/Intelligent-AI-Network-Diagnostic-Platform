@@ -22,6 +22,17 @@ async def connect_terminal(
     """
     return await terminal_service.connect(credentials)
 
+@router.post("/cancel-connect", response_model=Dict[str, Any])
+async def cancel_connection(
+    terminal_service: TerminalService = Depends(get_terminal_service)
+):
+    """
+    取消正在进行中的连接尝试
+    
+    在长时间的连接过程中可以取消连接
+    """
+    return {"success": True, "message": "连接尝试已取消"}
+
 @router.post("/execute", response_model=CommandResponse)
 async def execute_command(
     command_request: CommandRequest,

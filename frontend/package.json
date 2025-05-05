@@ -10,23 +10,23 @@
   },
   "dependencies": {
     "@inspira-ui/plugins": "^0.0.1",
-    "@vueuse/core": "^10.7.0",
-    "axios": "^1.6.2",
+    "@vueuse/core": "^10.11.1",
+    "axios": "^1.9.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
-    "pinia": "^2.1.7",
-    "tailwind-merge": "^2.0.0",
+    "pinia": "^2.3.1",
+    "tailwind-merge": "^2.6.0",
     "vue": "^3.3.8"
   },
   "devDependencies": {
-    "@types/node": "^20.9.5",
-    "@vitejs/plugin-vue": "^4.5.1",
+    "@types/node": "^20.17.32",
+    "@vitejs/plugin-vue": "^4.6.2",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.31",
-    "tailwindcss": "^3.3.5",
+    "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.2.2",
+    "typescript": "^5.8.3",
     "vite": "^5.0.0",
-    "vue-tsc": "^1.8.22"
+    "vue-tsc": "^1.8.27"
   }
 }

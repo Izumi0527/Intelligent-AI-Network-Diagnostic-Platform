@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     PORT: int = int(os.getenv("PORT", "8000"))
     
     # 会话设置
-    SESSION_IDLE_TIMEOUT: int = int(os.getenv("SESSION_IDLE_TIMEOUT", "600"))
+    SESSION_IDLE_TIMEOUT: int = int(os.getenv("SESSION_IDLE_TIMEOUT", "7200"))  # 默认2小时
     MAX_TERMINAL_SESSIONS: int = int(os.getenv("MAX_TERMINAL_SESSIONS", "5"))
     
     # 日志设置

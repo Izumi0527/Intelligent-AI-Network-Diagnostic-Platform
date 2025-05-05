@@ -52,24 +52,39 @@
         </div>
         
         <div class="flex items-end">
-          <button 
-            type="submit"
-            class="w-full h-10 rounded-md px-4 py-2 text-sm font-medium transition-all duration-300 focus-visible:outline-none btn-glow"
-            :class="[
-              store.connectionStatus === 'connected' 
-                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' 
-                : 'bg-primary text-primary-foreground hover:bg-primary/90'
-            ]"
-          >
-            <div class="flex items-center justify-center">
-              <span v-if="store.connectionStatus === 'connecting'" class="animate-pulse">
-                连接中...
-              </span>
-              <span v-else>
-                {{ store.connectionStatus === 'connected' ? '断开连接' : '连接' }}
-              </span>
-            </div>
-          </button>
+          <div class="w-full flex gap-2">
+            <button 
+              type="submit"
+              class="flex-1 h-10 rounded-md px-4 py-2 text-sm font-medium transition-all duration-300 focus-visible:outline-none btn-glow"
+              :class="[
+                store.connectionStatus === 'connected' 
+                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' 
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              ]"
+              :disabled="store.connectionStatus === 'connecting' && !store.canCancelConnection"
+            >
+              <div class="flex items-center justify-center">
+                <span v-if="store.connectionStatus === 'connecting' && !store.canCancelConnection" class="animate-pulse">
+                  连接中...
+                </span>
+                <span v-else>
+                  {{ store.connectionStatus === 'connected' ? '断开连接' : '连接' }}
+                </span>
+              </div>
+            </button>
+            
+            <!-- 取消按钮 -->
+            <button 
+              v-if="store.canCancelConnection && store.connectionStatus === 'connecting'"
+              type="button"
+              @click="handleCancelConnect"
+              class="h-10 rounded-md px-4 py-2 text-sm font-medium transition-all duration-300 focus-visible:outline-none btn-glow bg-amber-500 text-white hover:bg-amber-600"
+            >
+              <div class="flex items-center justify-center">
+                <span>取消连接</span>
+              </div>
+            </button>
+          </div>
         </div>
       </form>
       
@@ -98,9 +113,9 @@
     <!-- 虚拟终端显示区域 -->
     <div 
       ref="terminalOutputRef"
-      class="flex-1 overflow-auto p-4 font-mono text-sm whitespace-pre-wrap terminal-output"
+      class="flex-1 overflow-auto p-4 font-mono text-sm whitespace-pre-wrap terminal-output text-left"
     >
-      <div v-for="(line, index) in formattedOutput" :key="index" class="mb-1" :class="getLineClass(line)">
+      <div v-for="(line, index) in formattedOutput" :key="index" class="mb-1 text-left" :class="getLineClass(line)">
         <span v-if="line.startsWith('>')" class="text-terminal-prompt mr-1">{{ devicePrompt }}</span>
         <span>{{ line.startsWith('>') ? line.substring(1) : line }}</span>
       </div>
@@ -222,11 +237,24 @@ watch(
     scrollToBottom();
   }
 );
+
+// 处理取消连接
+const handleCancelConnect = async () => {
+  await store.cancelConnection();
+};
 </script>
 
 <style scoped>
 .terminal-output {
   min-height: 200px;
+  text-align: left;
+}
+
+.terminal-output > div {
+  text-align: left;
+  margin-right: auto;
+  display: block;
+  width: 100%;
 }
 
 .terminal-cursor {
@@ -241,5 +269,13 @@ watch(
 /* 添加内部阴影效果 */
 .shadow-inner {
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* 强制白色空间保留和左对齐 */
+.terminal-output span {
+  white-space: pre-wrap;
+  text-align: left;
+  word-break: break-all;
+  display: inline;
 }
 </style> 

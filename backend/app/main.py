@@ -1,5 +1,5 @@
 import logging
-
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -8,6 +8,7 @@ import time
 
 from app.api.api_v1.api import api_router
 from app.config.settings import settings
+from app.services.terminal_service import TerminalService
 
 # 配置日志
 logging.basicConfig(
@@ -54,6 +55,36 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 async def root():
     """根路径重定向到API文档"""
     return {"message": f"请访问 {settings.API_V1_STR}/docs 查看API文档"}
+
+# 创建后台任务
+async def cleanup_idle_sessions():
+    """定期清理闲置的终端会话"""
+    terminal_service = TerminalService()
+    while True:
+        try:
+            result = await terminal_service.cleanup_idle_sessions()
+            if result["cleaned_count"] > 0:
+                logger.info(f"定期清理: {result['message']}")
+        except Exception as e:
+            logger.error(f"定期清理任务出错: {str(e)}")
+        # 每5分钟运行一次
+        await asyncio.sleep(300)
+
+@app.on_event("startup")
+async def start_background_tasks():
+    """启动后台任务"""
+    app.state.cleanup_task = asyncio.create_task(cleanup_idle_sessions())
+    logger.info("已启动定期会话清理任务")
+
+@app.on_event("shutdown")
+async def shutdown_background_tasks():
+    """关闭后台任务"""
+    if hasattr(app.state, "cleanup_task"):
+        app.state.cleanup_task.cancel()
+        try:
+            await app.state.cleanup_task
+        except asyncio.CancelledError:
+            logger.info("已取消定期会话清理任务")
 
 if __name__ == "__main__":
     import uvicorn

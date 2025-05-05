@@ -23,6 +23,53 @@ class TerminalManager:
         self.sessions: Dict[str, SessionInfo] = {}
         self.lock = asyncio.Lock()
         
+        # 启动会话检查任务（如果是在异步环境中初始化的）
+        try:
+            loop = asyncio.get_event_loop()
+            if not loop.is_closed():
+                self.session_check_task = loop.create_task(self._session_check_routine())
+        except Exception as e:
+            logger.warning(f"无法启动会话检查任务: {str(e)}")
+    
+    async def _session_check_routine(self):
+        """定期检查会话状态并执行保活操作"""
+        try:
+            while True:
+                try:
+                    await self._check_and_keep_alive_sessions()
+                except Exception as e:
+                    logger.error(f"会话检查例程出错: {str(e)}")
+                    
+                # 每60秒检查一次
+                await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            logger.info("会话检查任务已取消")
+    
+    async def _check_and_keep_alive_sessions(self):
+        """检查所有会话状态并执行保活操作"""
+        current_time = time.time()
+        ssh_session_ids = []
+        
+        # 找出需要检查的SSH会话
+        for session_id, session in self.sessions.items():
+            if session.connection_type == "ssh":
+                # 如果会话在过去2分钟内有活动，我们不需要检查它
+                if (current_time - session.last_activity) < 120:
+                    continue
+                ssh_session_ids.append(session_id)
+        
+        # 对每个SSH会话执行检查
+        for session_id in ssh_session_ids:
+            if session_id in self.sessions:  # 确保会话仍然存在
+                try:
+                    # 检查会话状态
+                    is_active = await self.ssh_manager.check_session_active(session_id)
+                    
+                    if not is_active:
+                        logger.warning(f"SSH会话 {session_id} 已失效，将在下次使用时尝试恢复")
+                except Exception as e:
+                    logger.error(f"检查SSH会话 {session_id} 状态时出错: {str(e)}")
+        
     async def connect(
         self, connection_type: ConnectionType, 
         device_address: str, port: int, 
@@ -71,7 +118,8 @@ class TerminalManager:
                     device_address=device_address,
                     port=port,
                     username=username,
-                    is_active=True
+                    is_active=True,
+                    last_activity=time.time()  # 确保设置初始活动时间
                 )
             
             return ConnectionResponse(
@@ -116,12 +164,18 @@ class TerminalManager:
                 )
             
             if not success:
+                # 如果是会话失效或连接中断错误，设置会话为非活跃
+                if "会话" in output and ("失效" in output or "不存在" in output or "已过期" in output):
+                    session.is_active = False
+                    
                 return CommandResponse(
                     session_id=session_id,
                     output=output,
                     is_error=True
                 )
             
+            # 命令执行成功，更新会话活跃状态
+            session.is_active = True
             return CommandResponse(
                 session_id=session_id,
                 output=output,
@@ -130,6 +184,9 @@ class TerminalManager:
             
         except Exception as e:
             logger.error(f"执行命令时出错: {str(e)}")
+            # 可能是会话或连接问题，标记为非活跃
+            session.is_active = False
+            
             return CommandResponse(
                 session_id=session_id,
                 output=f"执行命令时出错: {str(e)}",
@@ -192,5 +249,12 @@ class TerminalManager:
             success, _ = await self.disconnect(session_id)
             if success:
                 cleaned_count += 1
-                
+        
+        # 同时让SSH和Telnet管理器进行它们自己的清理
+        try:
+            ssh_cleaned = await self.ssh_manager.cleanup_idle_sessions(idle_timeout)
+            cleaned_count += ssh_cleaned
+        except Exception as e:
+            logger.error(f"SSH会话清理出错: {str(e)}")
+            
         return cleaned_count 

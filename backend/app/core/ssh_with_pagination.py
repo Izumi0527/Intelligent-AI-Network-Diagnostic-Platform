@@ -161,14 +161,23 @@ class SSHManager:
             # 发送命令
             await asyncio.to_thread(shell.send, command + "\n")
             
-            # 给设备一些时间开始执行命令
-            await asyncio.sleep(0.5)
+            # 等待命令执行完成（需要根据设备响应速度调整）
+            await asyncio.sleep(2)
             
-            # 接收完整输出，处理分页提示
-            full_output = await self._receive_full_output_with_pagination(shell)
+            # 读取输出
+            output = ""
+            await asyncio.sleep(0.5)  # 给设备一点时间来产生输出
+            
+            # 检查是否有可用数据
+            while await asyncio.to_thread(lambda: shell.recv_ready()):
+                chunk = await asyncio.to_thread(shell.recv, 4096)
+                if not chunk:
+                    break
+                output += chunk.decode("utf-8", errors="replace")
+                await asyncio.sleep(0.1)  # 短暂等待更多数据
             
             # 处理输出 - 移除命令回显和终端提示符
-            processed_output = self._process_command_output(command, full_output)
+            processed_output = self._process_command_output(command, output)
             
             # 规范化输出格式
             normalized_output = self._normalize_output(processed_output)
@@ -183,70 +192,6 @@ class SSHManager:
                 if shell:
                     shell.active = False
             return False, error_msg
-    
-    async def _receive_full_output_with_pagination(self, shell) -> str:
-        """接收完整的命令输出，自动处理分页提示"""
-        full_output = ""
-        more_prompt_patterns = [
-            b"---- More ----", 
-            b"--More--",
-            b"---- more ----",
-            b"--more--"
-        ]
-        
-        # 初始等待时间（秒）
-        initial_wait = 1
-        # 最大尝试次数
-        max_attempts = 50
-        # 当前尝试次数
-        attempt = 0
-        
-        # 第一次读取输出
-        await asyncio.sleep(initial_wait)
-        output = await asyncio.to_thread(shell.recv, 65535)
-        full_output += output.decode("utf-8", errors="replace")
-        
-        # 检查并处理分页
-        while attempt < max_attempts:
-            # 检查是否有分页提示
-            has_more_prompt = False
-            for prompt in more_prompt_patterns:
-                if prompt in output:
-                    has_more_prompt = True
-                    break
-            
-            if not has_more_prompt:
-                # 检查是否还有更多数据可读
-                if await asyncio.to_thread(lambda: shell.recv_ready()):
-                    # 还有数据，但没有分页提示，继续读取
-                    await asyncio.sleep(0.5)
-                    output = await asyncio.to_thread(shell.recv, 65535)
-                    if not output:  # 如果没有更多数据，退出循环
-                        break
-                    full_output += output.decode("utf-8", errors="replace")
-                else:
-                    # 没有更多数据可读，退出循环
-                    break
-            else:
-                # 遇到分页提示，发送空格继续
-                logger.debug("检测到分页提示，发送空格继续...")
-                await asyncio.to_thread(shell.send, " ")
-                # 等待一小段时间接收新数据
-                await asyncio.sleep(0.5)
-                output = await asyncio.to_thread(shell.recv, 65535)
-                # 从输出中移除分页提示
-                output_text = output.decode("utf-8", errors="replace")
-                for prompt_text in ["---- More ----", "--More--", "---- more ----", "--more--"]:
-                    output_text = output_text.replace(prompt_text, "")
-                full_output += output_text
-            
-            attempt += 1
-            
-        # 如果达到最大尝试次数，记录警告
-        if attempt >= max_attempts:
-            logger.warning(f"命令输出过长，已达到最大尝试次数({max_attempts})，可能未获取完整输出")
-        
-        return full_output
     
     def _process_command_output(self, command: str, output: str) -> str:
         """处理命令输出，移除回显和提示符"""

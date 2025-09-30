@@ -1,0 +1,550 @@
+@import 'tailwindcss';
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* OKLCH色彩系统 - 更精确的色彩表示 */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.55 0.15 265);  /* 优化的科技蓝 */
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.7 0.12 200);  /* 青色调重音 */
+  --accent-foreground: oklch(0.21 0.006 285.885);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.4 0.01 250);  /* 大幅加深对比度，深灰色 */
+  --border-glow: oklch(0.5 0.1 260);  /* 稍亮的边框光晕 */
+  --input: oklch(0.4 0.01 250);
+  --ring: oklch(0.705 0.015 286.067);
+  --radius: 0.75rem;  /* 稍大的圆角 */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  
+  /* 终端专用色彩 - 按设计需求优化 */
+  --terminal: #0d1117;  /* 纯黑终端背景 */
+  --terminal-foreground: #e6edf3;  /* 正常文本颜色 */
+  --terminal-success: #00ff00;  /* 成功信息 */
+  --terminal-error: #ff0000;   /* 错误信息 */
+  --terminal-warning: #ffa500; /* 警告信息 */
+  --terminal-command: #e6edf3; /* 命令文本 */
+  --terminal-prompt: #ffeb3b;  /* 提示符 */
+  --terminal-border: #30363d;  /* 终端边框 */
+
+  /* 连接配置栏颜色 */
+  --config-panel-bg: #2d3139;     /* 配置栏背景 */
+  --config-input-bg: #1a1d21;     /* 输入框背景 */
+  --config-input-border: #3a3f47; /* 输入框边框 */
+  --config-button-bg: #e74c3c;    /* 执行按钮背景 */
+  --config-button-hover: #c0392b;  /* 执行按钮hover */
+
+  /* AI助手面板颜色 */
+  --ai-panel-bg: #ffffff;         /* AI面板背景 */
+  --ai-panel-border: #e0e0e0;     /* AI面板边框 */
+  --ai-title-color: #6366f1;      /* AI标题颜色 */
+  --ai-beta-bg: #e0e7ff;          /* Beta标签背景 */
+  --ai-input-bg: #f8f9fa;         /* AI输入框背景 */
+
+  /* 页面标题颜色 */
+  --page-title-color: #2196F3;    /* 页面标题蓝色 */
+  
+  /* 扩展色彩变量 */
+  --accent-cyan: oklch(0.65 0.2 190);
+  --accent-purple: oklch(0.7 0.25 280);
+  --card-hovered: oklch(0.98 0.002 240);
+  --success: oklch(0.6 0.18 142);
+}
+
+.dark {
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.141 0.005 285.823);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.7 0.18 265);  /* 暗色模式下更亮的主色 */
+  --primary-foreground: oklch(0.1 0.006 285.885);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --accent: oklch(0.6 0.15 200);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.5 0.18 25);
+  --destructive-foreground: oklch(0.9 0.05 25);
+  --border: oklch(0.9 0.25 195);  /* 青蓝色调，更高亮度对比 */
+  --border-glow: oklch(0.95 0.3 190);  /* 深色模式青色发光，更高对比 */
+  --input: oklch(0.65 0.15 210);
+  --ring: oklch(0.442 0.017 285.786);
+
+  /* AI助手面板深色模式颜色 */
+  --ai-panel-bg: #1a1d21;          /* 深色背景 */
+  --ai-panel-border: #30363d;      /* 深色边框 */
+  --ai-title-color: #93c5fd;       /* 浅蓝色标题 */
+  --ai-beta-bg: #1e3a5f;           /* 深蓝色Beta背景 */
+  --ai-input-bg: #2d3139;          /* 深色输入框背景 */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-glow: var(--border-glow);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  /* 终端色彩 */
+  --color-terminal: var(--terminal);
+  --color-terminal-foreground: var(--terminal-foreground);
+  --color-terminal-success: var(--terminal-success);
+  --color-terminal-error: var(--terminal-error);
+  --color-terminal-command: var(--terminal-command);
+  --color-terminal-prompt: var(--terminal-prompt);
+  
+  /* 圆角系统 */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* HTML主题管理 */
+html {
+  color-scheme: light dark;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+/* 玻璃态效果类 */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-effect {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 终端边框效果 */
+.terminal-border {
+  background: oklch(var(--terminal));
+  border: 1px solid oklch(var(--border));
+}
+
+/* AI助手边框效果 */
+.ai-assistant-border {
+  background: linear-gradient(135deg, 
+    oklch(var(--card)) 0%, 
+    oklch(var(--accent) / 0.1) 100%);
+}
+
+/* 改进的按钮发光效果 */
+.btn-glow {
+  box-shadow: 0 0 20px -5px oklch(var(--primary) / 0.3);
+  transition: all 0.3s ease;
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 30px -3px oklch(var(--primary) / 0.5);
+  transform: translateY(-1px);
+}
+
+/* 改进的输入框发光效果 */
+.input-glow {
+  transition: all 0.3s ease;
+}
+
+.input-glow:focus {
+  box-shadow: 0 0 15px -3px oklch(var(--primary) / 0.4);
+  border-color: oklch(var(--primary));
+}
+
+/* 边框发光效果 */
+.border-glow {
+  box-shadow: 0 0 0 1px oklch(var(--border-glow) / 0.3);
+}
+
+.border-glow-hover:hover {
+  box-shadow: 0 0 8px 0 oklch(var(--border-glow) / 0.4);
+}
+
+/* 科技感边框发光组合 */
+.border-tech {
+  border: 1px solid var(--border);  /* 移除透明度，使用完全不透明 */
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 85%);
+}
+
+.border-tech:hover {
+  border-color: color-mix(in oklch, var(--border-glow), transparent 20%);
+  box-shadow: 0 0 8px 0 color-mix(in oklch, var(--border-glow), transparent 70%);
+}
+
+.dark .border-tech {
+  border: 1px solid var(--border);  /* 添加明确的边框定义 */
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 60%),
+    inset 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 85%);
+}
+
+.dark .border-tech:hover {
+  box-shadow:
+    0 0 12px 0 color-mix(in oklch, var(--border-glow), transparent 50%),
+    inset 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 75%);
+}
+.shadow-glow-sm {
+  box-shadow: 0 0 10px -2px oklch(var(--primary) / 0.2);
+}
+
+.shadow-glow-md {
+  box-shadow: 0 0 20px -5px oklch(var(--primary) / 0.3);
+}
+
+.shadow-glow-lg {
+  box-shadow: 0 0 30px -8px oklch(var(--primary) / 0.4);
+}
+
+/* 深色模式下的shadow-glow使用border-glow颜色 */
+.dark .shadow-glow-sm {
+  box-shadow: 0 0 10px -2px oklch(var(--border-glow) / 0.3);
+}
+
+.dark .shadow-glow-md {
+  box-shadow: 0 0 20px -5px oklch(var(--border-glow) / 0.4);
+}
+
+.dark .shadow-glow-lg {
+  box-shadow: 0 0 30px -8px oklch(var(--border-glow) / 0.5);
+}
+
+/* AI助手对话区域渐变背景 - 按设计需求 */
+.ai-chat-gradient {
+  background: linear-gradient(180deg,
+    #f0f9ff 0%,      /* 极浅蓝色 */
+    #e0f2fe 20%,     /* 浅蓝色 */
+    #f0f9ff 40%,     /* 回到极浅蓝 */
+    #ffffff 70%,     /* 渐变到白色 */
+    #f8fafc 100%     /* 极浅灰 */
+  );
+  min-height: 400px;
+}
+
+/* 备选柔和渐变 */
+.ai-chat-gradient-soft {
+  background: linear-gradient(135deg,
+    rgba(147, 197, 253, 0.1) 0%,   /* 透明浅蓝 */
+    rgba(196, 224, 255, 0.15) 50%, /* 透明天蓝 */
+    rgba(241, 245, 249, 0.2) 100%  /* 透明灰蓝 */
+  );
+  min-height: 400px;
+}
+
+/* 深色模式下的AI助手渐变 - 蓝色调 */
+.dark .ai-chat-gradient,
+.dark .ai-chat-gradient-soft {
+  background: linear-gradient(180deg,
+    #1e3a5f 0%,      /* 深蓝色 */
+    #2d4a6b 20%,     /* 中蓝色 */
+    #1e3a5f 40%,     /* 回到深蓝 */
+    #162338 70%,     /* 渐变到深色 */
+    #0d1117 100%     /* 接近黑色 */
+  );
+}
+
+/* 深色模式下的AI助手面板样式 */
+.dark .ai-assistant-panel {
+  color: #e6edf3;  /* 浅色文字 */
+  border-color: rgba(148, 163, 184, 0.4);
+  box-shadow: 0 18px 40px -28px rgba(15, 23, 42, 0.6);
+}
+
+.dark .ai-title {
+  color: #93c5fd;  /* 浅蓝色标题 */
+}
+
+.dark .ai-beta-badge {
+  background-color: #1e3a5f;
+  color: #93c5fd;
+}
+
+.dark .ai-input {
+  background-color: #2d3139;
+  border-color: #30363d;
+  color: #e6edf3;
+}
+
+.dark .ai-input:focus {
+  border-color: #58a6ff;
+}
+
+/* 终端连接配置面板样式 */
+.terminal-config-panel {
+  background-color: var(--config-panel-bg);
+  border-radius: 8px;
+}
+
+.terminal-config-input {
+  background-color: var(--config-input-bg);
+  border-color: var(--config-input-border);
+  color: white;
+}
+
+.terminal-config-button {
+  background-color: var(--config-button-bg);
+  color: white;
+  padding: 8px 24px;
+  transition: all 0.3s ease;
+}
+
+.terminal-config-button:hover {
+  background-color: var(--config-button-hover);
+}
+
+/* AI助手面板样式 */
+.ai-assistant-panel {
+  background-color: var(--ai-panel-bg);
+  border: 1.5px solid rgba(0, 0, 0, 0.55);
+  border-radius: 18px;
+  padding: 20px 18px 18px;
+  box-shadow: 0 18px 40px -28px rgba(15, 23, 42, 0.45);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ai-title {
+  color: var(--ai-title-color);
+  font-weight: 500;
+}
+
+.ai-clear-button {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.92));
+  border-color: rgba(99, 102, 241, 0.22);
+  color: rgba(31, 41, 55, 0.9);
+}
+
+.ai-clear-button:hover {
+  background: linear-gradient(135deg, rgba(236, 242, 255, 0.98), rgba(219, 234, 254, 0.95));
+  border-color: rgba(99, 102, 241, 0.38);
+  color: rgba(17, 24, 39, 0.92);
+}
+
+.ai-clear-button__icon {
+  background: rgba(99, 102, 241, 0.14);
+  color: rgba(79, 70, 229, 0.95);
+}
+
+.dark .ai-clear-button {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(148, 163, 184, 0.45);
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.dark .ai-clear-button:hover {
+  background: rgba(30, 64, 175, 0.35);
+  border-color: rgba(96, 165, 250, 0.55);
+  color: rgba(241, 245, 249, 0.98);
+}
+
+.dark .ai-clear-button__icon {
+  background: rgba(59, 130, 246, 0.28);
+  color: rgba(191, 219, 254, 0.92);
+}
+
+.ai-beta-badge {
+  background-color: var(--ai-beta-bg);
+  color: var(--ai-title-color);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.ai-input {
+  background-color: var(--ai-input-bg);
+  border: 1px solid var(--ai-panel-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+
+.ai-input:focus {
+  border-color: #007bff;
+}
+
+/* 页面标题样式 */
+.page-title {
+  color: var(--page-title-color);
+  font-size: 28px;  /* 默认更大字体 */
+}
+
+/* 终端显示区域样式 */
+.terminal-display {
+  background-color: var(--terminal);
+  border: 1px solid oklch(var(--border));  /* 使用优化后的边框颜色 */
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.terminal-text {
+  color: var(--terminal-foreground);
+}
+
+.terminal-success {
+  color: var(--terminal-success);
+}
+
+.terminal-error {
+  color: var(--terminal-error);
+}
+
+.terminal-warning {
+  color: var(--terminal-warning);
+}
+
+.terminal-prompt {
+  color: var(--terminal-prompt);
+}
+
+/* 深色模式下的终端显示区边框 */
+.dark .terminal-display {
+  border: 1px solid oklch(var(--border));  /* 明确使用优化后的青蓝色边框 */
+}
+
+/* 通用动画效果 */
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+/* 阴影效果 */
+.card-shadow {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* 脉冲动画 */
+.pulse-animation {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 淡入动画 */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 保留原有的AI surface gradient用于兼容 */
+.ai-surface-gradient {
+  background: var(--ai-panel-bg);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .responsive-layout {
+    flex-direction: column;
+  }
+
+  .terminal-section {
+    width: 100%;
+    height: 50vh;
+  }
+
+  .ai-section {
+    width: 100%;
+    height: 50vh;
+    border-left: none;
+    border-top: 1px solid var(--ai-panel-border);
+  }
+
+  .terminal-config-panel form {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2px;
+  }
+
+  .terminal-config-panel label {
+    font-size: 11px;
+  }
+
+  .terminal-config-input {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .page-title {
+    font-size: 24px;  /* 增大移动端字体 */
+  }
+
+  .terminal-config-panel form {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1440px) {
+  .page-title {
+    font-size: 32px;  /* 大屏幕更大字体 */
+  }
+
+  .terminal-display {
+    font-size: 15px;
+  }
+
+  .ai-assistant-panel {
+    padding: 20px;
+  }
+}

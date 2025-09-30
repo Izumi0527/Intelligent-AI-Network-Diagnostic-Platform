@@ -1,0 +1,14 @@
+fastapi==0.115.12
+uvicorn==0.34.2
+pydantic==2.11.4
+pydantic-settings==2.9.1
+sse-starlette==1.6.5
+netmiko==4.5.0
+aiohttp==3.11.18
+python-dotenv==1.1.0
+httpx==0.28.1
+paramiko==3.5.1
+python-jose==3.4.0
+passlib==1.7.4
+bcrypt==4.3.0
+requests==2.32.3

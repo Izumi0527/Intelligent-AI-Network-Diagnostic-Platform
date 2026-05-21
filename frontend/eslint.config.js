@@ -184,6 +184,7 @@ export default [
       'coverage/**',
       '.vscode/**',
       '.idea/**',
+      '.vite/**',
       '*.d.ts'
     ]
   }

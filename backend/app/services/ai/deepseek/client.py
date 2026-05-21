@@ -61,10 +61,10 @@ class DeepseekClient:
         except Exception as e:
             logger.error(f"Deepseek连接检查失败: {str(e)}")
             return False
-    
-    async def generate_response(self, messages: List[Dict[str, str]], 
-                              model: str = "deepseek-chat", 
-                              stream: bool = False, 
+
+    async def generate_response(self, messages: List[Dict[str, str]],
+                              model: str = "deepseek-v4-pro",
+                              stream: bool = False,
                               **kwargs) -> Union[Dict[str, Any], AsyncGenerator[Dict[str, Any], None]]:
         """生成响应（兼容原接口）"""
         if not self.is_available():
@@ -116,9 +116,9 @@ class DeepseekClient:
                     yield {"error": event.data.get("error", "未知错误")}
         except Exception as e:
             yield {"error": str(e)}
-    
-    async def generate_response_stream(self, messages: List[Dict[str, str]], 
-                                     model: str = "deepseek-chat",
+
+    async def generate_response_stream(self, messages: List[Dict[str, str]],
+                                     model: str = "deepseek-v4-pro",
                                      **kwargs) -> AsyncGenerator[Dict[str, Any], None]:
         """流式响应生成（兼容原接口）"""
         async for chunk in await self.generate_response(messages, model, stream=True, **kwargs):

@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     
     # AI模型配置
     ANTHROPIC_API_KEY: str
-    CLAUDE_MODEL_VERSION: str = "claude-3.7-sonnet-20240229"
+    CLAUDE_MODEL_VERSION: str = "claude-opus-4-7"
     
     # 会话配置
     SESSION_IDLE_TIMEOUT: int = 600  # 10分钟超时
@@ -53,4 +53,4 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 # 创建全局可访问的设置实例
-settings = Settings() 
+settings = Settings()

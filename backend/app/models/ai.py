@@ -113,7 +113,7 @@ class ChatRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "model": "deepseek-chat",
+                "model": "deepseek-v4-pro",
                 "messages": [
                     {
                         "role": "user",
@@ -140,10 +140,10 @@ class ChatResponse(BaseModel):
             "example": {
                 "message": {
                     "role": "assistant",
-                    "content": "我是DeepSeek-V3-0324大语言模型。"
+                    "content": "我是DeepSeek-V4-Pro大语言模型。"
                 },
-                "model": "deepseek-chat",
-                "content": "我是DeepSeek-V3-0324大语言模型。",
+                "model": "deepseek-v4-pro",
+                "content": "我是DeepSeek-V4-Pro大语言模型。",
                 "finish_reason": "stop",
                 "usage": {
                     "prompt_tokens": 10,
@@ -177,4 +177,4 @@ class StreamEvent(BaseModel):
                     "content": "交换机端口状态显示up但无法正常通信"
                 }
             }
-        } 
+        }

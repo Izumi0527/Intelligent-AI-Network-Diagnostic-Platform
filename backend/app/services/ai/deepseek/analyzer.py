@@ -21,6 +21,7 @@ class NetworkLogAnalyzer:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = getattr(settings, 'DEEPSEEK_API_URL', 'https://api.deepseek.com/v1')
+        self.model_version = getattr(settings, 'DEEPSEEK_MODEL_VERSION', 'deepseek-v4-pro')
         self.timeout = getattr(settings, 'DEEPSEEK_TIMEOUT', 30)
         self.max_tokens = getattr(settings, 'DEEPSEEK_MAX_TOKENS', 4096)
         self.client = None
@@ -94,7 +95,7 @@ class NetworkLogAnalyzer:
             prompt = self.analysis_templates[analysis_type].format(log_content=log_content)
             
             payload = {
-                "model": "deepseek-chat",
+                "model": self.model_version,
                 "messages": [
                     {
                         "role": "system",
@@ -154,7 +155,7 @@ class NetworkLogAnalyzer:
             prompt = self.analysis_templates[analysis_type].format(log_content=log_content)
             
             payload = {
-                "model": "deepseek-chat",
+                "model": self.model_version,
                 "messages": [
                     {
                         "role": "system",

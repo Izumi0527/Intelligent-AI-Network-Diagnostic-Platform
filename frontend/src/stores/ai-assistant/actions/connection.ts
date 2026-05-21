@@ -84,7 +84,7 @@ export const createConnectionActions = (state: AIAssistantState) => ({
     if (state.availableModels.length === 0) {
       console.warn('没有可用模型，使用最小默认配置')
       state.availableModels = [
-        { label: 'DeepSeek-V3', value: 'deepseek-chat', available: true }
+        { label: 'DeepSeek-V4-Pro', value: 'deepseek-v4-pro', available: true }
       ]
     }
   }

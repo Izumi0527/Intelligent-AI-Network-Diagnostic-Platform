@@ -1,102 +1,187 @@
-﻿# AI智能网络故障分析平台 - 开发环境启动脚本
-# 生成时间: 2025-09-07 21:29
+# AI智能网络故障分析平台 - 开发环境统一启动脚本
+[CmdletBinding()]
+param(
+    [string]$BackendHost = "0.0.0.0",
+    [int]$BackendPort = 8000,
+    [string]$FrontendHost = "0.0.0.0",
+    [int]$FrontendPort = 5173,
+    [int]$BackendTimeoutSeconds = 90,
+    [switch]$SkipFrontendInstall
+)
 
-# 设置错误处理
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# 输出项目信息
-Write-Host "🚀 AI智能网络故障分析平台 - 开发环境启动" -ForegroundColor Green
-Write-Host "========================================"
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+$BackendPath = Join-Path $ProjectRoot "backend"
+$FrontendPath = Join-Path $ProjectRoot "frontend"
+$LogsPath = Join-Path $ProjectRoot "logs"
 
-# 检查必要目录
-if (!(Test-Path "logs")) {
-    Write-Host "❌ logs目录不存在，请先运行 scripts\setup.ps1" -ForegroundColor Red
-    exit 1
+function Write-Step {
+    param([string]$Message)
+    Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
-# 设置环境变量
-$env:APP_ENV = "development"
-$env:LOG_LEVEL = "DEBUG"
-
-# 启动后端服务
-Write-Host "📦 启动后端服务..."
-Set-Location backend
-
-# 检查虚拟环境
-$VenvPath = $null
-if (Test-Path ".venv") {
-    $VenvPath = ".venv"
-} elseif (Test-Path "venv") {
-    $VenvPath = "venv"
-    Write-Host "⚠️ 检测到旧版venv目录，建议重命名为.venv" -ForegroundColor Yellow
-} else {
-    Write-Host "❌ 未找到虚拟环境，请先创建虚拟环境" -ForegroundColor Red
-    exit 1
+function ConvertTo-PowerShellLiteral {
+    param([string]$Value)
+    return "'" + ($Value -replace "'", "''") + "'"
 }
 
-# 激活虚拟环境
-$ActivateScript = Join-Path $VenvPath "Scripts\activate.ps1"
-if (Test-Path $ActivateScript) {
-    & $ActivateScript
-} else {
-    Write-Host "❌ 无法找到虚拟环境激活脚本" -ForegroundColor Red
-    exit 1
+function Get-HealthHost {
+    param([string]$HostAddress)
+
+    if ($HostAddress -eq "0.0.0.0" -or $HostAddress -eq "::" -or $HostAddress -eq "[::]") {
+        return "127.0.0.1"
+    }
+
+    return $HostAddress
 }
 
-Write-Host "✅ 已激活虚拟环境: $VenvPath" -ForegroundColor Green
+function Ensure-Command {
+    param(
+        [string]$Name,
+        [string]$InstallHint
+    )
 
-# 启动后端（后台运行）
-Write-Host "🔄 启动FastAPI服务器..."
-$BackendProcess = Start-Process -FilePath "uv" -ArgumentList "run python run.py --reload" -RedirectStandardOutput "..\logs\backend_dev.log" -RedirectStandardError "..\logs\backend_dev.log" -PassThru -WindowStyle Hidden
-$BackendPID = $BackendProcess.Id
-Write-Host "✅ 后端服务已启动 (PID: $BackendPID)" -ForegroundColor Green
-
-# 启动前端服务
-Write-Host "📦 启动前端服务..."
-Set-Location ..\frontend
-
-# 检查依赖是否已安装
-if (!(Test-Path "node_modules")) {
-    Write-Host "📥 安装前端依赖..."
-    npm install
-}
-
-Write-Host "🔄 启动Vite开发服务器..."
-$FrontendProcess = Start-Process -FilePath "npm" -ArgumentList "run dev" -RedirectStandardOutput "..\logs\frontend_dev.log" -RedirectStandardError "..\logs\frontend_dev.log" -PassThru -WindowStyle Hidden
-$FrontendPID = $FrontendProcess.Id
-
-Write-Host "✅ 前端服务已启动 (PID: $FrontendPID)" -ForegroundColor Green
-Write-Host ""
-Write-Host "🎉 服务启动完成！" -ForegroundColor Green
-Write-Host "========================================"
-Write-Host "🌐 前端地址: http://localhost:5173" -ForegroundColor Cyan
-Write-Host "🔧 后端API: http://localhost:8000" -ForegroundColor Cyan  
-Write-Host "📚 API文档: http://localhost:8000/api/v1/docs" -ForegroundColor Cyan
-Write-Host "📋 日志位置: logs\backend_dev.log, logs\frontend_dev.log" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "💡 按 Ctrl+C 停止所有服务" -ForegroundColor Yellow
-
-# 创建停止函数
-function Stop-Services {
-    Write-Host ""
-    Write-Host "🔄 停止服务..."
-    try {
-        Stop-Process -Id $BackendPID -Force -ErrorAction SilentlyContinue
-        Stop-Process -Id $FrontendPID -Force -ErrorAction SilentlyContinue
-        Write-Host "✅ 所有服务已停止" -ForegroundColor Green
-    } catch {
-        Write-Host "⚠️ 停止服务时出现问题: $($_.Exception.Message)" -ForegroundColor Yellow
+    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        throw "缺少命令 $Name。$InstallHint"
     }
 }
 
-# 注册清理事件
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Stop-Services }
+function Ensure-ProjectLayout {
+    if (-not (Test-Path -LiteralPath $BackendPath)) {
+        throw "后端目录不存在: $BackendPath"
+    }
+
+    if (-not (Test-Path -LiteralPath $FrontendPath)) {
+        throw "前端目录不存在: $FrontendPath"
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $BackendPath ".env"))) {
+        throw "缺少 backend/.env，请先从 backend/.env.example 复制并填写配置。"
+    }
+
+    foreach ($dir in @("app", "access", "error", "backend", "frontend")) {
+        $path = Join-Path $LogsPath $dir
+        if (-not (Test-Path -LiteralPath $path)) {
+            New-Item -ItemType Directory -Path $path -Force | Out-Null
+        }
+    }
+}
+
+function Get-PowerShellExecutable {
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($pwsh) {
+        return $pwsh.Source
+    }
+
+    $powershell = Get-Command powershell -ErrorAction SilentlyContinue
+    if ($powershell) {
+        return $powershell.Source
+    }
+
+    throw "未找到 PowerShell 可执行文件。"
+}
+
+function Start-ManagedWindow {
+    param(
+        [ValidateSet("backend", "frontend")]
+        [string]$Role,
+        [string]$Title,
+        [string]$WorkingDirectory,
+        [string]$Command
+    )
+
+    $shell = Get-PowerShellExecutable
+    $titleLiteral = ConvertTo-PowerShellLiteral $Title
+    $workdirLiteral = ConvertTo-PowerShellLiteral $WorkingDirectory
+    $windowCommand = @"
+`$Host.UI.RawUI.WindowTitle = $titleLiteral
+Set-Location -LiteralPath $workdirLiteral
+$Command
+"@
+
+    Write-Step "弹出 $Role 窗口: $Title"
+    Start-Process -FilePath $shell -ArgumentList @("-NoExit", "-NoProfile", "-Command", $windowCommand) -WorkingDirectory $WorkingDirectory | Out-Null
+}
+
+function Wait-BackendReady {
+    param(
+        [string]$Url,
+        [int]$TimeoutSeconds
+    )
+
+    Write-Step "等待后端健康检查: $Url"
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastError = $null
+
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3
+            if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
+                Write-Host "后端已正常启动。" -ForegroundColor Green
+                return
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    throw "后端在 $TimeoutSeconds 秒内未通过健康检查。最后错误: $lastError"
+}
+
+function New-BackendCommand {
+    $hostLiteral = ConvertTo-PowerShellLiteral $BackendHost
+    return @"
+`$env:APP_ENV = 'development'
+`$env:LOG_LEVEL = 'DEBUG'
+`$env:PYTHONDONTWRITEBYTECODE = '1'
+Write-Host '后端开发服务启动中...' -ForegroundColor Green
+uv run python run.py --host $hostLiteral --port $BackendPort --reload
+"@
+}
+
+function New-FrontendCommand {
+    $hostLiteral = ConvertTo-PowerShellLiteral $FrontendHost
+    $installCommand = "if (-not (Test-Path -LiteralPath 'node_modules')) { Write-Host '未检测到 node_modules，正在安装前端依赖...' -ForegroundColor Yellow; npm install }"
+
+    if ($SkipFrontendInstall) {
+        $installCommand = "Write-Host '已跳过前端依赖自动安装。' -ForegroundColor Yellow"
+    }
+
+    return @"
+`$env:NODE_ENV = 'development'
+$installCommand
+`$vite = Join-Path (Get-Location) 'node_modules\.bin\vite.cmd'
+if (-not (Test-Path -LiteralPath `$vite)) { throw '未找到本地 Vite 可执行文件，请确认前端依赖安装成功。' }
+Write-Host '前端开发服务启动中...' -ForegroundColor Green
+& `$vite --host $hostLiteral --port $FrontendPort
+"@
+}
 
 try {
-    # 等待进程完成或用户中断
-    Write-Host "服务运行中... 按任意键停止服务" -ForegroundColor Yellow
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-} finally {
-    Stop-Services
-    Set-Location ..
+    Write-Host "AI智能网络故障分析平台 - 开发环境启动" -ForegroundColor Green
+    Write-Host "项目路径: $ProjectRoot"
+
+    Ensure-ProjectLayout
+    Ensure-Command -Name "uv" -InstallHint "请先安装 uv: https://github.com/astral-sh/uv"
+    Ensure-Command -Name "npm" -InstallHint "请先安装 Node.js 和 npm。"
+
+    $healthHost = Get-HealthHost $BackendHost
+    $healthUrl = "http://${healthHost}:$BackendPort/api/v1/health"
+
+    Start-ManagedWindow -Role "backend" -Title "AI Network Backend Dev :$BackendPort" -WorkingDirectory $BackendPath -Command (New-BackendCommand)
+    Wait-BackendReady -Url $healthUrl -TimeoutSeconds $BackendTimeoutSeconds
+    Start-ManagedWindow -Role "frontend" -Title "AI Network Frontend Dev :$FrontendPort" -WorkingDirectory $FrontendPath -Command (New-FrontendCommand)
+
+    Write-Host ""
+    Write-Host "开发环境启动流程已完成。" -ForegroundColor Green
+    Write-Host "后端: http://${healthHost}:$BackendPort"
+    Write-Host "前端: http://127.0.0.1:$FrontendPort"
+} catch {
+    Write-Host ""
+    Write-Host "启动失败: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }

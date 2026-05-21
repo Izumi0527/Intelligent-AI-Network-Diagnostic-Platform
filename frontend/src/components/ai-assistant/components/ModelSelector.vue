@@ -2,8 +2,11 @@
   <div class="flex items-center gap-3">
     <div class="flex-1">
       <select 
+        id="ai-model-selector"
+        name="aiModel"
         :value="selectedModel"
         @change="handleModelChange"
+        aria-label="模型选择"
         class="w-full rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-sm input-glow"
       >
         <option 
@@ -50,4 +53,3 @@ const handleModelChange = (event: Event) => {
   emit('model-change', target.value)
 }
 </script>
-

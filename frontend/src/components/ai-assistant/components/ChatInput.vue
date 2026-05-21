@@ -2,13 +2,17 @@
   <div class="p-4 border-t border-border/60 bg-transparent rounded-b-xl">
     <div class="flex gap-2 items-end">
       <div class="flex-1 relative">
+        <label for="chat-message-input" class="sr-only">输入消息</label>
         <textarea
+          id="chat-message-input"
+          name="message"
           ref="messageInput"
           v-model="message"
           :disabled="!!disabled"
           @keydown="handleKeyDown"
           @input="handleInput"
           placeholder="输入你的问题...(Shift+Enter 换行, Enter 发送)"
+          autocomplete="off"
           class="w-full resize-none rounded-lg border border-border/85 bg-background/50 px-3 py-2 text-sm min-h-[40px] max-h-[120px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 input-glow transition-colors placeholder:text-muted-foreground/60"
           :class="{ 
             'opacity-50 cursor-not-allowed': !!disabled,
@@ -35,6 +39,7 @@
         shimmer-color="rgba(255, 255, 255, 0.6)"
         border-radius="0.5rem"
         title="发送消息"
+        aria-label="发送消息"
         @click="handleSend"
       >
         <SendIcon class="w-4 h-4" />

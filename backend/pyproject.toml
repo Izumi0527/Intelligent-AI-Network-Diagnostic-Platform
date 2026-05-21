@@ -20,16 +20,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "pytest>=8.4.2",
-    "pytest-asyncio>=1.1.0",
-    "pytest-cov>=6.3.0",
-]
-
-# 修复hatchling构建配置
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
-
-dependencies = [
     "fastapi==0.115.12",
     "uvicorn==0.34.2",
     "pydantic==2.11.4",
@@ -45,6 +35,10 @@ dependencies = [
     "bcrypt==4.3.0",
     "requests==2.32.3",
 ]
+
+# 修复hatchling构建配置
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [project.optional-dependencies]
 dev = [
@@ -98,7 +92,7 @@ warn_unreachable = true
 strict_equality = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["../tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 addopts = "-v --cov=app --cov-report=term-missing --cov-report=html"

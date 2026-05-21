@@ -276,7 +276,7 @@ async def generate_text(
     max_tokens: int = Body(2048, description="最大生成令牌数"),
     temperature: float = Body(0.7, description="生成文本的随机性"),
     stream: bool = Body(False, description="是否使用流式响应"),
-    model: str = Body("deepseek-chat", description="使用的模型名称，可选: deepseek-reasoner 或 deepseek-chat"),
+    model: str = Body("deepseek-v4-pro", description="使用的模型名称，可选: deepseek-v4-pro 或 deepseek-v4-flash"),
     ai_manager: AIServiceManager = Depends(get_ai_service_manager)
 ):
     """使用AI Manager调用Deepseek生成文本"""
@@ -337,11 +337,11 @@ async def generate_text(
 async def analyze_network_log(
     log_content: str = Body(..., description="网络日志内容", embed=True),
     query: str = Body(..., description="用户查询", embed=True),
-    model: str = Body("deepseek-chat", description="使用的模型名称，可选: deepseek-reasoner 或 deepseek-chat"),
+    model: str = Body("deepseek-v4-pro", description="使用的模型名称，可选: deepseek-v4-pro 或 deepseek-v4-flash"),
     deepseek_service: DeepseekService = Depends(get_deepseek_service)
 ):
     """使用Deepseek分析网络日志"""
     return StreamingResponse(
         deepseek_service.analyze_network_log(log_content, query, model),
         media_type="text/event-stream"
-    ) 
+    )

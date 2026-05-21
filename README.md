@@ -147,17 +147,12 @@ backend/
 
 ```
 scripts/
-├── backend_dev.sh          # Linux/Mac专用后端启动脚本
-├── dev.sh                  # Linux/Mac完整开发环境启动脚本
-├── setup.sh                # Linux/Mac环境初始化脚本
-├── test.sh                 # Linux/Mac测试脚本
-├── build.sh                # Linux/Mac构建脚本
-├── prod.sh                 # Linux/Mac生产环境脚本
-├── lint.sh                 # Linux/Mac代码检查脚本
-├── start-backend.ps1       # Windows后端服务启动脚本 (推荐)
-├── venv-manager.ps1        # Windows虚拟环境管理脚本 (推荐)
-├── test-backend-logging.ps1 # Windows日志测试脚本
-└── *.ps1                   # 其他Windows PowerShell脚本
+├── dev.ps1                 # Windows开发环境统一启动脚本
+├── prod.ps1                # Windows生产环境统一启动脚本
+├── clean-python-cache.ps1  # Windows Python缓存清理脚本
+├── dev.sh                  # Linux/Mac开发环境统一启动脚本
+├── prod.sh                 # Linux/Mac生产环境统一启动脚本
+└── clean-python-cache.sh   # Linux/Mac Python缓存清理脚本
 ```
 
 ### 日志目录结构
@@ -193,9 +188,9 @@ logs/
 
 ### AI智能分析系统
 - **多模型智能分析**：支持多种大型语言模型：
-  - **Claude (Anthropic)**：Claude Sonnet 4系列，世界最佳编程模型
-  - **GPT (OpenAI)**：GPT-5等最新模型
-  - **Deepseek**：DeepSeek-V3.1-Terminus系列，深度对话和推理模型
+  - **Claude (Anthropic)**：Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5 系列
+  - **GPT (OpenAI)**：GPT-5.5 与 GPT-5.4 Mini 等先进模型
+  - **DeepSeek**：DeepSeek-V4-Pro / V4-Flash 系列，支持推理和高性价比分析
 - **专业网络分析**：网络日志和配置智能解析，故障模式识别
 - **解决方案推荐**：基于专业网络知识的上下文理解和问题解决
 - **模型状态监控**：实时检测各AI模型连接状态
@@ -254,9 +249,9 @@ logs/
   - Paramiko 3.5.1+ (SSH连接库)
   - Netmiko 4.5.0+ (网络设备连接库)
 - **AI集成**：
-  - Anthropic API (Claude Sonnet 4 系列)
-  - OpenAI API (GPT-5 等最新模型)
-  - Deepseek API (DeepSeek-V3.1-Terminus 系列)
+  - Anthropic API (Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5 系列)
+  - OpenAI API (GPT-5.5 / GPT-5.4 Mini 等先进模型)
+  - DeepSeek API (DeepSeek-V4-Pro / V4-Flash 系列)
 - **异步处理**：
   - aiohttp 3.11.18+ (异步HTTP客户端)
   - sse-starlette 1.6.5+ (服务器发送事件)
@@ -295,57 +290,36 @@ logs/
 
 ## 快速开始
 
-### Windows PowerShell 部署（推荐）
+### Windows PowerShell 启动（推荐）
 
-Windows用户推荐使用专用的PowerShell脚本来管理虚拟环境和启动服务：
-
-#### 1. 虚拟环境管理
-
-```powershell
-# 查看虚拟环境状态
-.\scripts\venv-manager.ps1 info
-
-# 创建虚拟环境
-.\scripts\venv-manager.ps1 create
-
-# 安装项目依赖
-.\scripts\venv-manager.ps1 install
-
-# 更新已安装的包
-.\scripts\venv-manager.ps1 update
-
-# 激活虚拟环境（显示激活命令）
-.\scripts\venv-manager.ps1 activate
-
-# 删除虚拟环境（需要-Force确认）
-.\scripts\venv-manager.ps1 clean -Force
-```
-
-#### 2. 后端服务启动
+Windows 用户只需要使用两个统一入口。脚本会先弹出后端窗口，
+等待 `/api/v1/health` 健康检查通过后，再弹出前端窗口。
 
 ```powershell
-# 基本启动（默认端口8000）
-.\scripts\start-backend.ps1
+# 开发环境：后端热重载 + 前端 Vite dev server
+.\scripts\dev.ps1
 
-# 自定义端口和主机地址
-.\scripts\start-backend.ps1 -Port 8080 -HostAddress "127.0.0.1"
+# 自定义端口
+.\scripts\dev.ps1 -BackendPort 8080 -FrontendPort 5174
 
-# 关闭热重载模式
-.\scripts\start-backend.ps1 -NoReload
+# 生产环境：后端非热重载 + 前端 preview
+.\scripts\prod.ps1
 
-# 启用调试模式（LOG_LEVEL=DEBUG）
-.\scripts\start-backend.ps1 -Debug
+# 生产环境强制重新构建前端资源
+.\scripts\prod.ps1 -RebuildFrontend
 
-# 组合参数使用
-.\scripts\start-backend.ps1 -Port 9000 -Debug -HostAddress "0.0.0.0"
+# 清理已有 Python 字节码缓存
+.\scripts\clean-python-cache.ps1
 ```
 
-#### PowerShell 特性说明
+#### PowerShell 启动脚本特性
 
-**智能检查**：自动检测虚拟环境、依赖、配置文件状态
-**彩色输出**：使用不同颜色区分信息级别，提升使用体验
-**错误诊断**：提供详细的故障排查建议和解决方案
-**UTF-8支持**：完美支持中文字符显示，无乱码问题
+- **顺序启动**：后端窗口启动并通过健康检查后，才启动前端窗口
+- **路径稳定**：脚本基于自身位置定位项目根目录，可从任意目录调用
+- **基础检查**：自动检查 `backend/.env`、`uv`、`npm` 和日志目录
+- **依赖兜底**：前端缺少 `node_modules` 时会在前端窗口内自动安装依赖
+- **缓存控制**：后端启动窗口会设置 `PYTHONDONTWRITEBYTECODE=1`，避免生成
+  `__pycache__` 目录和 `.pyc/.pyo` 文件
 
 ### 后端部署（推荐 uv 工具）
 
@@ -380,15 +354,12 @@ uv run python -c "import fastapi, uvicorn, pydantic; print('核心依赖已安�
 cp .env.example .env
 # 编辑.env文件，设置API密钥等
 
-# 6. 启动服务器（推荐方式）
-# 使用专用的后端启动脚本
-./scripts/backend_dev.sh
-
-# 或使用完整开发环境脚本
+# 6. 回到项目根目录，使用统一启动脚本
+cd ..
 ./scripts/dev.sh
 
-# 或手动启动（确保使用 uv run）
-uv run python run.py --reload
+# 生产环境启动
+./scripts/prod.sh
 ```
 
 #### Linux/Mac 传统部署方式
@@ -489,41 +460,25 @@ npm run build
 
 ### Windows PowerShell 脚本故障排除
 
-Windows用户推荐使用PowerShell脚本来解决常见问题：
+Windows 用户统一使用 `dev.ps1` 和 `prod.ps1`。两个脚本都会先启动后端
+窗口，并在健康检查通过后启动前端窗口。
 
-#### 虚拟环境相关问题
-
-```powershell
-# 检查虚拟环境状态
-.\scripts\venv-manager.ps1 info
-
-# 重新创建虚拟环境（如果有问题）
-.\scripts\venv-manager.ps1 clean -Force
-.\scripts\venv-manager.ps1 create
-
-# 重新安装依赖
-.\scripts\venv-manager.ps1 install
-
-# 更新所有包到最新版本
-.\scripts\venv-manager.ps1 update
-```
-
-#### 后端启动问题
+#### 启动问题
 
 ```powershell
-# 基本诊断 - 脚本会自动检查环境
-.\scripts\start-backend.ps1
+# 开发环境基本诊断
+.\scripts\dev.ps1
 
 # 如果遇到端口占用问题
-.\scripts\start-backend.ps1 -Port 8080
+.\scripts\dev.ps1 -BackendPort 8080 -FrontendPort 5174
 
-# 使用不同的监听地址
-.\scripts\start-backend.ps1 -HostAddress "127.0.0.1"
+# 生产环境基本诊断
+.\scripts\prod.ps1
 
-# 启用调试模式获取更多日志信息
-.\scripts\start-backend.ps1 -Debug
+# 生产环境强制重新构建前端资源
+.\scripts\prod.ps1 -RebuildFrontend
 
-# 检查PowerShell执行策略
+# 检查 PowerShell 执行策略
 Get-ExecutionPolicy
 # 如果受限，临时允许脚本执行
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
@@ -534,7 +489,7 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 如果遇到 **ExecutionPolicy** 错误：
 ```powershell
 # 方案1：临时绕过执行策略
-powershell -ExecutionPolicy Bypass -File ".\scripts\start-backend.ps1"
+powershell -ExecutionPolicy Bypass -File ".\scripts\dev.ps1"
 
 # 方案2：为当前用户设置执行策略
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
@@ -586,18 +541,23 @@ uv pip install fastapi uvicorn pydantic pydantic-settings sse-starlette netmiko 
 chmod +x scripts/*.sh
 
 # 使用正确的脚本启动
-./scripts/backend_dev.sh  # 后端专用脚本
-./scripts/dev.sh          # 完整开发环境脚本
+./scripts/dev.sh          # 开发环境
+./scripts/prod.sh         # 生产环境
+
+# 清理已有 Python 字节码缓存
+./scripts/clean-python-cache.sh
 ```
 
 **重要提示**：
 - 项目已配置日志输出到 `logs/backend/backend-YYYY-MM-DD.log` 文件（按日期自动归档）
-- **Windows用户推荐使用PowerShell脚本**：
-  - 虚拟环境管理：`.\scripts\venv-manager.ps1`
-  - 后端服务启动：`.\scripts\start-backend.ps1`
-- **Linux/Mac用户推荐使用Shell脚本**：
-  - 后端专用脚本：`./scripts/backend_dev.sh`
-  - 完整开发环境脚本：`./scripts/dev.sh`
+- **Windows 用户推荐使用 PowerShell 脚本**：
+  - 开发环境：`.\scripts\dev.ps1`
+  - 生产环境：`.\scripts\prod.ps1`
+- **Linux/Mac 用户推荐使用 Shell 脚本**：
+  - 开发环境：`./scripts/dev.sh`
+  - 生产环境：`./scripts/prod.sh`
+- 统一启动脚本会禁用 Python 字节码缓存写入；已有缓存可通过
+  `.\scripts\clean-python-cache.ps1` 或 `./scripts/clean-python-cache.sh` 清理
 - 确保使用 `uv run` 命令或激活虚拟环境后启动
 
 如果遇到 **中文字符乱码**：

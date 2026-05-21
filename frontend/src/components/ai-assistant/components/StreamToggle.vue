@@ -1,9 +1,13 @@
 <template>
   <div class="flex items-center justify-between">
-    <span class="text-sm text-foreground/70">流式响应</span>
+    <span id="stream-toggle-label" class="text-sm text-foreground/70">流式响应</span>
     <button 
       class="relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none"
       :class="enabled ? 'bg-primary shadow-glow-sm' : 'bg-muted/70'"
+      type="button"
+      role="switch"
+      :aria-checked="enabled"
+      aria-labelledby="stream-toggle-label"
       @click="$emit('toggle')"
     >
       <span

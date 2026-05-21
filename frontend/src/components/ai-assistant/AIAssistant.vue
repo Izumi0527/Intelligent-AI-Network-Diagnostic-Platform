@@ -24,8 +24,10 @@
     <div class="mb-4">
       <div class="flex flex-col lg:flex-row lg:items-start lg:gap-6 space-y-3 lg:space-y-0">
         <div class="flex-1 space-y-2">
-          <label class="text-sm font-medium text-foreground/80">模型选择</label>
+          <label for="ai-model-select" class="text-sm font-medium text-foreground/80">模型选择</label>
           <select
+            id="ai-model-select"
+            name="aiModel"
             class="w-full ai-input text-sm focus:outline-none transition-all duration-200"
             :value="selectedModel"
             @change="handleModelChange"
@@ -55,11 +57,14 @@
           </div>
 
           <div class="flex items-center gap-3">
-            <label class="text-sm font-medium text-foreground/80 whitespace-nowrap">流式响应</label>
+            <span id="streaming-toggle-label" class="text-sm font-medium text-foreground/80 whitespace-nowrap">流式响应</span>
             <button
               class="relative inline-flex h-8 w-14 items-center rounded-full transition-all duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
               :style="{ backgroundColor: store.streamingEnabled ? '#007AFF' : '#E5E5E7' }"
               type="button"
+              role="switch"
+              :aria-checked="store.streamingEnabled"
+              aria-labelledby="streaming-toggle-label"
               @click="toggleStreamingMode"
             >
               <span
@@ -88,10 +93,14 @@
     <div class="border-t border-border/60 pt-4 mt-5">
       <div class="space-y-2">
         <div class="flex items-end gap-3">
+          <label for="ai-message-input" class="sr-only">输入消息</label>
           <textarea
+            id="ai-message-input"
+            name="message"
             v-model="messageInput"
             class="ai-input flex-1 min-h-[32px] max-h-[120px] overflow-y-auto resize-none focus:outline-none"
             placeholder="输入消息..."
+            autocomplete="off"
             :disabled="store.isLoading || store.isAIResponding"
             @keydown.enter.exact.prevent="() => handleSendMessage()"
             @keydown.ctrl.enter="insertNewline"
@@ -100,6 +109,7 @@
           <button
             class="flex-shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl text-blue-600 dark:text-blue-200 hover:text-blue-700 dark:hover:text-blue-100 disabled:opacity-40 disabled:cursor-not-allowed transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/70 bg-blue-50 dark:bg-blue-500/20 shadow-glow-sm p-0"
             type="button"
+            aria-label="发送消息"
             :disabled="store.isLoading || store.isAIResponding || !messageInput.trim()"
             @click="() => handleSendMessage()"
           >

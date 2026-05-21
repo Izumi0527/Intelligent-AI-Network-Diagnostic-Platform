@@ -10,6 +10,21 @@ import os
 from app.config.settings import settings
 
 
+STANDARD_LOG_FORMAT = (
+    "%(asctime)s - %(name)s - %(levelname)s - "
+    "%(funcName)s:%(lineno)d - %(message)s"
+)
+STANDARD_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+RESET_COLOR = "\033[0m"
+LEVEL_COLORS = {
+    "DEBUG": "\033[36m",
+    "INFO": "\033[32m",
+    "WARNING": "\033[33m",
+    "ERROR": "\033[31m",
+    "CRITICAL": "\033[35m",
+}
+
+
 class LoggerManager:
     """日志管理器 - 统一管理所有日志配置"""
     
@@ -62,13 +77,18 @@ class LoggerManager:
         # 防止日志传播到父logger，避免重复输出
         logger.propagate = False
 
-        # 日志格式
+        # 文件日志始终保持纯文本/JSON，控制台标准日志额外突出级别颜色。
         if settings.LOG_FORMAT.lower() == "json":
             formatter = JsonFormatter()
+            console_formatter = formatter
         else:
             formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S"
+                STANDARD_LOG_FORMAT,
+                datefmt=STANDARD_DATE_FORMAT
+            )
+            console_formatter = ColoredConsoleFormatter(
+                STANDARD_LOG_FORMAT,
+                datefmt=STANDARD_DATE_FORMAT
             )
 
         # 文件日志处理器
@@ -87,7 +107,7 @@ class LoggerManager:
         # 控制台日志处理器
         if log_to_console:
             console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setFormatter(formatter)
+            console_handler.setFormatter(console_formatter)
             console_handler.setLevel(getattr(logging, level.upper()))
             logger.addHandler(console_handler)
 
@@ -199,6 +219,22 @@ class JsonFormatter(logging.Formatter):
             log_data.update(record.extra)
         
         return json.dumps(log_data, ensure_ascii=False)
+
+
+class ColoredConsoleFormatter(logging.Formatter):
+    """控制台日志格式化器：仅为终端输出的日志级别添加颜色。"""
+
+    def format(self, record: logging.LogRecord) -> str:
+        original_levelname = record.levelname
+        color = LEVEL_COLORS.get(original_levelname)
+
+        if color:
+            record.levelname = f"{color}{original_levelname}{RESET_COLOR}"
+
+        try:
+            return super().format(record)
+        finally:
+            record.levelname = original_levelname
 
 
 # 全局日志管理器实例

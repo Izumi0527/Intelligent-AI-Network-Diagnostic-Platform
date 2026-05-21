@@ -5,8 +5,10 @@
       <form @submit.prevent="handleConnect" class="grid grid-cols-6 gap-4">
         <!-- 1. 连接方式下拉框 -->
         <div>
-          <label class="text-sm font-medium mb-1 block text-gray-400">连接方式</label>
+          <label for="terminal-connection-type" class="text-sm font-medium mb-1 block text-gray-400">连接方式</label>
           <select
+            id="terminal-connection-type"
+            name="connectionType"
             v-model="store.connectionType"
             class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50"
           >
@@ -17,42 +19,58 @@
 
         <!-- 2. 设备地址输入框 -->
         <div>
-          <label class="text-sm font-medium mb-1 block text-gray-400">设备地址</label>
+          <label for="terminal-device-address" class="text-sm font-medium mb-1 block text-gray-400">设备地址</label>
           <input
+            id="terminal-device-address"
+            name="deviceAddress"
             v-model="store.deviceAddress"
             class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50 focus:border-primary"
             placeholder="192.168.20.1"
+            type="text"
+            autocomplete="off"
           />
         </div>
 
         <!-- 3. 端口输入框 -->
         <div>
-          <label class="text-sm font-medium mb-1 block text-gray-400">端口</label>
+          <label for="terminal-port" class="text-sm font-medium mb-1 block text-gray-400">端口</label>
           <input
+            id="terminal-port"
+            name="port"
             v-model="store.port"
             class="w-20 rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50 focus:border-primary"
             :placeholder="store.connectionType === 'ssh' ? '22' : '23'"
+            type="number"
+            inputmode="numeric"
+            autocomplete="off"
           />
         </div>
 
         <!-- 4. 用户名输入框 -->
         <div>
-          <label class="text-sm font-medium mb-1 block text-gray-400">用户名</label>
+          <label for="terminal-username" class="text-sm font-medium mb-1 block text-gray-400">用户名</label>
           <input
+            id="terminal-username"
+            name="username"
             v-model="store.username"
             class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50 focus:border-primary"
             placeholder="admin"
+            type="text"
+            autocomplete="username"
           />
         </div>
 
         <!-- 5. 密码输入框 -->
         <div>
-          <label class="text-sm font-medium mb-1 block text-gray-400">密码</label>
+          <label for="terminal-password" class="text-sm font-medium mb-1 block text-gray-400">密码</label>
           <input
+            id="terminal-password"
+            name="password"
             v-model="store.password"
             class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50 focus:border-primary"
             type="password"
             placeholder="••••••••"
+            autocomplete="current-password"
           />
         </div>
 
@@ -133,10 +151,15 @@
     <div class="border-t border-border bg-terminal/90 backdrop-blur-md p-4">
       <div class="flex gap-2 items-center">
         <span class="terminal-prompt font-mono font-semibold">{{ devicePrompt }}</span>
+        <label for="terminal-command" class="sr-only">终端命令</label>
         <input
+          id="terminal-command"
+          name="command"
           v-model="command"
           class="flex-1 rounded-lg border border-border bg-terminal/70 terminal-text px-3 py-2 text-sm font-mono input-glow focus:border-primary backdrop-blur-sm transition-all duration-200"
           placeholder="输入命令..."
+          type="text"
+          autocomplete="off"
           @keydown.enter="handleExecuteCommand"
           @keyup.up="handlePreviousCommand"
           @keyup.down="handleNextCommand"
@@ -319,4 +342,4 @@ const handleCancelConnect = async () => {
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
   box-shadow: 0 18px 34px -18px rgba(59, 130, 246, 0.55);
 }
-</style> 
+</style>

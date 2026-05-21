@@ -169,7 +169,11 @@ class ModelConfigParser:
     @staticmethod
     def _get_deepseek_features(model_id: str) -> List[str]:
         """根据模型ID获取Deepseek模型特性"""
-        if 'reasoner' in model_id:
+        if 'v4-pro' in model_id:
+            return ["旗舰推理", "智能体任务", "复杂网络诊断", "长上下文", "代码生成"]
+        elif 'v4-flash' in model_id:
+            return ["快速响应", "高性价比", "日志分析", "对话交互", "网络诊断"]
+        elif 'reasoner' in model_id:
             return ["深度推理", "逻辑分析", "问题求解", "数学计算", "代码生成"]
         else:
             return ["对话交互", "文本生成", "推理分析", "网络诊断"]
@@ -177,7 +181,11 @@ class ModelConfigParser:
     @staticmethod
     def _get_openai_features(model_id: str) -> List[str]:
         """根据模型ID获取OpenAI模型特性"""
-        if 'gpt-5' in model_id:
+        if 'gpt-5.5' in model_id:
+            return ["最新旗舰", "复杂推理", "代码生成", "智能体任务", "长上下文", "多模态"]
+        elif 'gpt-5.4' in model_id:
+            return ["先进推理", "快速响应", "代码生成", "智能体任务", "成本优化"]
+        elif 'gpt-5' in model_id:
             return ["最智能AI", "内置思维链", "专家级智能", "多模态", "推理分析", "代码生成"]
         elif 'gpt-4.1' in model_id:
             return ["超大上下文", "指令优化", "代码生成", "推理分析", "长文档处理"]
@@ -221,18 +229,18 @@ class ModelConfigParser:
         """获取默认的OpenAI模型配置"""
         return [
             AIModel(
-                value="gpt-4",
-                label="GPT-4",
-                description="最新的GPT-4模型，具有强大的推理能力",
-                features=["文本生成", "代码生成", "推理分析"],
-                max_tokens=8192
+                value="gpt-5.5",
+                label="GPT-5.5",
+                description="OpenAI最新旗舰模型，适合复杂推理、代码和智能体任务",
+                features=["最新旗舰", "复杂推理", "代码生成", "智能体任务", "长上下文", "多模态"],
+                max_tokens=1050000
             ),
             AIModel(
-                value="gpt-3.5-turbo",
-                label="GPT-3.5 Turbo",
-                description="快速且经济的GPT-3.5模型",
-                features=["文本生成", "对话交互"],
-                max_tokens=4096
+                value="gpt-5.4-mini",
+                label="GPT-5.4 Mini",
+                description="高性价比先进模型，适合快速推理和日常分析",
+                features=["先进推理", "快速响应", "代码生成", "智能体任务", "成本优化"],
+                max_tokens=400000
             )
         ]
     
@@ -241,17 +249,24 @@ class ModelConfigParser:
         """获取默认的Claude模型配置"""
         return [
             AIModel(
-                value="claude-3-sonnet-20240229",
-                label="Claude 3 Sonnet",
-                description="平衡性能和速度的Claude 3模型",
-                features=["文本生成", "代码生成", "分析推理"],
-                max_tokens=200000
+                value="claude-opus-4-7",
+                label="Claude Opus 4.7",
+                description="Anthropic最强旗舰模型，适合复杂推理和长时间编码任务",
+                features=["世界级编程", "持续性能", "长时间任务", "复杂推理", "代码生成"],
+                max_tokens=1000000
             ),
             AIModel(
-                value="claude-3-haiku-20240307",
-                label="Claude 3 Haiku",
-                description="快速且轻量的Claude 3模型",
-                features=["快速响应", "文本生成"],
+                value="claude-sonnet-4-6",
+                label="Claude Sonnet 4.6",
+                description="高性能通用模型，适合代码、分析和智能体任务",
+                features=["编程专家", "超大上下文", "成本优化", "推理分析", "代码生成"],
+                max_tokens=1000000
+            ),
+            AIModel(
+                value="claude-haiku-4-5",
+                label="Claude Haiku 4.5",
+                description="快速轻量模型，适合低延迟对话和批量处理",
+                features=["高性能", "快速响应", "轻量级", "文本生成", "成本优化"],
                 max_tokens=200000
             )
         ]
@@ -261,18 +276,18 @@ class ModelConfigParser:
         """获取默认的Deepseek模型配置"""
         return [
             AIModel(
-                value="deepseek-chat",
-                label="DeepSeek-V3.1-Terminus",
-                description="深度对话模型",
-                features=["对话交互", "文本生成", "推理分析", "网络诊断"],
-                max_tokens=128000
+                value="deepseek-v4-pro",
+                label="DeepSeek-V4-Pro",
+                description="DeepSeek最新旗舰模型，默认启用推理模式，适合复杂网络诊断",
+                features=["旗舰推理", "智能体任务", "复杂网络诊断", "长上下文", "代码生成"],
+                max_tokens=1000000
             ),
             AIModel(
-                value="deepseek-reasoner",
-                label="DeepSeek-V3.1-Terminus-Think",
-                description="深度推理模型",
-                features=["深度推理", "逻辑分析", "问题求解", "数学计算", "代码生成"],
-                max_tokens=128000
+                value="deepseek-v4-flash",
+                label="DeepSeek-V4-Flash",
+                description="DeepSeek快速高性价比模型，适合常规对话和日志分析",
+                features=["快速响应", "高性价比", "日志分析", "对话交互", "网络诊断"],
+                max_tokens=1000000
             )
         ]
 

@@ -23,11 +23,11 @@ class DeepseekService:
         # 保持原有属性以兼容现有代码
         self.api_key = settings.DEEPSEEK_API_KEY
         self.api_url = getattr(settings, 'DEEPSEEK_API_URL', 'https://api.deepseek.com/v1')
-        self.model_version = getattr(settings, 'DEEPSEEK_MODEL_VERSION', 'deepseek-chat')
+        self.model_version = getattr(settings, 'DEEPSEEK_MODEL_VERSION', 'deepseek-v4-pro')
         self.timeout = getattr(settings, 'DEEPSEEK_TIMEOUT', 30)
         self.max_tokens = getattr(settings, 'DEEPSEEK_MAX_TOKENS', 4096)
         self.enabled = getattr(settings, 'DEEPSEEK_API_ENABLED', True)
-        self.available_models = ["deepseek-reasoner", "deepseek-chat"]
+        self.available_models = ["deepseek-v4-pro", "deepseek-v4-flash"]
         
         logger.info(f"Deepseek服务初始化完成（重构版）: API URL={self.api_url}, 启用状态={self.enabled}")
     
@@ -57,14 +57,14 @@ class DeepseekService:
         return result
     
     async def generate_response(self, messages: List[Dict[str, str]], 
-                              model: str = "deepseek-chat",
+                              model: str = "deepseek-v4-pro",
                               stream: bool = False,
                               **kwargs) -> Union[Dict[str, Any], AsyncGenerator[Dict[str, Any], None]]:
         """生成响应 - 兼容原接口"""
         return await self.client.generate_response(messages, model, stream, **kwargs)
     
     async def generate_response_stream(self, messages: List[Dict[str, str]],
-                                     model: str = "deepseek-chat",
+                                     model: str = "deepseek-v4-pro",
                                      **kwargs) -> AsyncGenerator[Dict[str, Any], None]:
         """流式响应生成 - 兼容原接口"""
         async for chunk in self.client.generate_response_stream(messages, model, **kwargs):
@@ -72,7 +72,7 @@ class DeepseekService:
     
     async def analyze_network_log(self, log_content: str,
                                 query: Optional[str] = None,
-                                model: str = "deepseek-chat") -> AsyncGenerator[Dict[str, Any], None]:
+                                model: str = "deepseek-v4-pro") -> AsyncGenerator[Dict[str, Any], None]:
         """分析网络日志 - 兼容原接口，支持流式响应"""
         # 如果有query参数，使用它作为分析类型；否则使用默认的error_analysis
         analysis_type = query if query else "error_analysis"
@@ -122,7 +122,7 @@ class DeepseekService:
                 return model
         return None
     
-    async def test_model(self, model_id: str = "deepseek-chat") -> Dict[str, Any]:
+    async def test_model(self, model_id: str = "deepseek-v4-pro") -> Dict[str, Any]:
         """测试模型 - 扩展接口"""
         try:
             test_messages = [{"role": "user", "content": "Hello"}]

@@ -75,9 +75,13 @@ class DeepseekProvider(AIProviderBase):
             
             await self.initialize()
             
-            # 发送测试请求
+            available_models = self.get_available_models()
+            if not available_models:
+                return False, "未配置可用的Deepseek模型"
+
+            # 使用配置中的首个模型做连通性检查，避免旧模型别名退役后误报失败。
             test_payload = {
-                "model": "deepseek-chat",
+                "model": available_models[0].value,
                 "messages": [{"role": "user", "content": "Hello"}],
                 "max_tokens": 10
             }

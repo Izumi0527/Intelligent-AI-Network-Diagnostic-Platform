@@ -5,7 +5,7 @@ Telnet连接管理器
 
 import asyncio
 import time
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple
 import uuid
 
 from app.core.network.base import DeviceType, ConnectionStatus
@@ -130,11 +130,10 @@ class TelnetManager:
             result[session_id] = info
         return result
     
-    async def cleanup_idle_sessions(self, idle_timeout: int = 7200) -> Dict[str, Any]:
+    async def cleanup_idle_sessions(self, idle_timeout: int = 7200) -> int:
         """清理空闲会话"""
         current_time = time.time()
         cleanup_count = 0
-        cleaned_sessions = []
         
         # 找出需要清理的会话
         sessions_to_cleanup = []
@@ -149,19 +148,13 @@ class TelnetManager:
             try:
                 await self._cleanup_session(session_id)
                 cleanup_count += 1
-                cleaned_sessions.append(session_id)
             except Exception as e:
                 logger.error(f"清理会话 {session_id} 失败: {str(e)}")
         
         if cleanup_count > 0:
             logger.info(f"清理了 {cleanup_count} 个空闲或断开的会话")
         
-        return {
-            "cleaned_count": cleanup_count,
-            "cleaned_sessions": cleaned_sessions,
-            "message": f"清理了 {cleanup_count} 个会话",
-            "remaining_sessions": len(self.sessions)
-        }
+        return cleanup_count
     
     async def _cleanup_session(self, session_id: str):
         """清理单个会话"""

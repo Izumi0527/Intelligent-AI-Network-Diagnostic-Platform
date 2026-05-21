@@ -49,38 +49,13 @@ class HuaweiTelnetConnection(TelnetConnection):
             # 创建Telnet客户端
             self.client = telnetlib.Telnet()
             self.client.sock = sock
-            
-            # 华为设备特有的初始化序列
-            initial_data = self.client.read_until(b"Username:", 10)
-            if b"Username:" not in initial_data:
-                # 尝试其他提示符
-                self.client.write(b"\r\n")
-                initial_data = self.client.read_until(b":", 10)
-            
-            if b"Username:" in initial_data or b"Login:" in initial_data:
-                # 发送用户名
-                self.client.write(self.username.encode('ascii') + b"\r\n")
-                
-                # 等待密码提示
-                password_prompt = self.client.read_until(b"Password:", 10)
-                if b"Password:" in password_prompt:
-                    # 发送密码
-                    self.client.write(self.password.encode('ascii') + b"\r\n")
-                    
-                    # 等待登录成功
-                    welcome_response = self.client.read_until(b">", 10)
-                    
-                    if b">" in welcome_response or b"#" in welcome_response:
-                        logger.info("华为设备登录成功")
-                        
-                        # 进入系统视图（如果需要）
-                        self._enter_system_view()
-                        
-                        return True, "华为设备连接成功"
-                    else:
-                        return False, "登录失败，用户名或密码错误"
-            
-            return False, "未检测到正确的登录提示符"
+
+            success, message = self._perform_login(line_ending=b"\r\n")
+            if success:
+                logger.info("华为设备登录成功")
+                return True, "华为设备连接成功"
+
+            return False, message
             
         except socket.timeout:
             return False, "华为设备连接超时"

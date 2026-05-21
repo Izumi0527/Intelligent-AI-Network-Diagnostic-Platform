@@ -1,4 +1,4 @@
-import axios, { AxiosResponse } from 'axios';
+import axios, { AxiosHeaders, AxiosResponse } from 'axios';
 import type { ChatMessage, FormattedMessage, MessageHistoryItem } from '@/types';
 import type { ApiError } from '@/types/chat';
 import { extractErrorMessage, isApiError } from './helpers';
@@ -6,6 +6,19 @@ import { extractErrorMessage, isApiError } from './helpers';
 const api = axios.create({
     baseURL: '/api',
     timeout: 60000,
+});
+
+const internalApiToken = import.meta.env.VITE_INTERNAL_API_TOKEN as string | undefined;
+
+api.interceptors.request.use((config) => {
+    if (!internalApiToken) {
+        return config;
+    }
+
+    config.headers = AxiosHeaders.from(config.headers);
+    config.headers.set('Authorization', `Bearer ${internalApiToken}`);
+
+    return config;
 });
 
 interface SendMessageParams {
@@ -412,4 +425,4 @@ export const aiService = {
 
         throw lastError;
     }
-}; 
+};

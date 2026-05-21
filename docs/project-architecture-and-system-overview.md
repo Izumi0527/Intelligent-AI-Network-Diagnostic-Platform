@@ -508,7 +508,7 @@ DeepSeek 专项服务包括：
 - 支持 Shell 失效后的重连尝试。
 - 会对会话中的设备密码进行内存级加密封装。
 
-项目中还存在 `backend/app/core/ssh_with_pagination.py`，属于另一套 SSH 分页处理实现。当前主要终端路径使用 `ssh.py` 中的实现。
+SSH 分页能力已统一由 `backend/app/core/ssh.py` 提供，不再保留独立的历史分页实现文件。
 
 ### 7.6 TelnetManager
 

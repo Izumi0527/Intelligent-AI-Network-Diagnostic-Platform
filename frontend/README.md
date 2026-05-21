@@ -108,6 +108,7 @@ yarn build
 平台支持通过环境变量进行配置：
 
 - `VITE_API_BASE_URL`：后端API基础URL
+- `VITE_INTERNAL_API_TOKEN`：内部 API Token，需与后端 `INTERNAL_API_TOKEN` 保持一致
 - `VITE_DEFAULT_THEME`：默认主题（light或dark）
 - `VITE_DEFAULT_AI_MODEL`：默认AI模型
 

@@ -108,7 +108,6 @@ backend/
 │   │   │   └── __init__.py
 │   │   ├── telnet.py          # Telnet兼容性适配器
 │   │   ├── ssh.py             # SSH连接实现
-│   │   ├── ssh_with_pagination.py # SSH分页支持
 │   │   └── terminal.py        # 终端管理核心
 │   ├── services/               # 业务服务层
 │   │   ├── ai/                # AI服务模块
@@ -619,7 +618,7 @@ npm run typecheck
 ### 后端核心模块
 
 - **telnet.py**: 针对网络设备的高级Telnet实现，包含特定设备类型的优化（如华为设备专用连接方法）
-- **ssh.py/ssh_with_pagination.py**: SSH连接的实现，支持分页显示和命令执行
+- **ssh.py**: SSH连接的实现，支持分页显示、命令执行和主机密钥策略配置
 - **ai_service.py**: 集成多种AI模型的服务实现，支持Claude、GPT和自定义模型
 - **deepseek_service.py**: 专门针对Deepseek AI的服务实现，提供网络日志分析等高级功能
 - **network_service.py**: 网络设备连接和命令执行的服务层实现

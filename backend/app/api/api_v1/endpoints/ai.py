@@ -14,7 +14,12 @@ from app.models.ai import (
 )
 from app.services.ai.manager import AIServiceManager
 from app.services.deepseek_service import DeepseekService
-from app.api.deps import get_ai_service_manager, get_deepseek_service
+from app.api.deps import (
+    get_ai_service_manager,
+    get_deepseek_service,
+    require_development_internal_api_token,
+    require_internal_api_token,
+)
 from app.utils.logger import get_logger
 
 router = APIRouter()
@@ -118,7 +123,7 @@ async def chat(
         logger.error(f"处理聊天请求时出错: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"服务器错误: {str(e)}"
+            detail="内部服务器错误"
         )
 
 def encode_event(event: dict) -> str:
@@ -196,8 +201,8 @@ async def chat_stream(
                         break
 
             except Exception as e:
-                logger.error(f"流式生成内容时出错: {e}")
-                yield f"错误: {str(e)}"
+                logger.error(f"流式生成内容时出错: {e}", exc_info=True)
+                yield "错误: 内部服务器错误"
         
         # 返回文本流响应
         return StreamingResponse(
@@ -206,16 +211,17 @@ async def chat_stream(
         )
                 
     except Exception as e:
-        logger.error(f"处理流式聊天请求时出错: {str(e)}")
+        logger.error(f"处理流式聊天请求时出错: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"服务器错误: {str(e)}"
+            detail="内部服务器错误"
         )
 
 # 添加一个辅助接口，用于调试消息格式
 @router.post("/debug/request-format")
 async def debug_request_format(
     raw_request: Dict[str, Any] = Body(...),
+    _auth: None = Depends(require_development_internal_api_token),
 ):
     """调试API - 回显请求格式，帮助排查格式问题"""
     try:
@@ -239,8 +245,9 @@ async def debug_request_format(
             "is_valid": len([m for m in messages if "errors" in m]) == 0
         }
     except Exception as e:
+        logger.error(f"调试请求格式解析失败: {str(e)}", exc_info=True)
         return {
-            "error": f"解析请求时出错: {str(e)}",
+            "error": "解析请求时出错",
             "original_request": raw_request
         }
 
@@ -277,7 +284,8 @@ async def generate_text(
     temperature: float = Body(0.7, description="生成文本的随机性"),
     stream: bool = Body(False, description="是否使用流式响应"),
     model: str = Body("deepseek-v4-pro", description="使用的模型名称，可选: deepseek-v4-pro 或 deepseek-v4-flash"),
-    ai_manager: AIServiceManager = Depends(get_ai_service_manager)
+    ai_manager: AIServiceManager = Depends(get_ai_service_manager),
+    _auth: None = Depends(require_internal_api_token),
 ):
     """使用AI Manager调用Deepseek生成文本"""
     try:
@@ -313,7 +321,8 @@ async def generate_text(
                             yield f"data: {json.dumps({'error': error_msg})}\n\n"
                             break
                 except Exception as e:
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    logger.error(f"Deepseek流式文本生成失败: {str(e)}", exc_info=True)
+                    yield f"data: {json.dumps({'error': '内部服务器错误'})}\n\n"
 
             return StreamingResponse(generate_stream(), media_type="text/event-stream")
         else:
@@ -327,10 +336,10 @@ async def generate_text(
             }
 
     except Exception as e:
-        logger.error(f"Deepseek文本生成失败: {str(e)}")
+        logger.error(f"Deepseek文本生成失败: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"文本生成失败: {str(e)}"
+            detail="文本生成失败"
         )
 
 @router.post("/deepseek/analyze-network-log")
@@ -338,7 +347,8 @@ async def analyze_network_log(
     log_content: str = Body(..., description="网络日志内容", embed=True),
     query: str = Body(..., description="用户查询", embed=True),
     model: str = Body("deepseek-v4-pro", description="使用的模型名称，可选: deepseek-v4-pro 或 deepseek-v4-flash"),
-    deepseek_service: DeepseekService = Depends(get_deepseek_service)
+    deepseek_service: DeepseekService = Depends(get_deepseek_service),
+    _auth: None = Depends(require_internal_api_token),
 ):
     """使用Deepseek分析网络日志"""
     return StreamingResponse(

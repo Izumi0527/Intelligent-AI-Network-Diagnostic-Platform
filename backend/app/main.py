@@ -6,8 +6,8 @@ from starlette.requests import Request
 import time
 
 from app.api.api_v1.api import api_router
+from app.api.deps import get_terminal_service
 from app.config.settings import settings
-from app.services.terminal_service import TerminalService
 from app.utils.logger import get_logger
 
 # 使用统一的日志管理器获取logger
@@ -22,10 +22,11 @@ app = FastAPI(
 )
 
 # 添加CORS中间件
-if settings.BACKEND_CORS_ORIGINS:
+cors_origins = [origin for origin in settings.BACKEND_CORS_ORIGINS if origin != "*"]
+if cors_origins:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_origins=[str(origin) for origin in cors_origins],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -53,9 +54,8 @@ async def root():
     return {"message": f"请访问 {settings.API_V1_STR}/docs 查看API文档"}
 
 # 创建后台任务
-async def cleanup_idle_sessions():
+async def cleanup_idle_sessions(terminal_service):
     """定期清理闲置的终端会话"""
-    terminal_service = TerminalService()
     while True:
         try:
             result = await terminal_service.cleanup_idle_sessions()
@@ -69,7 +69,10 @@ async def cleanup_idle_sessions():
 @app.on_event("startup")
 async def start_background_tasks():
     """启动后台任务"""
-    app.state.cleanup_task = asyncio.create_task(cleanup_idle_sessions())
+    terminal_service = get_terminal_service()
+    app.state.cleanup_task = asyncio.create_task(
+        cleanup_idle_sessions(terminal_service)
+    )
     logger.info("已启动定期会话清理任务")
 
 @app.on_event("shutdown")
@@ -89,4 +92,4 @@ if __name__ == "__main__":
         host=settings.HOST, 
         port=settings.PORT,
         reload=True
-    ) 
+    )

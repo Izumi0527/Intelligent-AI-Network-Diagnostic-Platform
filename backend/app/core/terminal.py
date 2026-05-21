@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from typing import Dict, Any, Optional, Tuple, List
-import time
+from datetime import datetime, timezone
 
 from app.utils.logger import get_logger
 from app.core.ssh import SSHManager
@@ -30,6 +30,27 @@ class TerminalManager:
                 self.session_check_task = loop.create_task(self._session_check_routine())
         except Exception as e:
             logger.warning(f"无法启动会话检查任务: {str(e)}")
+
+    def _now(self) -> datetime:
+        """返回统一的 UTC 时间，避免会话时间字段混用 float 与 datetime。"""
+        return datetime.now(timezone.utc)
+
+    def _normalize_activity_time(self, value: Any) -> datetime:
+        """兼容旧会话中的时间戳格式。"""
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc)
+            return value.astimezone(timezone.utc)
+
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(value, timezone.utc)
+
+        return self._now()
+
+    def _seconds_since_activity(self, session: SessionInfo) -> float:
+        """计算会话距上次活动的秒数。"""
+        last_activity = self._normalize_activity_time(session.last_activity)
+        return (self._now() - last_activity).total_seconds()
     
     async def _session_check_routine(self):
         """定期检查会话状态并执行保活操作"""
@@ -47,14 +68,13 @@ class TerminalManager:
     
     async def _check_and_keep_alive_sessions(self):
         """检查所有会话状态并执行保活操作"""
-        current_time = time.time()
         ssh_session_ids = []
         
         # 找出需要检查的SSH会话
         for session_id, session in self.sessions.items():
             if session.connection_type == "ssh":
                 # 如果会话在过去2分钟内有活动，我们不需要检查它
-                if (current_time - session.last_activity) < 120:
+                if self._seconds_since_activity(session) < 120:
                     continue
                 ssh_session_ids.append(session_id)
         
@@ -111,6 +131,7 @@ class TerminalManager:
                     device_info = session_info["device_info"]
             
             # 创建会话信息
+            now = self._now()
             async with self.lock:
                 self.sessions[session_id] = SessionInfo(
                     session_id=session_id,
@@ -119,7 +140,8 @@ class TerminalManager:
                     port=port,
                     username=username,
                     is_active=True,
-                    last_activity=time.time()  # 确保设置初始活动时间
+                    connected_at=now,
+                    last_activity=now,
                 )
             
             return ConnectionResponse(
@@ -150,7 +172,7 @@ class TerminalManager:
         
         try:
             # 更新会话最后活动时间
-            session.last_activity = time.time()
+            session.last_activity = self._now()
             
             if session.connection_type == "ssh":
                 success, output = await self.ssh_manager.execute_command(session_id, command)
@@ -235,12 +257,11 @@ class TerminalManager:
     
     async def cleanup_idle_sessions(self, idle_timeout: int = 600) -> int:
         """清理闲置的会话"""
-        current_time = time.time()
         sessions_to_cleanup = []
         
         # 找出闲置的会话
         for session_id, session in self.sessions.items():
-            if (current_time - session.last_activity) > idle_timeout:
+            if self._seconds_since_activity(session) > idle_timeout:
                 sessions_to_cleanup.append(session_id)
         
         # 断开这些会话
@@ -256,5 +277,24 @@ class TerminalManager:
             cleaned_count += ssh_cleaned
         except Exception as e:
             logger.error(f"SSH会话清理出错: {str(e)}")
+
+        try:
+            telnet_cleaned = await self.telnet_manager.cleanup_idle_sessions(
+                idle_timeout
+            )
+            cleaned_count += telnet_cleaned
+
+            if telnet_cleaned:
+                async with self.lock:
+                    stale_telnet_sessions = [
+                        session_id
+                        for session_id, session in self.sessions.items()
+                        if session.connection_type == "telnet"
+                        and not self.telnet_manager.get_session_info(session_id)
+                    ]
+                    for session_id in stale_telnet_sessions:
+                        del self.sessions[session_id]
+        except Exception as e:
+            logger.error(f"Telnet会话清理出错: {str(e)}")
             
-        return cleaned_count 
+        return cleaned_count

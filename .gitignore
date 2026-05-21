@@ -52,3 +52,5 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+.claude/

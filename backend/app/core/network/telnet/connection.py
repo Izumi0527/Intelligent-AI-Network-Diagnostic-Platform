@@ -8,6 +8,7 @@ import telnetlib
 import socket
 import time
 import concurrent.futures
+import re
 from typing import Dict, Any, Optional, Tuple
 
 from app.core.network.base import NetworkConnection, DeviceType, ConnectionStatus
@@ -27,6 +28,16 @@ class TelnetConnection(NetworkConnection):
         self.command_timeout = 30
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.prompt_pattern = None  # 动态记录提示符
+        self.username_prompt_patterns = [
+            re.compile(rb"(?:username|user name|login)\s*(?::|\xef\xbc\x9a)", re.IGNORECASE),
+        ]
+        self.password_prompt_patterns = [
+            re.compile(rb"password\s*(?::|\xef\xbc\x9a)", re.IGNORECASE),
+        ]
+        self.shell_prompt_patterns = [
+            re.compile(rb"(?:^|[\r\n])\s*[<\[]?[\w.\-()/@]+[>\]#$]\s*$"),
+            re.compile(rb"[>\]#$]\s*$"),
+        ]
     
     async def connect(self, timeout: int = 30) -> Tuple[bool, str]:
         """建立Telnet连接"""
@@ -70,32 +81,9 @@ class TelnetConnection(NetworkConnection):
             self.client = telnetlib.Telnet()
             self.client.open(self.host, self.port, timeout)
 
-            # 等待用户名提示
-            username_prompt = self.client.read_until(b":", self.login_timeout)
-            if not username_prompt:
-                return False, "未收到用户名提示"
-
-            # 发送用户名
-            self.client.write(self.username.encode('ascii') + b"\n")
-
-            # 等待密码提示
-            password_prompt = self.client.read_until(b":", self.login_timeout)
-            if not password_prompt:
-                return False, "未收到密码提示"
-
-            # 发送密码
-            self.client.write(self.password.encode('ascii') + b"\n")
-
-            # 等待登录成功，动态检测提示符
-            welcome_msg = self.client.read_very_eager()
-            time.sleep(1)  # 等待提示符稳定
-
-            # 发送空命令来获取当前提示符
-            self.client.write(b"\n")
-            prompt_response = self.client.read_very_eager()
-
-            # 检测并保存提示符模式
-            self._detect_prompt_pattern(prompt_response)
+            success, message = self._perform_login(line_ending=b"\n")
+            if not success:
+                return False, message
 
             return True, "连接成功"
 
@@ -105,6 +93,92 @@ class TelnetConnection(NetworkConnection):
             return False, "连接被拒绝"
         except Exception as e:
             return False, f"连接失败: {str(e)}"
+
+    def _perform_login(self, line_ending: bytes = b"\n") -> Tuple[bool, str]:
+        """使用小型状态机完成 Telnet 登录。"""
+        auth_output = b""
+        sent_username = False
+        sent_password = False
+
+        for _ in range(4):
+            prompt_type, data = self._expect_login_prompt()
+            auth_output += data
+
+            if prompt_type == "username":
+                self.client.write(self.username.encode("utf-8") + line_ending)
+                sent_username = True
+                continue
+
+            if prompt_type == "password":
+                self.client.write(self.password.encode("utf-8") + line_ending)
+                sent_password = True
+                continue
+
+            if prompt_type == "shell":
+                self._detect_prompt_pattern(data or auth_output)
+                return True, "登录成功"
+
+            break
+
+        if not sent_username:
+            return False, "未收到用户名或登录提示"
+        if not sent_password:
+            return False, "未收到密码提示"
+
+        time.sleep(0.5)
+        prompt_response = self.client.read_very_eager()
+        auth_output += prompt_response
+
+        if self._looks_like_shell_prompt(auth_output):
+            self._detect_prompt_pattern(auth_output)
+            return True, "登录成功"
+
+        return False, "登录失败，未检测到设备提示符"
+
+    def _expect_login_prompt(self) -> Tuple[str, bytes]:
+        """等待用户名、密码或登录后的设备提示符。"""
+        patterns = (
+            self.username_prompt_patterns
+            + self.password_prompt_patterns
+            + self.shell_prompt_patterns
+        )
+        index, _match, data = self.client.expect(patterns, self.login_timeout)
+
+        if index < 0:
+            return "unknown", data or b""
+
+        username_end = len(self.username_prompt_patterns)
+        password_end = username_end + len(self.password_prompt_patterns)
+
+        if index < username_end:
+            return "username", data or b""
+        if index < password_end:
+            return "password", data or b""
+        return "shell", data or b""
+
+    def _looks_like_shell_prompt(self, data: bytes) -> bool:
+        """判断登录输出中是否包含设备命令提示符。"""
+        if not data:
+            return False
+
+        lines = data.decode("utf-8", errors="ignore").splitlines()
+        for line in reversed(lines[-3:]):
+            stripped = line.strip()
+            if self._is_pagination_text(stripped):
+                continue
+            if stripped and re.search(r"[>\]#$]\s*$", stripped):
+                return True
+        return False
+
+    def _is_pagination_text(self, text: str) -> bool:
+        """识别分页提示，避免误判为命令提示符。"""
+        lowered = text.lower()
+        pagination_markers = [
+            "more",
+            "press any key to continue",
+            "press space to continue",
+        ]
+        return any(marker in lowered for marker in pagination_markers)
     
     def _check_host_reachable(self, timeout: float) -> bool:
         """检查主机是否可达"""
@@ -310,6 +384,10 @@ class TelnetConnection(NetworkConnection):
     def _check_command_completion(self, chunk: bytes, full_response: bytes) -> bool:
         """检查命令是否完成"""
         try:
+            chunk_text = chunk.decode('utf-8', errors='ignore').strip()
+            if chunk_text and self._is_pagination_text(chunk_text):
+                return False
+
             # 检查动态检测的提示符
             if self.prompt_pattern and self.prompt_pattern in chunk:
                 logger.debug(f"检测到动态提示符: {self.prompt_pattern.decode('utf-8')}")
@@ -326,6 +404,8 @@ class TelnetConnection(NetworkConnection):
                     if line and any(prompt in line for prompt in common_prompts):
                         # 检查是否像提示符（在行尾或单独一行）
                         line_str = line.decode('utf-8', errors='ignore')
+                        if self._is_pagination_text(line_str):
+                            continue
                         if any(line_str.endswith(prompt.decode('utf-8')) for prompt in common_prompts):
                             logger.debug(f"检测到通用提示符: {line_str}")
                             return True
@@ -337,48 +417,17 @@ class TelnetConnection(NetworkConnection):
                 # 检查最后3行
                 for line in lines[-3:]:
                     line = line.strip()
-                    if line and any(prompt.decode('utf-8') in line for prompt in common_prompts):
-                        # 检查是否像主机名提示符格式
-                        if ('@' in line and any(line.endswith(prompt.decode('utf-8')) for prompt in common_prompts)):
-                            logger.debug(f"检测到主机提示符: {line}")
-                            return True
+                    if not line or self._is_pagination_text(line):
+                        continue
+                    if any(line.endswith(prompt.decode('utf-8')) for prompt in common_prompts):
+                        logger.debug(f"检测到响应末尾提示符: {line}")
+                        return True
 
             return False
 
         except Exception as e:
             logger.error(f"检查命令完成状态失败: {str(e)}")
             return False
-        """灵活的命令响应读取"""
-        try:
-            import time
-
-            response = b""
-            start_time = time.time()
-            stable_count = 0  # 连续稳定次数
-            last_length = 0
-
-            while time.time() - start_time < self.command_timeout:
-                # 读取当前可用数据
-                chunk = self.client.read_very_eager()
-
-                if chunk:
-                    response += chunk
-                    stable_count = 0  # 重置稳定计数
-                    last_length = len(response)
-                else:
-                    # 没有新数据，检查是否稳定
-                    if len(response) == last_length and len(response) > 0:
-                        stable_count += 1
-                        if stable_count >= 3:  # 连续3次没有新数据，认为命令完成
-                            break
-
-                time.sleep(0.1)  # 等待100ms
-
-            return response
-
-        except Exception as e:
-            logger.error(f"读取命令响应失败: {str(e)}")
-            return b""
 
     def _clean_command_response(self, response: str, command: str) -> str:
         """清理命令响应数据 - 改进版本"""

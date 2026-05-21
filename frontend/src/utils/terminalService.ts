@@ -1,8 +1,21 @@
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
 
 const api = axios.create({
     baseURL: '/api',
     timeout: 30000,
+});
+
+const internalApiToken = import.meta.env.VITE_INTERNAL_API_TOKEN as string | undefined;
+
+api.interceptors.request.use((config) => {
+    if (!internalApiToken) {
+        return config;
+    }
+
+    config.headers = AxiosHeaders.from(config.headers);
+    config.headers.set('Authorization', `Bearer ${internalApiToken}`);
+
+    return config;
 });
 
 export interface TerminalConnectParams {
@@ -48,4 +61,4 @@ export const terminalService = {
     async cancelConnection() {
         return api.post('/terminal/cancel-connect');
     }
-}; 
+};

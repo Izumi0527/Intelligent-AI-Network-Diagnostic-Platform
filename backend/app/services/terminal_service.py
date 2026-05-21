@@ -46,9 +46,10 @@ class TerminalService:
             
             # 如果连接失败，抛出异常
             if not response.success:
+                logger.warning(f"终端连接失败: {response.message}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=response.message
+                    detail="终端连接失败，请检查连接参数或稍后重试"
                 )
                 
             return response
@@ -57,14 +58,17 @@ class TerminalService:
             logger.error(f"验证错误: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"验证错误: {str(e)}"
+                detail="请求参数验证失败"
             )
-            
+
+        except HTTPException:
+            raise
+
         except Exception as e:
-            logger.error(f"连接出错: {str(e)}")
+            logger.error(f"连接出错: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"连接出错: {str(e)}"
+                detail="内部服务器错误"
             )
     
     async def execute_command(self, command_request: CommandRequest) -> CommandResponse:
@@ -83,10 +87,10 @@ class TerminalService:
             return response
             
         except Exception as e:
-            logger.error(f"执行命令出错: {str(e)}")
+            logger.error(f"执行命令出错: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"执行命令出错: {str(e)}"
+                detail="内部服务器错误"
             )
     
     async def disconnect(self, session_id: str) -> Dict[str, Any]:
@@ -107,10 +111,10 @@ class TerminalService:
             raise
             
         except Exception as e:
-            logger.error(f"断开连接出错: {str(e)}")
+            logger.error(f"断开连接出错: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"断开连接出错: {str(e)}"
+                detail="内部服务器错误"
             )
     
     async def get_sessions(self) -> SessionList:
@@ -120,10 +124,10 @@ class TerminalService:
             return SessionList(sessions=sessions, count=len(sessions))
             
         except Exception as e:
-            logger.error(f"获取会话列表出错: {str(e)}")
+            logger.error(f"获取会话列表出错: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"获取会话列表出错: {str(e)}"
+                detail="内部服务器错误"
             )
     
     async def get_session(self, session_id: str) -> SessionInfo:
@@ -143,10 +147,10 @@ class TerminalService:
             raise
             
         except Exception as e:
-            logger.error(f"获取会话信息出错: {str(e)}")
+            logger.error(f"获取会话信息出错: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"获取会话信息出错: {str(e)}"
+                detail="内部服务器错误"
             )
     
     async def cleanup_idle_sessions(self) -> Dict[str, Any]:
@@ -163,9 +167,9 @@ class TerminalService:
             }
             
         except Exception as e:
-            logger.error(f"清理闲置会话出错: {str(e)}")
+            logger.error(f"清理闲置会话出错: {str(e)}", exc_info=True)
             return {
                 "success": False,
-                "message": f"清理闲置会话出错: {str(e)}",
+                "message": "清理闲置会话失败",
                 "cleaned_count": 0
-            } 
+            }

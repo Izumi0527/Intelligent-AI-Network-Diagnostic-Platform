@@ -42,11 +42,12 @@ def create_access_token(
 def encrypt_device_password(password: str) -> str:
     """简单加密设备密码，用于内存存储"""
     # 注意：这不是强安全加密，仅用于避免明文内存存储
-    # 生成随机密钥
-    key = secrets.token_bytes(32)
-    
-    # XOR加密
     password_bytes = password.encode('utf-8')
+
+    # 生成与密码等长的随机密钥，避免 zip 截断长密码。
+    key = secrets.token_bytes(len(password_bytes) or 1)
+
+    # XOR加密
     encrypted = bytes(a ^ b for a, b in zip(password_bytes, key))
     
     # Base64编码结果和密钥
@@ -66,4 +67,4 @@ def decrypt_device_password(encrypted_str: str) -> str:
     # XOR解密
     decrypted = bytes(a ^ b for a, b in zip(encrypted, key))
     
-    return decrypted.decode('utf-8') 
+    return decrypted.decode('utf-8')

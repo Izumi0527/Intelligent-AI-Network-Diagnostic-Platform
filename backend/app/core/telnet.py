@@ -39,7 +39,10 @@ class TelnetManager:
     
     async def cleanup_idle_sessions(self, timeout: int = 7200):
         """清理空闲会话 - 兼容原接口"""
-        return await self.manager.cleanup_idle_sessions(timeout)
+        result = await self.manager.cleanup_idle_sessions(timeout)
+        if isinstance(result, dict):
+            return int(result.get("cleaned_count", 0))
+        return int(result)
 
 
 # 提供原有的全局实例以保持兼容性

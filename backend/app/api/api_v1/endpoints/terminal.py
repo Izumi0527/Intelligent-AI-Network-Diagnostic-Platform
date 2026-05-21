@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 from app.services.terminal_service import TerminalService
 from app.models.terminal import (
     TerminalCredentials, CommandRequest, CommandResponse,
-    SessionInfo, SessionList, ConnectionResponse
+    SessionInfo, SessionList, ConnectionResponse, DisconnectRequest
 )
 from app.api.deps import get_terminal_service
 
@@ -47,7 +47,7 @@ async def execute_command(
 
 @router.post("/disconnect", response_model=Dict[str, Any])
 async def disconnect_terminal(
-    session_id: str,
+    request: DisconnectRequest,
     terminal_service: TerminalService = Depends(get_terminal_service)
 ):
     """
@@ -55,7 +55,7 @@ async def disconnect_terminal(
     
     需要提供有效的会话ID
     """
-    return await terminal_service.disconnect(session_id)
+    return await terminal_service.disconnect(request.session_id)
 
 @router.get("/sessions", response_model=SessionList)
 async def get_sessions(
@@ -87,4 +87,4 @@ async def cleanup_idle_sessions(
     
     自动断开超过配置的闲置时间的会话
     """
-    return await terminal_service.cleanup_idle_sessions() 
+    return await terminal_service.cleanup_idle_sessions()

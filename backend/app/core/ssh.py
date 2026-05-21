@@ -8,6 +8,7 @@ import re
 import paramiko
 from paramiko.ssh_exception import SSHException, AuthenticationException, NoValidConnectionsError
 
+from app.config.settings import settings
 from app.utils.logger import get_logger
 from app.utils.security import encrypt_device_password, decrypt_device_password
 
@@ -19,6 +20,15 @@ class SSHManager:
     def __init__(self):
         """初始化SSH管理器"""
         self.clients: Dict[str, Dict[str, Any]] = {}
+
+    def _configure_host_key_policy(self, client: paramiko.SSHClient) -> None:
+        """按环境配置 SSH 未知主机密钥策略。"""
+        if settings.SSH_AUTO_ADD_HOST_KEY:
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            return
+
+        client.load_system_host_keys()
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
         
     async def connect(
         self, host: str, port: int, username: str, password: str, timeout: int = 10
@@ -73,7 +83,7 @@ class SSHManager:
 
             # 创建SSH客户端
             client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self._configure_host_key_policy(client)
 
             # 使用线程运行阻塞的SSH连接
             await asyncio.to_thread(
@@ -202,10 +212,13 @@ class SSHManager:
                 )
                 
                 if success and new_session_id:
-                    # 更新会话信息
-                    if session_id in self.clients:
-                        del self.clients[session_id]
-                    return await self.execute_command(new_session_id, command)
+                    # 底层重连可能产生新的连接对象，但对 API 调用方保持原 session_id。
+                    new_session_data = self.clients.pop(new_session_id, None)
+                    if not new_session_data:
+                        return False, "会话已恢复但新连接信息丢失"
+
+                    self.clients[session_id] = new_session_data
+                    return await self.execute_command(session_id, command)
                 else:
                     return False, f"会话已失效且无法重新连接: {msg}"
             except Exception as e:
@@ -488,4 +501,4 @@ class SSHManager:
             if success:
                 cleanup_count += 1
                 
-        return cleanup_count 
+        return cleanup_count

@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field, validator
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 终端连接类型枚举
 ConnectionType = Literal["ssh", "telnet"]
@@ -29,12 +29,19 @@ class CommandRequest(BaseModel):
     session_id: str = Field(..., description="会话ID")
     command: str = Field(..., description="要执行的命令")
 
+class DisconnectRequest(BaseModel):
+    """终端断开连接请求模型"""
+    session_id: str = Field(..., description="会话ID")
+
 class CommandResponse(BaseModel):
     """终端命令响应模型"""
     session_id: str = Field(..., description="会话ID")
     output: str = Field(..., description="命令执行输出")
     is_error: bool = Field(False, description="是否包含错误")
-    timestamp: datetime = Field(default_factory=datetime.now, description="响应时间戳")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="响应时间戳",
+    )
 
 class SessionInfo(BaseModel):
     """会话信息模型"""
@@ -43,8 +50,12 @@ class SessionInfo(BaseModel):
     device_address: str
     port: int
     username: str
-    connected_at: datetime = Field(default_factory=datetime.now)
-    last_activity: datetime = Field(default_factory=datetime.now)
+    connected_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    last_activity: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     is_active: bool = Field(True, description="会话是否活跃")
     
     class Config:
@@ -71,4 +82,4 @@ class ConnectionResponse(BaseModel):
     success: bool = Field(..., description="连接是否成功")
     session_id: Optional[str] = Field(None, description="会话ID（成功时）")
     message: str = Field(..., description="连接结果消息")
-    device_info: Optional[str] = Field(None, description="设备信息（成功时）") 
+    device_info: Optional[str] = Field(None, description="设备信息（成功时）")

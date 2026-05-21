@@ -1,3 +1,4 @@
+import json
 import os
 from pydantic_settings import BaseSettings
 from typing import Optional, Dict, Any, List
@@ -19,10 +20,19 @@ class Settings(BaseSettings):
     SECRET_KEY: Optional[str] = os.getenv("SECRET_KEY")
     JWT_ALGORITHM: Optional[str] = os.getenv("JWT_ALGORITHM")
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "0"))
+    API_AUTH_ENABLED: bool = os.getenv("API_AUTH_ENABLED", "false").lower() == "true"
+    INTERNAL_API_TOKEN: Optional[str] = os.getenv("INTERNAL_API_TOKEN")
     
     # 服务器设置
     HOST: Optional[str] = os.getenv("HOST")
     PORT: int = int(os.getenv("PORT", "0"))
+
+    # SSH连接设置：开发环境默认允许自动加入主机密钥，生产环境默认拒绝未知主机
+    SSH_AUTO_ADD_HOST_KEY: bool = (
+        os.getenv("SSH_AUTO_ADD_HOST_KEY", "").lower() == "true"
+        if os.getenv("SSH_AUTO_ADD_HOST_KEY") is not None
+        else os.getenv("APP_ENV", "development").lower() != "production"
+    )
     
     # 会话设置
     SESSION_IDLE_TIMEOUT: int = int(os.getenv("SESSION_IDLE_TIMEOUT", "0"))
@@ -77,6 +87,10 @@ class Settings(BaseSettings):
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
         """验证必需配置项并规范化配置"""
+        cors_env = os.getenv("CORS_ORIGINS")
+        cors_value = cors_env if cors_env is not None else self.BACKEND_CORS_ORIGINS
+        self.BACKEND_CORS_ORIGINS = self._normalize_cors_origins(cors_value)
+
         # 验证必需的基础配置项
         self._validate_required_config()
 
@@ -93,6 +107,37 @@ class Settings(BaseSettings):
 
         # 验证必需的AI配置项
         self._validate_ai_config()
+
+    @staticmethod
+    def _normalize_cors_origins(value: Any) -> List[str]:
+        """规范化 CORS origin，凭证模式下不允许通配符。"""
+        if value is None:
+            return []
+
+        if isinstance(value, str):
+            raw_value = value.strip()
+            if not raw_value:
+                return []
+            if raw_value.startswith("["):
+                try:
+                    parsed = json.loads(raw_value)
+                except json.JSONDecodeError:
+                    parsed = raw_value.split(",")
+            else:
+                parsed = raw_value.split(",")
+        elif isinstance(value, (list, tuple, set)):
+            parsed = list(value)
+        else:
+            parsed = [value]
+
+        normalized = []
+        for origin in parsed:
+            origin_text = str(origin).strip()
+            if not origin_text or origin_text == "*":
+                continue
+            normalized.append(origin_text)
+
+        return normalized
 
     def _validate_required_config(self) -> None:
         """验证必需的基础配置项"""

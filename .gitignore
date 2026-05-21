@@ -52,5 +52,3 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
-
-backend/.env

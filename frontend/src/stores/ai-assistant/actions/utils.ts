@@ -1,4 +1,4 @@
-import type { AIAssistantState, ChatMessage, ApiError } from '../types'
+import type { AIAssistantState, ChatMessage, ApiError } from '@/types/chat'
 import { generateId, isApiError } from '../../../utils/helpers'
 
 export const createUtilActions = (state: AIAssistantState) => ({

@@ -60,7 +60,7 @@
             <span id="streaming-toggle-label" class="text-sm font-medium text-foreground/80 whitespace-nowrap">流式响应</span>
             <button
               class="relative inline-flex h-8 w-14 items-center rounded-full transition-all duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-              :style="{ backgroundColor: store.streamingEnabled ? '#007AFF' : '#E5E5E7' }"
+              :style="{ backgroundColor: store.streamingEnabled ? 'oklch(var(--primary))' : 'oklch(var(--muted))' }"
               type="button"
               role="switch"
               :aria-checked="store.streamingEnabled"
@@ -130,7 +130,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import ChatMessages from './components/ChatMessages.vue'
-import { useAiAssistantStore } from '@/stores/aiAssistant'
+import { useAiAssistantStore } from '@/stores/ai-assistant'
 
 const store = useAiAssistantStore()
 const chatMessagesRef = ref<InstanceType<typeof ChatMessages> | null>(null)

@@ -1,4 +1,4 @@
-import type { AIAssistantState } from './types'
+import type { AIAssistantState } from '@/types/chat'
 import { generateId } from '../../utils/helpers'
 
 export const initialState = (): AIAssistantState => ({

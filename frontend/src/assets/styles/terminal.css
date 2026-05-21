@@ -1,0 +1,99 @@
+/* ============================================================
+   Terminal：工程师审美 — mono 字体 / 深色面板 / status pill
+   ============================================================ */
+
+.terminal-border {
+  background: var(--terminal-bg);
+  border: 1px solid oklch(var(--border));
+}
+
+.terminal-display {
+  background-color: var(--terminal-bg);
+  border: 1px solid oklch(var(--border));
+  border-radius: 8px;
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dark .terminal-display {
+  border: 1px solid oklch(var(--border));
+}
+
+.terminal-text {
+  color: var(--terminal-fg);
+}
+
+.terminal-success {
+  color: var(--terminal-success);
+}
+
+.terminal-error {
+  color: var(--terminal-error);
+}
+
+.terminal-warning {
+  color: var(--terminal-warning);
+}
+
+.terminal-prompt {
+  color: var(--terminal-prompt);
+}
+
+/* ─── 连接配置面板 ──────────────────────────────────────── */
+.terminal-config-panel {
+  background-color: var(--config-panel-bg);
+  border-radius: 8px;
+}
+
+.terminal-config-input {
+  background-color: var(--config-input-bg);
+  border-color: var(--config-input-border);
+  color: white;
+}
+
+.terminal-config-button {
+  background-color: var(--config-button-bg);
+  color: white;
+  padding: 8px 24px;
+  transition: background-color var(--dur-base) var(--ease-out);
+}
+
+.terminal-config-button:hover {
+  background-color: var(--config-button-hover);
+}
+
+/* ─── 响应式 ────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .terminal-config-panel form {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .terminal-config-panel form {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2px;
+  }
+
+  .terminal-config-panel label {
+    font-size: 11px;
+  }
+
+  .terminal-config-input {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .terminal-section {
+    width: 100%;
+    height: 50vh;
+  }
+}
+
+@media (min-width: 1440px) {
+  .terminal-display {
+    font-size: 15px;
+  }
+}

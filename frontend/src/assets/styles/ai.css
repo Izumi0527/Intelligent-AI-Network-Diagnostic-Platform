@@ -1,0 +1,148 @@
+/* ============================================================
+   AI Assistant：conversational 审美 — 气泡 / 渐变 / 软阴影
+   ============================================================ */
+
+/* ─── 主面板 ────────────────────────────────────────────── */
+.ai-assistant-panel {
+  background-color: var(--ai-panel-bg);
+  border: 1.5px solid color-mix(in oklch, var(--ai-panel-border), transparent 30%);
+  border-radius: 18px;
+  padding: 20px 18px 18px;
+  box-shadow: var(--shadow-ai-panel);
+  transition:
+    border-color var(--dur-slow) var(--ease-out),
+    box-shadow var(--dur-slow) var(--ease-out);
+  color: var(--foreground);
+}
+
+/* ─── 标题与 Beta 徽章 ─────────────────────────────────── */
+.ai-title {
+  color: var(--ai-title-color);
+  font-weight: 500;
+}
+
+.ai-beta-badge {
+  background-color: var(--ai-beta-bg);
+  color: var(--ai-title-color);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ─── 清空按钮 ──────────────────────────────────────────── */
+.ai-clear-button {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--background), white 4%),
+    color-mix(in oklch, var(--background), oklch(var(--primary)) 8%)
+  );
+  border-color: color-mix(in oklch, oklch(var(--primary)), transparent 75%);
+  color: color-mix(in oklch, var(--foreground), transparent 10%);
+}
+
+.ai-clear-button:hover {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(var(--primary)), white 90%),
+    color-mix(in oklch, oklch(var(--primary)), white 75%)
+  );
+  border-color: color-mix(in oklch, oklch(var(--primary)), transparent 60%);
+  color: var(--foreground);
+}
+
+.ai-clear-button__icon {
+  background: color-mix(in oklch, oklch(var(--primary)), transparent 80%);
+  color: oklch(var(--primary));
+}
+
+.dark .ai-clear-button {
+  background: color-mix(in oklch, var(--background), white 6%);
+  border-color: color-mix(in oklch, var(--ai-panel-border), white 10%);
+  color: var(--foreground);
+}
+
+.dark .ai-clear-button:hover {
+  background: color-mix(in oklch, oklch(var(--primary)), transparent 60%);
+  border-color: color-mix(in oklch, oklch(var(--primary)), transparent 40%);
+}
+
+.dark .ai-clear-button__icon {
+  background: color-mix(in oklch, oklch(var(--primary)), transparent 70%);
+  color: color-mix(in oklch, oklch(var(--primary)), white 30%);
+}
+
+/* ─── 输入框 ────────────────────────────────────────────── */
+.ai-input {
+  background-color: var(--ai-input-bg);
+  border: 1px solid var(--ai-panel-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+
+.ai-input:focus {
+  border-color: oklch(var(--primary));
+}
+
+.dark .ai-input {
+  color: var(--foreground);
+}
+
+/* ─── 对话区渐变 ────────────────────────────────────────── */
+.ai-chat-gradient {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--background), oklch(var(--primary)) 4%) 0%,
+    color-mix(in oklch, var(--background), oklch(var(--primary)) 8%) 20%,
+    color-mix(in oklch, var(--background), oklch(var(--primary)) 4%) 40%,
+    var(--background) 70%,
+    color-mix(in oklch, var(--background), oklch(var(--muted)) 10%) 100%
+  );
+  min-height: 400px;
+}
+
+.ai-chat-gradient-soft {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--background), oklch(var(--primary)) 6%) 0%,
+    color-mix(in oklch, var(--background), oklch(var(--accent)) 8%) 50%,
+    color-mix(in oklch, var(--background), oklch(var(--muted)) 8%) 100%
+  );
+  min-height: 400px;
+}
+
+.dark .ai-chat-gradient,
+.dark .ai-chat-gradient-soft {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--background), oklch(var(--primary)) 18%) 0%,
+    color-mix(in oklch, var(--background), oklch(var(--primary)) 10%) 20%,
+    color-mix(in oklch, var(--background), oklch(var(--primary)) 18%) 40%,
+    var(--background) 70%,
+    color-mix(in oklch, var(--background), black 20%) 100%
+  );
+}
+
+/* ─── 兼容性渐变（保留旧引用） ──────────────────────────── */
+.ai-surface-gradient {
+  background: var(--ai-panel-bg);
+}
+
+/* ─── 响应式 ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .responsive-layout {
+    flex-direction: column;
+  }
+
+  .ai-section {
+    width: 100%;
+    height: 50vh;
+    border-left: none;
+    border-top: 1px solid var(--ai-panel-border);
+  }
+}
+
+@media (min-width: 1440px) {
+  .ai-assistant-panel {
+    padding: 20px;
+  }
+}

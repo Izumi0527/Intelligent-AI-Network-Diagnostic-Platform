@@ -310,36 +310,56 @@ const handleCancelConnect = async () => {
 
 /* 发送按钮采用高对比配色，确保浅色模式下文字清晰 */
 .terminal-send-button {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: #ffffff;
-  border: 1px solid rgba(37, 99, 235, 0.65);
-  box-shadow: 0 14px 28px -18px rgba(37, 99, 235, 0.6);
+  background: linear-gradient(
+    135deg,
+    oklch(var(--primary)),
+    color-mix(in oklch, oklch(var(--primary)), black 15%)
+  );
+  color: oklch(var(--primary-foreground));
+  border: 1px solid color-mix(in oklch, oklch(var(--primary)), transparent 35%);
+  box-shadow: 0 14px 28px -18px oklch(var(--primary) / 0.6);
 }
 
 .terminal-send-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1d4ed8, #1e40af);
-  box-shadow: 0 16px 32px -16px rgba(37, 99, 235, 0.55);
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(var(--primary)), black 12%),
+    color-mix(in oklch, oklch(var(--primary)), black 28%)
+  );
+  box-shadow: 0 16px 32px -16px oklch(var(--primary) / 0.55);
 }
 
 .terminal-send-button:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: 0 10px 22px -18px rgba(37, 99, 235, 0.65);
+  box-shadow: 0 10px 22px -18px oklch(var(--primary) / 0.65);
 }
 
 .terminal-send-button:disabled {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(29, 78, 216, 0.25));
-  color: rgba(241, 245, 249, 0.6);
-  border-color: rgba(148, 163, 184, 0.35);
+  background: linear-gradient(
+    135deg,
+    oklch(var(--primary) / 0.2),
+    oklch(var(--primary) / 0.25)
+  );
+  color: oklch(var(--muted-foreground));
+  border-color: oklch(var(--border) / 0.6);
 }
 
 :deep(.dark) .terminal-send-button {
-  background: linear-gradient(135deg, #3b82f6, #1e3a8a);
-  color: #f8fafc;
-  border-color: rgba(96, 165, 250, 0.85);
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(var(--primary)), white 8%),
+    color-mix(in oklch, oklch(var(--primary)), black 35%)
+  );
+  color: oklch(var(--primary-foreground));
+  border-color: color-mix(in oklch, oklch(var(--primary)), white 15%);
 }
 
 :deep(.dark) .terminal-send-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  box-shadow: 0 18px 34px -18px rgba(59, 130, 246, 0.55);
+  background: linear-gradient(
+    135deg,
+    oklch(var(--primary)),
+    color-mix(in oklch, oklch(var(--primary)), black 15%)
+  );
+  box-shadow: 0 18px 34px -18px oklch(var(--primary) / 0.55);
 }
 </style>

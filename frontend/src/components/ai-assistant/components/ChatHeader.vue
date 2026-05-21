@@ -8,7 +8,7 @@
         <ShimmerButton
           class="flex items-center gap-1 rounded-lg border border-border/40 px-2.5 py-1.5 text-xs font-medium text-foreground"
           background="oklch(var(--secondary))"
-          shimmer-color="rgba(139, 92, 246, 0.5)"
+          shimmer-color="oklch(var(--accent-purple) / 0.5)"
           border-radius="0.5rem"
           @click="$emit('clear')"
           title="清空当前对话"

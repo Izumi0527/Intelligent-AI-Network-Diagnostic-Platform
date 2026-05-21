@@ -1,5 +1,5 @@
 import { aiService } from '@/utils/aiService'
-import type { AIAssistantState } from '../types'
+import type { AIAssistantState } from '@/types/chat'
 
 export const createConnectionActions = (state: AIAssistantState) => ({
   async checkModelConnection() {

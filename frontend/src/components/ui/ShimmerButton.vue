@@ -26,7 +26,7 @@ interface Props {
 
 withDefaults(defineProps<Props>(), {
   class: '',
-  shimmerColor: '#ffffff',
+  shimmerColor: 'oklch(1 0 0)',
   shimmerSize: '0.05em',
   borderRadius: '0.75rem',
   shimmerDuration: '2s',
@@ -70,9 +70,9 @@ withDefaults(defineProps<Props>(), {
   height: 100%;
   background: linear-gradient(
     100deg,
-    rgba(255, 255, 255, 0) 0%,
+    oklch(1 0 0 / 0) 0%,
     var(--shimmer-color) 50%,
-    rgba(255, 255, 255, 0) 100%
+    oklch(1 0 0 / 0) 100%
   );
   transform: translateX(-100%);
   animation: shimmer var(--shimmer-duration) infinite;

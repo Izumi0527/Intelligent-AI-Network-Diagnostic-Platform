@@ -1,5 +1,5 @@
 import { localStorageUtils } from '@/utils/localStorageUtils'
-import type { AIAssistantState, ChatData } from '../types'
+import type { AIAssistantState, ChatData } from '@/types/chat'
 
 export const createStorageActions = (state: AIAssistantState) => ({
   saveToStorage(chatData: ChatData) {

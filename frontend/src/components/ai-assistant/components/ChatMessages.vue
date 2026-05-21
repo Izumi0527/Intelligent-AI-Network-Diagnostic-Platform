@@ -225,11 +225,11 @@ defineExpose({
 }
 
 .flex-1::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: color-mix(in oklch, oklch(var(--muted)), oklch(var(--foreground)) 18%);
   border-radius: 3px;
 }
 
 .flex-1::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: color-mix(in oklch, oklch(var(--muted)), oklch(var(--foreground)) 32%);
 }
 </style>

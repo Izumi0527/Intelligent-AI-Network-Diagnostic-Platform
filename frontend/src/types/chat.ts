@@ -1,37 +1,38 @@
-// 聊天相关统一类型定义
-// 生成时间: 2025-09-07 23:35
+// 聊天与 AI 助手统一类型定义
+// 本文件是 stores/ai-assistant 与组件层共用的类型源头
 
-// 思考内容接口
+// ───────────────────────────────── 基础消息类型 ─────────────────────────────────
+
 export interface ThinkingContent {
   content: string
   isComplete: boolean
   timestamp: number
 }
 
-// 标准聊天消息接口 - 用于stores和主要逻辑
+// 标准聊天消息接口 - 用于 stores 和主要逻辑
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp?: number
-  thinking?: ThinkingContent // 思考内容（仅限assistant角色）
+  thinking?: ThinkingContent // 思考内容（仅限 assistant 角色）
 }
 
-// 组件兼容的消息接口 - 用于ChatMessages组件
+// 组件兼容的消息接口 - 用于 ChatMessages 组件
 export interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp?: number
-  id?: string // 可选，为了向后兼容
+  id?: string // 可选，向后兼容
 }
 
-// API传输格式消息
+// API 传输格式消息
 export interface FormattedMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
 }
 
-// 消息历史项（用于API调用）
+// 消息历史项（用于 API 调用）
 export interface MessageHistoryItem {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -39,21 +40,78 @@ export interface MessageHistoryItem {
   timestamp?: number
 }
 
-// API错误类型
+// ───────────────────────────────── API / 错误类型 ─────────────────────────────────
+
 export interface ApiError extends Error {
+  code?: string
+  status?: number
   response?: {
     data?: {
       detail?: string | Array<{ msg: string; type: string }>
-      [key: string]: any
+      [key: string]: unknown
     }
     status: number
     statusText: string
   }
-  request?: any
+  request?: unknown
   validationErrors?: Array<{ msg: string; type: string }>
 }
 
-// 聊天数据存储格式
+export interface MessageRequest {
+  model: string
+  messages: Array<{
+    role: 'user' | 'assistant' | 'system'
+    content: string
+  }>
+  stream?: boolean
+}
+
+export interface APIResponse {
+  data?: {
+    content?: string
+    message?: {
+      content: string
+    }
+    connected?: boolean
+    status?: string
+  }
+}
+
+// ───────────────────────────────── AI 模型与状态 ─────────────────────────────────
+
+export interface AIModel {
+  label: string
+  value: string
+  description?: string
+  available: boolean
+}
+
+export interface AIAssistantState {
+  selectedModel: string
+  availableModels: AIModel[]
+  isModelConnected: boolean
+  streamingEnabled: boolean
+  isAIResponding: boolean
+  isStreamingContent: boolean // 正在接收流式内容
+  isThinking: boolean // 是否正在思考中
+  currentThinkingContent: string // 当前思考内容
+  chatMessages: ChatMessage[]
+  isLoading: boolean
+  error: string | null
+  conversationId: string
+  modelConnections: Record<string, boolean>
+  connectionStatus: string
+}
+
+// ───────────────────────────────── 持久化与 Store ─────────────────────────────────
+
+export interface ChatSettings {
+  temperature?: number
+  maxTokens?: number
+  streamMode?: boolean
+  model?: string
+}
+
 export interface ChatData {
   id: string
   title: string
@@ -64,68 +122,65 @@ export interface ChatData {
   settings: ChatSettings
 }
 
-// 聊天设置
-export interface ChatSettings {
-  temperature?: number
-  maxTokens?: number
-  streamMode?: boolean
-  model?: string
+export interface StoreActions {
+  utilActions: {
+    handleMessageError: (error: ApiError | Error, content: string) => void
+    updateLastActivity: () => void
+    validateMessage: (content: string) => boolean
+  }
+  storageActions: {
+    saveToStorage: (data: ChatData) => void
+    loadFromStorage: (id: string) => ChatData | null
+    removeFromStorage: (id: string) => void
+  }
 }
 
-// 类型守卫函数
+// ───────────────────────────────── 类型守卫与工具函数 ─────────────────────────────────
+
 export function isApiError(error: unknown): error is ApiError {
   return (
     error instanceof Error &&
     'response' in error &&
-    typeof (error as any).response === 'object' &&
-    (error as any).response !== null
+    typeof (error as { response?: unknown }).response === 'object' &&
+    (error as { response?: unknown }).response !== null
   )
 }
 
 export function isChatMessage(obj: unknown): obj is ChatMessage {
+  if (obj === null || typeof obj !== 'object') return false
+  const m = obj as Partial<ChatMessage>
   return (
-    obj !== null &&
-    typeof obj === 'object' &&
-    'id' in obj &&
-    'role' in obj &&
-    'content' in obj &&
-    typeof (obj as any).id === 'string' &&
-    ['user', 'assistant', 'system'].includes((obj as any).role) &&
-    typeof (obj as any).content === 'string'
+    typeof m.id === 'string' &&
+    typeof m.content === 'string' &&
+    (m.role === 'user' || m.role === 'assistant' || m.role === 'system')
   )
 }
 
-// 消息转换工具函数
 export function messageToFormattedMessage(message: ChatMessage | Message): FormattedMessage {
   return {
     role: message.role === 'system' ? 'user' : message.role,
-    content: message.content
+    content: message.content,
   }
 }
 
 export function messageToChatMessage(message: Message, generateId: () => string): ChatMessage {
   return {
-    id: message.id || generateId(),
+    id: message.id ?? generateId(),
     role: message.role,
     content: message.content,
-    timestamp: message.timestamp || Date.now()
+    timestamp: message.timestamp ?? Date.now(),
   }
 }
 
-// 批量转换函数
-export function formatMessagesForAPI(messages: (ChatMessage | Message)[]): FormattedMessage[] {
-  if (!messages || !Array.isArray(messages)) return []
-  
+export function formatMessagesForAPI(messages: Array<ChatMessage | Message>): FormattedMessage[] {
+  if (!Array.isArray(messages)) return []
   return messages.map(messageToFormattedMessage)
 }
 
-export function ensureChatMessages(messages: (Message | ChatMessage)[], generateId: () => string): ChatMessage[] {
-  if (!messages || !Array.isArray(messages)) return []
-  
-  return messages.map(msg => {
-    if (isChatMessage(msg)) {
-      return msg
-    }
-    return messageToChatMessage(msg, generateId)
-  })
+export function ensureChatMessages(
+  messages: Array<Message | ChatMessage>,
+  generateId: () => string
+): ChatMessage[] {
+  if (!Array.isArray(messages)) return []
+  return messages.map((msg) => (isChatMessage(msg) ? msg : messageToChatMessage(msg, generateId)))
 }

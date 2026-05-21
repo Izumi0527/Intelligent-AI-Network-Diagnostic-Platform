@@ -36,7 +36,7 @@
         :disabled="!canSend"
         class="flex items-center justify-center w-11 h-11 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-glow-sm ring-1 ring-primary/40"
         background="oklch(var(--primary))"
-        shimmer-color="rgba(255, 255, 255, 0.6)"
+        shimmer-color="oklch(1 0 0 / 0.6)"
         border-radius="0.5rem"
         title="发送消息"
         aria-label="发送消息"

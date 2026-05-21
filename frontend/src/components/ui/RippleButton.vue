@@ -40,7 +40,7 @@ interface Ripple {
 
 const props = withDefaults(defineProps<Props>(), {
   class: '',
-  rippleColor: 'rgba(255, 255, 255, 0.6)',
+  rippleColor: 'oklch(1 0 0 / 0.6)',
   duration: 600,
   disabled: false
 });

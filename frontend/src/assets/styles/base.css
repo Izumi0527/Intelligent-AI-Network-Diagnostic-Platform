@@ -1,0 +1,45 @@
+/* ============================================================
+   Base：reset / html / body / 主题 color-scheme
+   ============================================================ */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    transition:
+      background-color var(--dur-slow) var(--ease-out),
+      color var(--dur-slow) var(--ease-out);
+  }
+
+  /* 键盘焦点可见环 — WCAG AA */
+  :focus-visible {
+    outline: 2px solid oklch(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* 用户偏好减少动效时禁用过渡 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}

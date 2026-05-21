@@ -1,5 +1,5 @@
 import { aiService } from '@/utils/aiService'
-import type { AIAssistantState, ChatMessage, StoreActions, ApiError } from '../types'
+import type { AIAssistantState, ChatMessage, StoreActions, ApiError } from '@/types/chat'
 import { generateId } from '../../../utils/helpers'
 import { nextTick } from 'vue'
 

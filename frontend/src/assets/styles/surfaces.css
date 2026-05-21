@@ -1,0 +1,142 @@
+/* ============================================================
+   Surfaces：通用面板 / 玻璃态 / 边框 / 阴影 / 通用动画
+   ============================================================ */
+
+/* ─── 玻璃态 ─────────────────────────────────────────────── */
+.glass-effect {
+  background: rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgb(255 255 255 / 0.2);
+}
+
+.dark .glass-effect {
+  background: rgb(0 0 0 / 0.2);
+  border: 1px solid rgb(255 255 255 / 0.1);
+}
+
+/* ─── 科技感发光边框 ─────────────────────────────────────── */
+.border-tech {
+  border: 1px solid var(--border);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 85%);
+}
+
+.border-tech:hover {
+  border-color: color-mix(in oklch, var(--border-glow), transparent 20%);
+  box-shadow: 0 0 8px 0 color-mix(in oklch, var(--border-glow), transparent 70%);
+}
+
+.dark .border-tech {
+  border: 1px solid var(--border);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 60%),
+    inset 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 85%);
+}
+
+.dark .border-tech:hover {
+  box-shadow:
+    0 0 12px 0 color-mix(in oklch, var(--border-glow), transparent 50%),
+    inset 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 75%);
+}
+
+.border-glow {
+  box-shadow: 0 0 0 1px oklch(var(--border-glow) / 0.3);
+}
+
+.border-glow-hover:hover {
+  box-shadow: 0 0 8px 0 oklch(var(--border-glow) / 0.4);
+}
+
+/* ─── 按钮 / 输入框发光 ─────────────────────────────────── */
+.btn-glow {
+  box-shadow: 0 0 20px -5px oklch(var(--primary) / 0.3);
+  transition:
+    box-shadow var(--dur-slow) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 30px -3px oklch(var(--primary) / 0.5);
+  transform: translateY(-1px);
+}
+
+.input-glow {
+  transition: box-shadow var(--dur-slow) var(--ease-out), border-color var(--dur-slow) var(--ease-out);
+}
+
+.input-glow:focus {
+  box-shadow: 0 0 15px -3px oklch(var(--primary) / 0.4);
+  border-color: oklch(var(--primary));
+}
+
+/* ─── 阴影层级 ──────────────────────────────────────────── */
+.shadow-glow-sm {
+  box-shadow: 0 0 10px -2px oklch(var(--primary) / 0.2);
+}
+
+.shadow-glow-md {
+  box-shadow: 0 0 20px -5px oklch(var(--primary) / 0.3);
+}
+
+.shadow-glow-lg {
+  box-shadow: 0 0 30px -8px oklch(var(--primary) / 0.4);
+}
+
+.dark .shadow-glow-sm {
+  box-shadow: 0 0 10px -2px oklch(var(--border-glow) / 0.3);
+}
+
+.dark .shadow-glow-md {
+  box-shadow: 0 0 20px -5px oklch(var(--border-glow) / 0.4);
+}
+
+.dark .shadow-glow-lg {
+  box-shadow: 0 0 30px -8px oklch(var(--border-glow) / 0.5);
+}
+
+.card-shadow {
+  box-shadow: var(--shadow-card);
+}
+
+/* ─── 通用动画 ──────────────────────────────────────────── */
+.pulse-animation {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.fade-in {
+  animation: fadeIn var(--dur-slow) var(--ease-out);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── 页面标题（共享外观） ──────────────────────────────── */
+.page-title {
+  color: var(--ai-page-title);
+  font-size: 28px;
+}
+
+@media (max-width: 1024px) {
+  .page-title {
+    font-size: 24px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .page-title {
+    font-size: 32px;
+  }
+}

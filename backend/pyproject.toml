@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "ai-network-platform"
 version = "1.0.0"
 description = "AI智能网络故障分析平台"
-readme = "README.md"
+readme = "../README.md"
 requires-python = ">=3.9"
 authors = [
     {name = "AI Network Platform Team"},

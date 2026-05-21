@@ -96,6 +96,7 @@ testpaths = ["../tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 addopts = "-v --cov=app --cov-report=term-missing --cov-report=html"
+cache_dir = "../tests/.pytest_cache"
 asyncio_mode = "auto"
 
 [tool.coverage.run]

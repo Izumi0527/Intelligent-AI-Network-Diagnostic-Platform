@@ -40,7 +40,10 @@ def _remove_virtualenv_startup_cache() -> None:
             continue
 
         for cache_file in cache_dir.glob("_virtualenv*.py[co]"):
-            cache_file.unlink(missing_ok=True)
+            try:
+                cache_file.unlink(missing_ok=True)
+            except OSError:
+                pass
 
         try:
             cache_dir.rmdir()

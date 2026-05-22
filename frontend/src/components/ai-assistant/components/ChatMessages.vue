@@ -144,6 +144,7 @@
 </template>
 
 <script setup lang="ts">
+import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { useChatScroll } from '@/composables'
 import type { ChatMessage } from '@/types/chat'
@@ -169,11 +170,15 @@ const { containerRef, scrollToBottom } = useChatScroll({
 
 const formatMessage = (content: string): string => {
   try {
-    const result = marked.parse(content, { async: false })
-    return typeof result === 'string' ? result : content
+    const parsed = marked.parse(content, { async: false })
+    const html = typeof parsed === 'string' ? parsed : content
+    return DOMPurify.sanitize(html, {
+      ADD_TAGS: ['pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+      ADD_ATTR: ['class', 'target', 'rel']
+    })
   } catch (error) {
     console.error('Markdown 渲染错误:', error)
-    return content
+    return DOMPurify.sanitize(content)
   }
 }
 

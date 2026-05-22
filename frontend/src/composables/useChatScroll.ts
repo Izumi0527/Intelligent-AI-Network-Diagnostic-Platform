@@ -1,4 +1,4 @@
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick } from 'vue';
 
 interface UseChatScrollOptions {
   /** 返回当前消息总数的 getter，用于在新消息到达时滚动 */
@@ -20,18 +20,18 @@ interface UseChatScrollOptions {
  * 通过返回的 `scrollToBottom` 也可在外部主动触发（例如发送后立即滚动）。
  */
 export function useChatScroll(options: UseChatScrollOptions) {
-  const containerRef = ref<HTMLElement | null>(null)
+  const containerRef = ref<HTMLElement | null>(null);
 
   const scrollToBottom = async (): Promise<void> => {
-    await nextTick()
+    await nextTick();
     if (containerRef.value) {
-      containerRef.value.scrollTop = containerRef.value.scrollHeight
+      containerRef.value.scrollTop = containerRef.value.scrollHeight;
     }
-  }
+  };
 
-  watch(options.messageCount, scrollToBottom)
-  watch(options.isTyping, scrollToBottom)
-  watch(options.isStreamingContent, scrollToBottom)
+  watch(options.messageCount, scrollToBottom);
+  watch(options.isTyping, scrollToBottom);
+  watch(options.isStreamingContent, scrollToBottom);
 
-  return { containerRef, scrollToBottom }
+  return { containerRef, scrollToBottom };
 }

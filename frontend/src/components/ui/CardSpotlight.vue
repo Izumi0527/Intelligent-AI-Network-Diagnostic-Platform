@@ -1,12 +1,12 @@
 <template>
-  <div 
+  <div
     ref="cardRef"
     class="card-spotlight"
     :class="slotClass"
     @mousemove="handleMouseMove"
     @mouseleave="handleMouseLeave"
   >
-    <div 
+    <div
       class="spotlight-gradient"
       :style="gradientStyle"
     ></div>
@@ -54,8 +54,8 @@ const gradientStyle = computed(() => {
 });
 
 const handleMouseMove = (event: MouseEvent) => {
-  if (!cardRef.value) return;
-  
+  if (!cardRef.value) { return; }
+
   const rect = cardRef.value.getBoundingClientRect();
   mouseX.value = event.clientX - rect.left;
   mouseY.value = event.clientY - rect.top;

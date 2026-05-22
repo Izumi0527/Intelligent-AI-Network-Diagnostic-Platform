@@ -9,12 +9,12 @@
  */
 export function useTerminalLineStyle() {
   const getLineClass = (line: string): string => {
-    if (line.includes('错误') || line.includes('失败')) return 'terminal-error'
-    if (line.includes('成功') || line.includes('已连接')) return 'terminal-success'
-    if (line.startsWith('>')) return 'terminal-command'
-    if (line.includes('警告')) return 'terminal-warning'
-    return 'terminal-text'
-  }
+    if (line.includes('错误') || line.includes('失败')) { return 'terminal-error'; }
+    if (line.includes('成功') || line.includes('已连接')) { return 'terminal-success'; }
+    if (line.startsWith('>')) { return 'terminal-command'; }
+    if (line.includes('警告')) { return 'terminal-warning'; }
+    return 'terminal-text';
+  };
 
-  return { getLineClass }
+  return { getLineClass };
 }

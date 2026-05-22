@@ -1,12 +1,12 @@
 <template>
-  <form @submit.prevent="handleConnect" class="grid grid-cols-6 gap-4">
+  <form class="grid grid-cols-6 gap-4" @submit.prevent="handleConnect">
     <!-- 1. 连接方式 -->
     <div>
       <label for="terminal-connection-type" class="text-sm font-medium mb-1 block text-gray-400">连接方式</label>
       <select
         id="terminal-connection-type"
-        name="connectionType"
         v-model="store.connectionType"
+        name="connectionType"
         class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50"
       >
         <option value="telnet">Telnet</option>
@@ -19,8 +19,8 @@
       <label for="terminal-device-address" class="text-sm font-medium mb-1 block text-gray-400">设备地址</label>
       <input
         id="terminal-device-address"
-        name="deviceAddress"
         v-model="store.deviceAddress"
+        name="deviceAddress"
         class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
         placeholder="192.168.20.1"
         type="text"
@@ -33,8 +33,8 @@
       <label for="terminal-port" class="text-sm font-medium mb-1 block text-gray-400">端口</label>
       <input
         id="terminal-port"
-        name="port"
         v-model="store.port"
+        name="port"
         class="w-20 rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
         :placeholder="store.connectionType === 'ssh' ? '22' : '23'"
         type="number"
@@ -48,8 +48,8 @@
       <label for="terminal-username" class="text-sm font-medium mb-1 block text-gray-400">用户名</label>
       <input
         id="terminal-username"
-        name="username"
         v-model="store.username"
+        name="username"
         class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
         placeholder="admin"
         type="text"
@@ -62,8 +62,8 @@
       <label for="terminal-password" class="text-sm font-medium mb-1 block text-gray-400">密码</label>
       <input
         id="terminal-password"
-        name="password"
         v-model="store.password"
+        name="password"
         class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
         type="password"
         placeholder="••••••••"
@@ -107,15 +107,15 @@
 </template>
 
 <script setup lang="ts">
-import { useTerminalStore } from '@/stores/terminal'
+import { useTerminalStore } from '@/stores/terminal';
 
-const store = useTerminalStore()
+const store = useTerminalStore();
 
 const handleConnect = async (): Promise<void> => {
-  await store.connectToDevice()
-}
+  await store.connectToDevice();
+};
 
 const handleCancelConnect = async (): Promise<void> => {
-  await store.cancelConnection()
-}
+  await store.cancelConnection();
+};
 </script>

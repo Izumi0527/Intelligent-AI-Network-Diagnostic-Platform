@@ -8,15 +8,15 @@
 
       <div class="flex items-center gap-4">
         <!-- 后端连接状态指示器 -->
-        <ServerStatusIndicator />
+        <server-status-indicator />
 
         <!-- 主题切换开关 -->
         <button
           class="p-2 rounded-xl glass-effect text-foreground hover:text-primary transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-slow)] ease-[var(--ease-out)] hover:scale-105 hover:shadow-glow-sm"
-          @click="toggleTheme"
           :title="isDarkMode ? '切换到浅色模式' : '切换到深色模式'"
           :aria-label="isDarkMode ? '切换到浅色模式' : '切换到深色模式'"
           type="button"
+          @click="toggleTheme"
         >
           <component :is="isDarkMode ? SunIcon : MoonIcon" class="w-5 h-5" />
         </button>
@@ -26,27 +26,27 @@
     <!-- 主内容区域：左侧终端(2/3) + 右侧AI助手(1/3) -->
     <main class="flex flex-1 overflow-hidden min-h-0 responsive-layout">
       <section class="w-2/3 h-full overflow-hidden transition-[width,opacity] duration-[var(--dur-slow)] ease-[var(--ease-out)] p-3 terminal-section">
-        <CardSpotlight
+        <card-spotlight
           :gradient-size="400"
           gradient-color="oklch(var(--primary) / 0.3)"
           :gradient-opacity="0.1"
           slot-class="h-full flex flex-col"
         >
-          <NetworkTerminal />
-        </CardSpotlight>
+          <network-terminal />
+        </card-spotlight>
       </section>
 
       <section class="w-1/3 h-full overflow-hidden border-l border-border/60 rounded-r-xl pr-3 pt-3 pb-3 ai-section">
-        <CardSpotlight
+        <card-spotlight
           :gradient-size="350"
           gradient-color="oklch(var(--accent) / 0.4)"
           :gradient-opacity="0.08"
           slot-class="h-full flex flex-col rounded-xl"
         >
-          <FloatingParticlesBackground>
-            <AIAssistant />
-          </FloatingParticlesBackground>
-        </CardSpotlight>
+          <floating-particles-background>
+            <a-i-assistant />
+          </floating-particles-background>
+        </card-spotlight>
       </section>
     </main>
   </div>

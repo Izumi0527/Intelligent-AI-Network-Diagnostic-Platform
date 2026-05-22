@@ -2,11 +2,11 @@
  * AI助手子组件统一导出
  */
 
-import ChatHeader from './ChatHeader.vue'
-import ModelSelector from './ModelSelector.vue'
-import StreamToggle from './StreamToggle.vue'
-import ChatMessages from './ChatMessages.vue'
-import ChatInput from './ChatInput.vue'
+import ChatHeader from './ChatHeader.vue';
+import ModelSelector from './ModelSelector.vue';
+import StreamToggle from './StreamToggle.vue';
+import ChatMessages from './ChatMessages.vue';
+import ChatInput from './ChatInput.vue';
 
 export {
   ChatHeader,
@@ -14,7 +14,7 @@ export {
   StreamToggle,
   ChatMessages,
   ChatInput
-}
+};
 
 export default {
   ChatHeader,
@@ -22,4 +22,4 @@ export default {
   StreamToggle,
   ChatMessages,
   ChatInput
-}
+};

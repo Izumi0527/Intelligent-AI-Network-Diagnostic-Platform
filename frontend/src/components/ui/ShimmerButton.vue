@@ -1,5 +1,5 @@
 <template>
-  <button 
+  <button
     class="shimmer-button"
     :style="{
       '--shimmer-color': shimmerColor,

@@ -5,30 +5,30 @@
         AI智能助手
       </h2>
       <div class="flex gap-2">
-        <ShimmerButton
+        <shimmer-button
           class="flex items-center gap-1 rounded-lg border border-border/40 px-2.5 py-1.5 text-xs font-medium text-foreground"
           background="oklch(var(--secondary))"
           shimmer-color="oklch(var(--accent-purple) / 0.5)"
           border-radius="0.5rem"
-          @click="$emit('clear')"
           title="清空当前对话"
+          @click="$emit('clear')"
         >
-          <ClearIcon class="w-3.5 h-3.5" />
+          <clear-icon class="w-3.5 h-3.5" />
           <span class="hidden sm:inline">清空对话</span>
-        </ShimmerButton>
+        </shimmer-button>
       </div>
     </div>
-    
+
     <slot />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ClearIcon } from '@/components/common/icons'
-import ShimmerButton from '@/components/ui/ShimmerButton.vue'
+import { ClearIcon } from '@/components/common/icons';
+import ShimmerButton from '@/components/ui/ShimmerButton.vue';
 
 // 定义事件
 defineEmits<{
   clear: []
-}>()
+}>();
 </script>

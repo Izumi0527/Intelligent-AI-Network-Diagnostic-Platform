@@ -143,24 +143,24 @@ export function isApiError(error: unknown): error is ApiError {
     'response' in error &&
     typeof (error as { response?: unknown }).response === 'object' &&
     (error as { response?: unknown }).response !== null
-  )
+  );
 }
 
 export function isChatMessage(obj: unknown): obj is ChatMessage {
-  if (obj === null || typeof obj !== 'object') return false
-  const m = obj as Partial<ChatMessage>
+  if (obj === null || typeof obj !== 'object') { return false; }
+  const m = obj as Partial<ChatMessage>;
   return (
     typeof m.id === 'string' &&
     typeof m.content === 'string' &&
     (m.role === 'user' || m.role === 'assistant' || m.role === 'system')
-  )
+  );
 }
 
 export function messageToFormattedMessage(message: ChatMessage | Message): FormattedMessage {
   return {
     role: message.role === 'system' ? 'user' : message.role,
     content: message.content,
-  }
+  };
 }
 
 export function messageToChatMessage(message: Message, generateId: () => string): ChatMessage {
@@ -169,18 +169,18 @@ export function messageToChatMessage(message: Message, generateId: () => string)
     role: message.role,
     content: message.content,
     timestamp: message.timestamp ?? Date.now(),
-  }
+  };
 }
 
 export function formatMessagesForAPI(messages: Array<ChatMessage | Message>): FormattedMessage[] {
-  if (!Array.isArray(messages)) return []
-  return messages.map(messageToFormattedMessage)
+  if (!Array.isArray(messages)) { return []; }
+  return messages.map(messageToFormattedMessage);
 }
 
 export function ensureChatMessages(
   messages: Array<Message | ChatMessage>,
   generateId: () => string
 ): ChatMessage[] {
-  if (!Array.isArray(messages)) return []
-  return messages.map((msg) => (isChatMessage(msg) ? msg : messageToChatMessage(msg, generateId)))
+  if (!Array.isArray(messages)) { return []; }
+  return messages.map((msg) => (isChatMessage(msg) ? msg : messageToChatMessage(msg, generateId)));
 }

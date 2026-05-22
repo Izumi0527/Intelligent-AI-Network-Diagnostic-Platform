@@ -22,4 +22,4 @@
     <path d="m6.34 17.66-1.41 1.41"></path>
     <path d="m19.07 4.93-1.41 1.41"></path>
   </svg>
-</template> 
+</template>

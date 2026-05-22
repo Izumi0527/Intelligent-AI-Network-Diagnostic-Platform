@@ -1,24 +1,24 @@
 <template>
   <div class="flex items-center gap-3">
     <div class="flex-1">
-      <select 
+      <select
         id="ai-model-selector"
         name="aiModel"
         :value="selectedModel"
-        @change="handleModelChange"
         aria-label="模型选择"
         class="w-full rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-sm input-glow"
+        @change="handleModelChange"
       >
-        <option 
-          v-for="model in availableModels" 
-          :key="model.value" 
+        <option
+          v-for="model in availableModels"
+          :key="model.value"
           :value="model.value"
         >
           {{ model.label }}
         </option>
       </select>
     </div>
-    
+
     <div
       class="px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5"
       :class="isConnected
@@ -45,14 +45,14 @@ defineProps<{
   selectedModel: string
   availableModels: ModelOption[]
   isConnected: boolean
-}>()
+}>();
 
 const emit = defineEmits<{
   'model-change': [value: string]
-}>()
+}>();
 
 const handleModelChange = (event: Event) => {
-  const target = event.target as HTMLSelectElement
-  emit('model-change', target.value)
-}
+  const target = event.target as HTMLSelectElement;
+  emit('model-change', target.value);
+};
 </script>

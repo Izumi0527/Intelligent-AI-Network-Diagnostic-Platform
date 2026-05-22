@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue';
 
 interface UseAiKeyboardOptions {
   /** Ctrl/Cmd + K 触发的回调，通常用于清空当前对话 */
@@ -14,11 +14,11 @@ interface UseAiKeyboardOptions {
 export function useAiKeyboard(options: UseAiKeyboardOptions): void {
   const handler = (event: KeyboardEvent): void => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault()
-      options.onClear()
+      event.preventDefault();
+      options.onClear();
     }
-  }
+  };
 
-  onMounted(() => document.addEventListener('keydown', handler))
-  onUnmounted(() => document.removeEventListener('keydown', handler))
+  onMounted(() => document.addEventListener('keydown', handler));
+  onUnmounted(() => document.removeEventListener('keydown', handler));
 }

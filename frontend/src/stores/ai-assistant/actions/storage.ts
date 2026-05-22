@@ -1,17 +1,17 @@
-import { localStorageUtils } from '@/utils/localStorageUtils'
-import type { AIAssistantState, ChatData } from '@/types/chat'
+import { localStorageUtils } from '@/utils/localStorageUtils';
+import type { AIAssistantState, ChatData } from '@/types/chat';
 
 export const createStorageActions = (state: AIAssistantState) => ({
   saveToStorage(chatData: ChatData) {
-    const storageKey = `chat_history_${state.selectedModel}`
-    localStorageUtils.saveChat(storageKey, chatData)
+    const storageKey = `chat_history_${state.selectedModel}`;
+    localStorageUtils.saveChat(storageKey, chatData);
   },
 
   saveConversationToStorage() {
     const chatData: ChatData = {
       id: state.conversationId,
-      title: state.chatMessages.length > 0 ? 
-        (state.chatMessages[state.chatMessages.length - 1]?.content?.substring(0, 50) ?? '新对话') + '...' : 
+      title: state.chatMessages.length > 0 ?
+        (state.chatMessages[state.chatMessages.length - 1]?.content?.substring(0, 50) ?? '新对话') + '...' :
         '新对话',
       messages: state.chatMessages,
       createdAt: new Date().toISOString(),
@@ -23,15 +23,15 @@ export const createStorageActions = (state: AIAssistantState) => ({
         streamMode: state.streamingEnabled,
         model: state.selectedModel
       }
-    }
-    
-    this.saveToStorage(chatData)
+    };
+
+    this.saveToStorage(chatData);
   },
 
   loadFromStorage(id: string): ChatData | null {
-    const storageKey = `chat_history_${id}`
-    const savedData = localStorageUtils.loadChat(storageKey)
-    
+    const storageKey = `chat_history_${id}`;
+    const savedData = localStorageUtils.loadChat(storageKey);
+
     if (savedData) {
       if (Array.isArray(savedData)) {
         // 如果是 ChatMessage[] 格式，转换为 ChatData
@@ -48,39 +48,39 @@ export const createStorageActions = (state: AIAssistantState) => ({
             streamMode: state.streamingEnabled,
             model: state.selectedModel
           }
-        }
+        };
       } else if (savedData.messages && Array.isArray(savedData.messages)) {
         // 如果是 ChatData 格式
-        return savedData
+        return savedData;
       }
     }
-    return null
+    return null;
   },
 
   loadConversationFromStorage() {
-    const storageKey = `chat_history_${state.selectedModel}`
-    const savedData = localStorageUtils.loadChat(storageKey)
+    const storageKey = `chat_history_${state.selectedModel}`;
+    const savedData = localStorageUtils.loadChat(storageKey);
 
     if (savedData) {
       if (Array.isArray(savedData)) {
-        state.chatMessages = savedData
+        state.chatMessages = savedData;
       } else if (savedData.messages && Array.isArray(savedData.messages)) {
-        state.chatMessages = savedData.messages
+        state.chatMessages = savedData.messages;
       } else {
-        state.chatMessages = []
+        state.chatMessages = [];
       }
     } else {
-      state.chatMessages = []
+      state.chatMessages = [];
     }
   },
 
   removeFromStorage(id: string) {
-    const storageKey = `chat_history_${id}`
-    localStorageUtils.removeChat(storageKey)
+    const storageKey = `chat_history_${id}`;
+    localStorageUtils.removeChat(storageKey);
   },
 
   clearConversation() {
-    state.chatMessages = []
+    state.chatMessages = [];
     // Note: saveConversationToStorage will be called by the main store
   }
-})
+});

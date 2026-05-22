@@ -158,10 +158,10 @@
 </template>
 
 <script setup lang="ts">
-import DOMPurify from 'dompurify'
-import { marked } from 'marked'
-import { useChatScroll } from '@/composables'
-import type { ChatMessage } from '@/types/chat'
+import DOMPurify from 'dompurify';
+import { marked } from 'marked';
+import { useChatScroll } from '@/composables';
+import type { ChatMessage } from '@/types/chat';
 
 export interface StreamState {
   isTyping: boolean
@@ -174,38 +174,38 @@ export interface StreamState {
 const props = defineProps<{
   messages: ChatMessage[]
   streamState: StreamState
-}>()
+}>();
 
 const { containerRef, scrollToBottom } = useChatScroll({
   messageCount: () => props.messages.length,
   isTyping: () => props.streamState.isTyping,
   isStreamingContent: () => props.streamState.isStreamingContent
-})
+});
 
 const formatMessage = (content: string): string => {
   try {
-    const parsed = marked.parse(content, { async: false })
-    const html = typeof parsed === 'string' ? parsed : content
+    const parsed = marked.parse(content, { async: false });
+    const html = typeof parsed === 'string' ? parsed : content;
     return DOMPurify.sanitize(html, {
       ADD_TAGS: ['pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
       ADD_ATTR: ['class', 'target', 'rel']
-    })
+    });
   } catch (error) {
-    console.error('Markdown 渲染错误:', error)
-    return DOMPurify.sanitize(content)
+    console.error('Markdown 渲染错误:', error);
+    return DOMPurify.sanitize(content);
   }
-}
+};
 
 const formatTime = (timestamp?: number): string => {
-  if (!timestamp) return ''
-  const date = new Date(timestamp)
+  if (!timestamp) { return ''; }
+  const date = new Date(timestamp);
   return date.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit'
-  })
-}
+  });
+};
 
-defineExpose({ scrollToBottom })
+defineExpose({ scrollToBottom });
 </script>
 
 <style scoped>

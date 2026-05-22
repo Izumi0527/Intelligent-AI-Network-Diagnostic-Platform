@@ -1,5 +1,5 @@
-import type { AIAssistantState } from '@/types/chat'
-import { generateId } from '../../utils/helpers'
+import type { AIAssistantState } from '@/types/chat';
+import { generateId } from '../../utils/helpers';
 
 export const initialState = (): AIAssistantState => ({
   selectedModel: 'deepseek-v4-pro',
@@ -16,4 +16,4 @@ export const initialState = (): AIAssistantState => ({
   conversationId: generateId(),
   modelConnections: {},
   connectionStatus: 'disconnected'
-})
+});

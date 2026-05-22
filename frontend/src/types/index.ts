@@ -26,19 +26,19 @@ export interface TerminalResponse {
 
 // AI助手相关类型 - 重新导出统一类型
 export type {
-    ChatMessage,
-    Message,
-    FormattedMessage,
-    MessageHistoryItem,
-    ChatData,
-    ChatSettings
-} from './chat'
+  ChatMessage,
+  Message,
+  FormattedMessage,
+  MessageHistoryItem,
+  ChatData,
+  ChatSettings
+} from './chat';
 
 export {
-    isApiError,
-    isChatMessage,
-    formatMessagesForAPI
-} from './chat'
+  isApiError,
+  isChatMessage,
+  formatMessagesForAPI
+} from './chat';
 
 export interface AIModel {
     id: string;
@@ -166,4 +166,4 @@ export interface ThemeConfig {
     spacing: Record<string, string>;
     borderRadius: Record<string, string>;
     animations: Record<string, string>;
-} 
+}

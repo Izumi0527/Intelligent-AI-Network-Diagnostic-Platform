@@ -22,27 +22,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useTerminalStore } from '@/stores/terminal'
-import { useTerminalLineStyle } from '../composables/useTerminalLineStyle'
+import { ref, watch } from 'vue';
+import { useTerminalStore } from '@/stores/terminal';
+import { useTerminalLineStyle } from '../composables/useTerminalLineStyle';
 
 defineProps<{
   devicePrompt: string
-}>()
+}>();
 
-const store = useTerminalStore()
-const { getLineClass } = useTerminalLineStyle()
+const store = useTerminalStore();
+const { getLineClass } = useTerminalLineStyle();
 
-const outputRef = ref<HTMLElement | null>(null)
+const outputRef = ref<HTMLElement | null>(null);
 
 watch(
   () => store.terminalOutput.length,
   () => {
     if (outputRef.value) {
-      outputRef.value.scrollTop = outputRef.value.scrollHeight
+      outputRef.value.scrollTop = outputRef.value.scrollHeight;
     }
   }
-)
+);
 </script>
 
 <style scoped>

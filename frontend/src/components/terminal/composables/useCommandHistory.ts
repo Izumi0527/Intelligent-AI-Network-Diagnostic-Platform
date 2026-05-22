@@ -1,5 +1,5 @@
-import { ref } from 'vue'
-import { useTerminalStore } from '@/stores/terminal'
+import { ref } from 'vue';
+import { useTerminalStore } from '@/stores/terminal';
 
 /**
  * 终端命令输入框的本地 ref 与历史导航。
@@ -9,22 +9,22 @@ import { useTerminalStore } from '@/stores/terminal'
  * 历史调用之间的桥接，便于在 input 元素上 v-model。
  */
 export function useCommandHistory() {
-  const store = useTerminalStore()
-  const command = ref('')
+  const store = useTerminalStore();
+  const command = ref('');
 
   const showPrevious = (): void => {
-    const prev = store.getPreviousCommand()
-    if (prev) command.value = prev
-  }
+    const prev = store.getPreviousCommand();
+    if (prev) { command.value = prev; }
+  };
 
   const showNext = (): void => {
-    const next = store.getNextCommand()
-    command.value = next || ''
-  }
+    const next = store.getNextCommand();
+    command.value = next || '';
+  };
 
   const reset = (): void => {
-    command.value = ''
-  }
+    command.value = '';
+  };
 
-  return { command, showPrevious, showNext, reset }
+  return { command, showPrevious, showNext, reset };
 }

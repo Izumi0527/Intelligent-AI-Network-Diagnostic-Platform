@@ -5,21 +5,21 @@
         <label for="chat-message-input" class="sr-only">输入消息</label>
         <textarea
           id="chat-message-input"
-          name="message"
           ref="messageInput"
           v-model="message"
+          name="message"
           :disabled="!!disabled"
-          @keydown="handleKeyDown"
-          @input="handleInput"
           placeholder="输入你的问题...(Shift+Enter 换行, Enter 发送)"
           autocomplete="off"
           class="w-full resize-none rounded-lg border border-border/85 bg-background/50 px-3 py-2 text-sm min-h-[40px] max-h-[120px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 input-glow transition-colors placeholder:text-muted-foreground/60"
-          :class="{ 
+          :class="{
             'opacity-50 cursor-not-allowed': !!disabled,
             'pr-10': hasError
           }"
+          @keydown="handleKeyDown"
+          @input="handleInput"
         />
-        
+
         <!-- 错误提示 -->
         <div
           v-if="hasError"
@@ -34,8 +34,8 @@
           <span class="sr-only">{{ errorMessage }}</span>
         </div>
       </div>
-      
-      <ShimmerButton
+
+      <shimmer-button
         :disabled="!canSend"
         class="flex items-center justify-center w-11 h-11 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-glow-sm ring-1 ring-primary/40"
         background="oklch(var(--primary))"
@@ -45,10 +45,10 @@
         aria-label="发送消息"
         @click="handleSend"
       >
-        <SendIcon class="w-4 h-4" />
-      </ShimmerButton>
+        <send-icon class="w-4 h-4" />
+      </shimmer-button>
     </div>
-    
+
     <!-- 字符计数和提示 -->
     <div class="flex justify-between items-center mt-2 text-xs text-muted-foreground">
       <div class="flex items-center gap-4">
@@ -61,10 +61,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { SendIcon } from '@/components/common/icons'
-import ShimmerButton from '@/components/ui/ShimmerButton.vue'
-import { useAutoResizeTextarea } from '@/composables'
+import { ref, computed, watch } from 'vue';
+import { SendIcon } from '@/components/common/icons';
+import ShimmerButton from '@/components/ui/ShimmerButton.vue';
+import { useAutoResizeTextarea } from '@/composables';
 
 const props = withDefaults(defineProps<{
   disabled?: boolean
@@ -76,57 +76,57 @@ const props = withDefaults(defineProps<{
   statusText: '',
   maxLength: 2000,
   placeholder: '输入你的问题...(Shift+Enter 换行, Enter 发送)'
-})
+});
 
 const emit = defineEmits<{
   send: [message: string]
   input: [message: string]
-}>()
+}>();
 
-const message = ref('')
-const { textareaRef: messageInput, resize: adjustTextareaHeight } = useAutoResizeTextarea({ maxHeight: 120 })
+const message = ref('');
+const { textareaRef: messageInput, resize: adjustTextareaHeight } = useAutoResizeTextarea({ maxHeight: 120 });
 
 const canSend = computed(() => {
-  return !props.disabled && message.value.trim().length > 0 && message.value.length <= props.maxLength
-})
+  return !props.disabled && message.value.trim().length > 0 && message.value.length <= props.maxLength;
+});
 
-const hasError = computed(() => message.value.length > props.maxLength)
+const hasError = computed(() => message.value.length > props.maxLength);
 
 const errorMessage = computed(() => {
   if (hasError.value) {
-    return `内容超出限制，最多 ${props.maxLength} 字符`
+    return `内容超出限制，最多 ${props.maxLength} 字符`;
   }
-  return ''
-})
+  return '';
+});
 
 const handleSend = () => {
-  if (!canSend.value) return
-  const content = message.value.trim()
+  if (!canSend.value) { return; }
+  const content = message.value.trim();
   if (content) {
-    emit('send', content)
-    message.value = ''
-    adjustTextareaHeight()
+    emit('send', content);
+    message.value = '';
+    adjustTextareaHeight();
   }
-}
+};
 
 const handleKeyDown = (event: KeyboardEvent) => {
   if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    handleSend()
+    event.preventDefault();
+    handleSend();
   }
-}
+};
 
 const handleInput = () => {
-  emit('input', message.value)
-  adjustTextareaHeight()
-}
+  emit('input', message.value);
+  adjustTextareaHeight();
+};
 
-const focus = () => { messageInput.value?.focus() }
-const clear = () => { message.value = ''; adjustTextareaHeight() }
+const focus = () => { messageInput.value?.focus(); };
+const clear = () => { message.value = ''; adjustTextareaHeight(); };
 
-watch(() => props.disabled, (disabled) => { if (!disabled) focus() })
+watch(() => props.disabled, (disabled) => { if (!disabled) { focus(); } });
 
-defineExpose({ focus, clear })
+defineExpose({ focus, clear });
 </script>
 
 <style scoped>

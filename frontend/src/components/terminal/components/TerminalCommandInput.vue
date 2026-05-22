@@ -5,8 +5,8 @@
       <label for="terminal-command" class="sr-only">终端命令</label>
       <input
         id="terminal-command"
-        name="command"
         v-model="command"
+        name="command"
         class="flex-1 rounded-lg border border-border bg-terminal/70 terminal-text px-3 py-2 text-sm font-mono input-glow focus:border-primary backdrop-blur-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)]"
         placeholder="输入命令..."
         type="text"
@@ -36,20 +36,20 @@
 </template>
 
 <script setup lang="ts">
-import { useTerminalStore } from '@/stores/terminal'
-import { useCommandHistory } from '../composables/useCommandHistory'
+import { useTerminalStore } from '@/stores/terminal';
+import { useCommandHistory } from '../composables/useCommandHistory';
 
 defineProps<{
   devicePrompt: string
-}>()
+}>();
 
-const store = useTerminalStore()
-const { command, showPrevious, showNext, reset } = useCommandHistory()
+const store = useTerminalStore();
+const { command, showPrevious, showNext, reset } = useCommandHistory();
 
 const handleExecute = async (): Promise<void> => {
-  const value = command.value.trim()
-  if (!value || store.connectionStatus !== 'connected') return
-  await store.executeCommand(value)
-  reset()
-}
+  const value = command.value.trim();
+  if (!value || store.connectionStatus !== 'connected') { return; }
+  await store.executeCommand(value);
+  reset();
+};
 </script>

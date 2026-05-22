@@ -10,7 +10,7 @@ import vueParser from 'vue-eslint-parser';
 export default [
   // JavaScript 基础配置
   js.configs.recommended,
-  
+
   // Vue 文件配置
   {
     files: ['**/*.vue'],
@@ -38,14 +38,14 @@ export default [
     rules: {
       // Vue 3.5 特定规则
       ...vue.configs['vue3-recommended'].rules,
-      
+
       // TypeScript 规则
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-non-null-assertion': 'warn',
       '@typescript-eslint/no-inferrable-types': 'error',
-      
+
       // Vue 自定义规则
       'vue/multi-word-component-names': 'off',
       'vue/no-v-html': 'off',
@@ -56,14 +56,14 @@ export default [
       'vue/prop-name-casing': ['error', 'camelCase'],
       'vue/attribute-hyphenation': ['error', 'always'],
       'vue/v-on-event-hyphenation': ['error', 'always'],
-      
+
       // Vue 3.5 组合式 API 规则
       'vue/no-setup-props-destructure': 'error',
       'vue/no-duplicate-attr-inheritance': 'error',
       'vue/no-useless-v-bind': 'error',
       'vue/no-unused-refs': 'error',
       'vue/prefer-import-from-vue': 'error',
-      
+
       // 代码质量规则
       'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'warn',
       'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'warn',
@@ -73,7 +73,7 @@ export default [
       'no-var': 'error',
     }
   },
-  
+
   // TypeScript 文件配置
   {
     files: ['**/*.ts', '**/*.tsx'],
@@ -91,7 +91,7 @@ export default [
     rules: {
       ...typescript.configs.recommended.rules,
       ...typescript.configs['recommended-requiring-type-checking'].rules,
-      
+
       // 严格的 TypeScript 规则
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': 'error',
@@ -104,7 +104,7 @@ export default [
       '@typescript-eslint/strict-boolean-expressions': 'warn',
     }
   },
-  
+
   // 全局配置
   {
     files: ['**/*.js', '**/*.ts', '**/*.vue'],
@@ -116,14 +116,14 @@ export default [
         process: 'readonly',
         Buffer: 'readonly',
         console: 'readonly',
-        
+
         // 浏览器全局变量
         window: 'readonly',
         document: 'readonly',
         localStorage: 'readonly',
         sessionStorage: 'readonly',
         fetch: 'readonly',
-        
+
         // Vite 全局变量
         import: 'readonly',
       }
@@ -143,7 +143,7 @@ export default [
       'radix': 'error',
       'wrap-iife': 'error',
       'yoda': 'error',
-      
+
       // 代码风格规则
       'array-bracket-spacing': ['error', 'never'],
       'block-spacing': ['error', 'always'],
@@ -172,7 +172,7 @@ export default [
       'space-unary-ops': ['error', { words: true, nonwords: false }],
     }
   },
-  
+
   // 忽略文件
   {
     ignores: [

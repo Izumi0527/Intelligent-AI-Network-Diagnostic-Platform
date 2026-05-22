@@ -4,6 +4,6 @@ import MainLayout from '@/layouts/MainLayout.vue';
 
 <template>
   <div class="h-screen w-full overflow-hidden">
-    <MainLayout />
+    <main-layout />
   </div>
 </template>

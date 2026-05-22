@@ -23,4 +23,4 @@ const statusText = computed(() =>
 useIntervalFn(() => {
   appStore.checkServerConnection();
 }, 30000, { immediateCallback: true });
-</script> 
+</script>

@@ -15,4 +15,4 @@
     <path d="m18 6-12 12"></path>
     <path d="m6 6 12 12"></path>
   </svg>
-</template> 
+</template>

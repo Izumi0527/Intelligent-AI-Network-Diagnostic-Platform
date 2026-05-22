@@ -1,11 +1,11 @@
 import logging
 import logging.handlers
 import json
+import re
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import sys
-import os
 
 from app.config.settings import settings
 
@@ -23,6 +23,23 @@ LEVEL_COLORS = {
     "ERROR": "\033[31m",
     "CRITICAL": "\033[35m",
 }
+
+SENSITIVE_LOG_PATTERNS = [
+    (re.compile(r"(Authorization\s*:\s*Bearer\s+)[^\s,;]+", re.IGNORECASE), r"\1***"),
+    (re.compile(r"((?:password|passwd|token|api[_-]?key|secret)\s*[=:]\s*)[^\s,;]+", re.IGNORECASE), r"\1***"),
+    (re.compile(r"(content\s*[=:]\s*)[^,;]+", re.IGNORECASE), r"\1***"),
+]
+
+
+def redact_sensitive_text(value: Any, max_length: int = 500) -> str:
+    """脱敏日志文本，避免记录 Token、密码、Prompt 或模型输出明文。"""
+    text = str(value)
+    for pattern, replacement in SENSITIVE_LOG_PATTERNS:
+        text = pattern.sub(replacement, text)
+
+    if len(text) > max_length:
+        return f"{text[:max_length]}...<truncated:{len(text)}>"
+    return text
 
 
 class LoggerManager:

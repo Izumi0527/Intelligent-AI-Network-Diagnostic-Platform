@@ -1,16 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
-from sse_starlette.sse import EventSourceResponse
 from fastapi.responses import StreamingResponse, JSONResponse
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from pydantic import ValidationError
 from datetime import datetime
 import json
 import time
-import asyncio
 
 from app.models.ai import (
     ChatRequest, ChatResponse, ModelsResponse,
-    ModelConnectionStatus, StreamEvent, Message
+    ModelConnectionStatus, Message
 )
 from app.services.ai.manager import AIServiceManager
 from app.services.deepseek_service import DeepseekService
@@ -20,7 +18,7 @@ from app.api.deps import (
     require_development_internal_api_token,
     require_internal_api_token,
 )
-from app.utils.logger import get_logger
+from app.utils.logger import get_logger, redact_sensitive_text
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -61,12 +59,10 @@ async def chat(
         # 记录请求信息，帮助排查问题
         logger.info(f"接收聊天请求: 模型={request.model}, 消息数量={len(request.messages)}")
         
-        # 记录详细的消息内容用于调试
+        # 只记录消息长度，避免日志落盘用户提示词明文。
         message_summary = []
         for i, msg in enumerate(request.messages):
-            # 限制内容长度防止日志过大
-            content_preview = msg.content[:50] + "..." if len(msg.content) > 50 else msg.content
-            message_summary.append(f"[{i}] {msg.role}: {content_preview}")
+            message_summary.append(f"[{i}] {msg.role}: {len(msg.content)} chars")
         
         logger.debug(f"消息详情: {'; '.join(message_summary)}")
         
@@ -90,7 +86,10 @@ async def chat(
         # 提取并记录原始请求数据，帮助排查问题
         try:
             if hasattr(request, "__dict__"):
-                req_dict = {k: str(v)[:100] for k, v in request.__dict__.items()}
+                req_dict = {
+                    k: redact_sensitive_text(v, max_length=100)
+                    for k, v in request.__dict__.items()
+                }
                 logger.error(f"原始请求数据: {req_dict}")
         except Exception as ex:
             logger.error(f"无法记录原始请求数据: {str(ex)}")

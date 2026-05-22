@@ -437,9 +437,17 @@ npm run lint       # eslint .
 - `OPENAI_API_KEY`: OpenAI API密钥
 - `DEEPSEEK_API_KEY`: Deepseek API密钥
 - `SECRET_KEY`: 应用密钥
+- `API_AUTH_ENABLED`: 内部 API 鉴权开关；生产环境必须为 `true`
+- `INTERNAL_API_TOKEN`: 内部接口 Bearer Token，需与前端 `VITE_INTERNAL_API_TOKEN` 一致
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`: JWT令牌过期时间
 - `MAX_TERMINAL_SESSIONS`: 最大终端会话数
 - `SESSION_IDLE_TIMEOUT`: 会话闲置超时时间(秒)
+- `TERMINAL_ALLOWED_HOSTS`: 可选，逗号分隔允许连接的设备主机名或 IP
+- `TERMINAL_ALLOWED_CIDRS`: 可选，逗号分隔允许连接的设备网段
+- `TERMINAL_ALLOWED_SSH_PORTS`: SSH 允许端口，默认 `22,2222`
+- `TERMINAL_ALLOWED_TELNET_PORTS`: Telnet 允许端口，默认 `23,2323`
+- `TERMINAL_COMMAND_MAX_LENGTH`: 终端命令最大长度，默认 `256`
+- `TERMINAL_BLOCKED_COMMAND_PATTERNS`: 高风险终端命令拦截正则列表
 - `HOST`: 监听主机地址（默认: 0.0.0.0）
 - `PORT`: 监听端口（默认: 8000）
 - `LOG_LEVEL`: 日志级别

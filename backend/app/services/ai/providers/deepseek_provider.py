@@ -204,9 +204,14 @@ class DeepseekProvider(AIProviderBase):
             payload["enable_reasoning"] = True
             # DeepSeek V3的beta参数格式
             payload["beta"] = {"reasoning": True}
-            logger.info(f"[DeepSeek调试] 已添加推理参数: reasoning=True, beta.reasoning=True")
+            logger.info("[DeepSeek调试] 已添加推理参数: reasoning=True, beta.reasoning=True")
 
-        logger.info(f"[DeepSeek调试] 最终请求payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+        logger.debug(
+            "[DeepSeek调试] 请求payload摘要: model=%s, messages=%s, stream=%s",
+            request.model,
+            len(messages),
+            stream,
+        )
         return payload
     
     def _parse_deepseek_response(self, response_data: Dict[str, Any]) -> ChatResponse:
@@ -237,16 +242,16 @@ class DeepseekProvider(AIProviderBase):
     
     def _parse_deepseek_stream_chunk(self, chunk_data: Dict[str, Any]) -> StreamEvent:
         """解析Deepseek流式响应块"""
-        # 添加详细的调试日志
-        logger.info(f"[DeepSeek调试] 收到流式数据块: {json.dumps(chunk_data, ensure_ascii=False, indent=2)}")
+        # 只记录结构摘要，避免输出模型内容明文。
+        logger.debug("[DeepSeek调试] 收到流式数据块")
 
         choices = chunk_data.get('choices', [])
         if not choices:
-            logger.warning(f"[DeepSeek调试] 数据块中没有choices字段")
+            logger.warning("[DeepSeek调试] 数据块中没有choices字段")
             return None
 
         delta = choices[0].get('delta', {})
-        logger.info(f"[DeepSeek调试] delta内容: {json.dumps(delta, ensure_ascii=False, indent=2)}")
+        logger.debug("[DeepSeek调试] delta字段: %s", list(delta.keys()))
 
         content = delta.get('content', '')
 
@@ -255,7 +260,7 @@ class DeepseekProvider(AIProviderBase):
 
         # 如果有思考内容，返回思考事件
         if reasoning_content:
-            logger.info(f"[DeepSeek调试] 找到推理内容: {reasoning_content}")
+            logger.debug("[DeepSeek调试] 找到推理内容: %s chars", len(reasoning_content))
             return StreamEvent(
                 type="thinking",
                 data={"thinking": reasoning_content}
@@ -263,7 +268,7 @@ class DeepseekProvider(AIProviderBase):
 
         # 如果有普通内容，返回内容事件
         if content:
-            logger.info(f"[DeepSeek调试] 返回内容事件: {content}")
+            logger.debug("[DeepSeek调试] 返回内容事件: %s chars", len(content))
             return StreamEvent(
                 type="content",
                 data={"content": content}
@@ -277,5 +282,5 @@ class DeepseekProvider(AIProviderBase):
                 data={"reason": finish_reason}
             )
 
-        logger.debug(f"[DeepSeek调试] 无关键内容的数据块，返回None")
+        logger.debug("[DeepSeek调试] 无关键内容的数据块，返回None")
         return None

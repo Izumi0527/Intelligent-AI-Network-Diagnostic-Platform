@@ -19,10 +19,21 @@ os.environ.setdefault("LOG_LEVEL", "INFO")
 os.environ.setdefault("LOG_FORMAT", "standard")
 os.environ.setdefault("AI_ENABLED", "false")
 
-from app.api.deps import get_network_service, get_terminal_service
+from app.api.deps import (
+    get_ai_service_manager,
+    get_network_service,
+    get_terminal_service,
+)
 from app.config.settings import Settings, settings
+from app.utils import logger as logger_utils
 from app.main import app
-from app.models.terminal import ConnectionResponse, TerminalCredentials
+from app.models.ai import ChatResponse, Message, ModelsResponse
+from app.models.terminal import (
+    CommandRequest,
+    CommandResponse,
+    ConnectionResponse,
+    TerminalCredentials,
+)
 from app.services.terminal_service import TerminalService
 
 
@@ -55,6 +66,50 @@ class BrokenTerminalManager:
         raise RuntimeError("sensitive device stack trace")
 
 
+class FakeAIManager:
+    async def chat(self, request):
+        return ChatResponse(
+            message=Message(role="assistant", content="ok"),
+            model=request.model,
+            content="ok",
+        )
+
+    async def chat_stream(self, _request):
+        yield type("Event", (), {"type": "content", "data": {"content": "ok"}})()
+        yield type("Event", (), {"type": "done", "data": {}})()
+
+    async def get_models_response(self):
+        return ModelsResponse(models=[], status={})
+
+    async def check_model_status(self, _model_id):
+        return True, "ok"
+
+
+class RejectingTerminalManager:
+    def __init__(self):
+        self.connect_calls = 0
+        self.command_calls = 0
+
+    async def get_all_sessions(self):
+        return []
+
+    async def connect(self, **_kwargs):
+        self.connect_calls += 1
+        return ConnectionResponse(
+            success=True,
+            session_id="should-not-connect",
+            message="不应连接",
+        )
+
+    async def execute_command(self, **_kwargs):
+        self.command_calls += 1
+        return CommandResponse(
+            session_id="session-1",
+            output="不应执行",
+            is_error=False,
+        )
+
+
 def _enable_internal_auth(monkeypatch):
     monkeypatch.setattr(settings, "API_AUTH_ENABLED", True, raising=False)
     monkeypatch.setattr(settings, "INTERNAL_API_TOKEN", "test-token", raising=False)
@@ -62,6 +117,34 @@ def _enable_internal_auth(monkeypatch):
 
 def _auth_headers():
     return {"Authorization": "Bearer test-token"}
+
+
+def _build_terminal_service(manager):
+    service = TerminalService.__new__(TerminalService)
+    service.terminal_manager = manager
+    service.max_sessions = 5
+    service.idle_timeout = 600
+    return service
+
+
+def _set_required_config(monkeypatch):
+    required = {
+        "API_PREFIX": "/api",
+        "APP_NAME": "AI智能网络故障分析平台",
+        "APP_VERSION": "0.1.0",
+        "SECRET_KEY": "test-secret-key",
+        "JWT_ALGORITHM": "HS256",
+        "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": "30",
+        "HOST": "127.0.0.1",
+        "PORT": "8000",
+        "SESSION_IDLE_TIMEOUT": "600",
+        "MAX_TERMINAL_SESSIONS": "5",
+        "LOG_LEVEL": "INFO",
+        "LOG_FORMAT": "standard",
+        "AI_ENABLED": "false",
+    }
+    for key, value in required.items():
+        monkeypatch.setenv(key, value)
 
 
 def test_terminal_connect_requires_internal_token(monkeypatch):
@@ -112,6 +195,78 @@ def test_terminal_connect_accepts_valid_internal_token(monkeypatch):
     assert response.status_code == 200
     assert response.json()["success"] is True
     assert fake_service.connect_calls == 1
+
+
+def test_ai_chat_requires_internal_token(monkeypatch):
+    """AI 对话接口会消耗外部模型能力，缺少内部 Token 时必须拒绝。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app).post(
+            "/api/v1/ai/chat",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [{"role": "user", "content": "ping"}],
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 401
+
+
+def test_ai_chat_accepts_valid_internal_token(monkeypatch):
+    """携带正确内部 Token 时，AI 对话接口应保持原有业务路径。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app).post(
+            "/api/v1/ai/chat",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [{"role": "user", "content": "ping"}],
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["content"] == "ok"
+
+
+def test_ai_stream_requires_internal_token(monkeypatch):
+    """流式 AI 对话同样必须受内部 Token 保护。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app).post(
+            "/api/v1/ai/chat/stream",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [{"role": "user", "content": "ping"}],
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 401
+
+
+def test_ai_model_status_requires_internal_token(monkeypatch):
+    """模型状态接口不能在未授权场景暴露外部服务连通性。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app).get("/api/v1/ai/models/deepseek-v4-pro/status")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 401
 
 
 def test_network_connect_is_gone_and_does_not_call_legacy_service(monkeypatch):
@@ -167,6 +322,46 @@ def test_cors_origins_remove_wildcard_and_empty_items(monkeypatch):
     ]
 
 
+def test_cors_preflight_rejects_unlisted_headers():
+    """凭证模式 CORS 不应镜像任意请求头。"""
+    response = TestClient(app).options(
+        "/api/v1/health",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "X-Debug-Header",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "x-debug-header" not in response.headers.get(
+        "access-control-allow-headers",
+        "",
+    ).lower()
+
+
+def test_production_requires_internal_api_auth(monkeypatch):
+    """生产环境不能因漏配 API_AUTH_ENABLED 而放开内部接口。"""
+    _set_required_config(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("API_AUTH_ENABLED", "false")
+    monkeypatch.setenv("INTERNAL_API_TOKEN", "prod-token")
+
+    with pytest.raises(ValueError, match="生产环境必须启用内部 API 鉴权"):
+        Settings()
+
+
+def test_production_rejects_placeholder_internal_token(monkeypatch):
+    """生产环境必须拒绝示例占位 Token，避免复制模板直接上线。"""
+    _set_required_config(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("API_AUTH_ENABLED", "true")
+    monkeypatch.setenv("INTERNAL_API_TOKEN", "change-me-internal-api-token")
+
+    with pytest.raises(ValueError, match="INTERNAL_API_TOKEN"):
+        Settings()
+
+
 def test_debug_request_format_hidden_outside_development(monkeypatch):
     """调试回显接口只能在 development 环境且通过鉴权后访问。"""
     _enable_internal_auth(monkeypatch)
@@ -191,6 +386,99 @@ def test_deepseek_generate_requires_internal_token(monkeypatch):
     )
 
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_terminal_service_rejects_loopback_target_before_network():
+    """终端连接不能被滥用为本机或内网敏感地址探测。"""
+    manager = RejectingTerminalManager()
+    service = _build_terminal_service(manager)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.connect(
+            TerminalCredentials(
+                connection_type="ssh",
+                device_address="127.0.0.1",
+                port=22,
+                username="admin",
+                password="password",
+            )
+        )
+
+    assert exc_info.value.status_code in {400, 403}
+    assert manager.connect_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_terminal_service_rejects_metadata_target_before_network():
+    """终端连接必须拒绝云元数据地址。"""
+    manager = RejectingTerminalManager()
+    service = _build_terminal_service(manager)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.connect(
+            TerminalCredentials(
+                connection_type="ssh",
+                device_address="169.254.169.254",
+                port=22,
+                username="admin",
+                password="password",
+            )
+        )
+
+    assert exc_info.value.status_code in {400, 403}
+    assert manager.connect_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_terminal_service_rejects_unapproved_ssh_port_before_network():
+    """SSH 连接只能使用配置允许的端口。"""
+    manager = RejectingTerminalManager()
+    service = _build_terminal_service(manager)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.connect(
+            TerminalCredentials(
+                connection_type="ssh",
+                device_address="192.0.2.10",
+                port=22222,
+                username="admin",
+                password="password",
+            )
+        )
+
+    assert exc_info.value.status_code == 400
+    assert manager.connect_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_terminal_service_rejects_dangerous_command_before_shell():
+    """破坏性设备命令必须在写入 SSH/Telnet shell 前被拒绝。"""
+    manager = RejectingTerminalManager()
+    service = _build_terminal_service(manager)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_command(
+            CommandRequest(session_id="session-1", command="reboot")
+        )
+
+    assert exc_info.value.status_code == 400
+    assert manager.command_calls == 0
+
+
+def test_sensitive_log_redaction_removes_tokens_passwords_and_content():
+    """日志脱敏工具不能留下 Token、密码或大段内容明文。"""
+    redact = getattr(logger_utils, "redact_sensitive_text", None)
+
+    assert callable(redact)
+    redacted = redact(
+        "Authorization: Bearer secret-token password=secret content=业务敏感内容"
+    )
+
+    assert "secret-token" not in redacted
+    assert "password=secret" not in redacted
+    assert "业务敏感内容" not in redacted
+    assert "***" in redacted
 
 
 @pytest.mark.asyncio

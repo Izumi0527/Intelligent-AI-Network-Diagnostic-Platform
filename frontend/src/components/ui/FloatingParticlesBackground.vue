@@ -1,7 +1,7 @@
 <template>
-  <div class="floating-particles-bg">
-    <div 
-      v-for="particle in particles" 
+  <div class="floating-particles-bg" aria-hidden="true">
+    <div
+      v-for="particle in particles"
       :key="particle.id"
       class="particle"
       :style="particle.style"
@@ -12,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted } from 'vue';
 
 interface Props {
   /** 是否禁用覆盖性的渐变遮罩（便于查看底部背景） */
@@ -37,14 +37,13 @@ interface Particle {
 }
 
 const particles = ref<Particle[]>([]);
-let animationId: number;
 
 const createParticles = () => {
   const particleCount = 8;
   const newParticles: Particle[] = [];
 
   for (let i = 0; i < particleCount; i++) {
-    const particle: Particle = {
+    newParticles.push({
       id: i,
       style: {
         left: Math.random() * 100 + '%',
@@ -53,43 +52,15 @@ const createParticles = () => {
         height: (Math.random() * 6 + 2) + 'px',
         animationDelay: (Math.random() * 20) + 's',
         animationDuration: (Math.random() * 10 + 15) + 's',
-        opacity: (Math.random() * 0.3 + 0.1).toString()
-      }
-    };
-    newParticles.push(particle);
+        opacity: (Math.random() * 0.3 + 0.1).toString(),
+      },
+    });
   }
 
   particles.value = newParticles;
 };
 
-const animateParticles = () => {
-  // Update particle positions subtly
-  particles.value.forEach(particle => {
-    const currentLeft = parseFloat(particle.style.left);
-    const currentTop = parseFloat(particle.style.top);
-    
-    // Very slow drift movement
-    const newLeft = currentLeft + (Math.random() - 0.5) * 0.02;
-    const newTop = currentTop + (Math.random() - 0.5) * 0.02;
-    
-    // Keep within bounds
-    particle.style.left = Math.max(0, Math.min(100, newLeft)) + '%';
-    particle.style.top = Math.max(0, Math.min(100, newTop)) + '%';
-  });
-  
-  animationId = requestAnimationFrame(animateParticles);
-};
-
-onMounted(() => {
-  createParticles();
-  animateParticles();
-});
-
-onUnmounted(() => {
-  if (animationId) {
-    cancelAnimationFrame(animationId);
-  }
-});
+onMounted(createParticles);
 </script>
 
 <style scoped>
@@ -102,13 +73,14 @@ onUnmounted(() => {
 
 .particle {
   position: absolute;
-  background: linear-gradient(45deg, 
-    oklch(var(--primary) / 0.4), 
+  background: linear-gradient(45deg,
+    oklch(var(--primary) / 0.4),
     oklch(var(--accent) / 0.3)
   );
   border-radius: 50%;
   pointer-events: none;
   animation: float-around linear infinite;
+  will-change: transform;
 }
 
 .gradient-overlay {
@@ -145,6 +117,13 @@ onUnmounted(() => {
   }
   75% {
     transform: translate(-10px, 20px) rotate(270deg) scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .particle {
+    animation: none;
+    display: none;
   }
 }
 </style>

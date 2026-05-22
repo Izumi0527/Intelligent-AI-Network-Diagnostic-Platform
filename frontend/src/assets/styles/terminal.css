@@ -97,3 +97,58 @@
     font-size: 15px;
   }
 }
+
+/* ─── 发送按钮：深色 / 浅色双模渐变 ─────────────────────────── */
+.terminal-send-button {
+  background: linear-gradient(
+    135deg,
+    oklch(var(--primary)),
+    color-mix(in oklch, oklch(var(--primary)), black 15%)
+  );
+  color: oklch(var(--primary-foreground));
+  border: 1px solid color-mix(in oklch, oklch(var(--primary)), transparent 35%);
+  box-shadow: 0 14px 28px -18px oklch(var(--primary) / 0.6);
+}
+
+.terminal-send-button:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(var(--primary)), black 12%),
+    color-mix(in oklch, oklch(var(--primary)), black 28%)
+  );
+  box-shadow: 0 16px 32px -16px oklch(var(--primary) / 0.55);
+}
+
+.terminal-send-button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 10px 22px -18px oklch(var(--primary) / 0.65);
+}
+
+.terminal-send-button:disabled {
+  background: linear-gradient(
+    135deg,
+    oklch(var(--primary) / 0.2),
+    oklch(var(--primary) / 0.25)
+  );
+  color: oklch(var(--muted-foreground));
+  border-color: oklch(var(--border) / 0.6);
+}
+
+.dark .terminal-send-button {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(var(--primary)), white 8%),
+    color-mix(in oklch, oklch(var(--primary)), black 35%)
+  );
+  color: oklch(var(--primary-foreground));
+  border-color: color-mix(in oklch, oklch(var(--primary)), white 15%);
+}
+
+.dark .terminal-send-button:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    oklch(var(--primary)),
+    color-mix(in oklch, oklch(var(--primary)), black 15%)
+  );
+  box-shadow: 0 18px 34px -18px oklch(var(--primary) / 0.55);
+}

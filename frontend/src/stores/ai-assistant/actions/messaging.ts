@@ -127,7 +127,7 @@ export const createMessagingActions = (
           logger.debug('[流式诊断] 响应对象:', response);
           logger.debug('[流式诊断] response.data 类型:', typeof response.data);
           logger.debug('[流式诊断] 是否为 ReadableStream:', response.data instanceof ReadableStream);
-          logger.debug('[流式诊断] 构造函数名称:', response.data?.constructor?.name);
+          logger.debug('[流式诊断] 构造函数名称:', response.data.constructor.name);
 
           // StreamSendResult 类型已保证 response.data 是 ReadableStream<Uint8Array>，
           // 兜底防线只需保留 instanceof 检查（处理上游契约破坏的极端情况）。
@@ -146,13 +146,10 @@ export const createMessagingActions = (
             await nextTick();
             logger.debug(`[流式状态] nextTick后状态 - isAIResponding: ${state.isAIResponding}, isStreamingContent: ${state.isStreamingContent}`);
 
-            await actions._handleStreamResponse(response.data as ReadableStream<Uint8Array>, assistantMessage, sessionId);
+            await actions._handleStreamResponse(response.data, assistantMessage, sessionId);
           } else {
             logger.error(`[流式错误] 响应不是ReadableStream，会话ID: ${sessionId}`);
             logger.error(`[流式错误] 实际类型: ${typeof response.data}`);
-            const dataType = response.data ? Object.prototype.toString.call(response.data) : 'null';
-            logger.error(`[流式错误] 构造函数: ${dataType}`);
-
             logger.error('[流式错误] 响应数据:', response.data);
             actions._handleStreamError(assistantMessage, '服务器返回的不是流式数据');
           }
@@ -173,13 +170,15 @@ export const createMessagingActions = (
           });
           logger.debug(`流式响应处理完成，会话ID: ${sessionId}`);
         } catch (error) {
-          logger.error(`流式响应错误: ${error}, 会话ID: ${sessionId}`);
-          actions._handleStreamError(assistantMessage, (error as Error).message || '请求失败');
+          const errMsg = error instanceof Error ? error.message : String(error);
+          logger.error(`流式响应错误: ${errMsg}, 会话ID: ${sessionId}`);
+          actions._handleStreamError(assistantMessage, error instanceof Error ? error.message : '请求失败');
         }
       } catch (error) {
         state.isAIResponding = false;
         state.isStreamingContent = false;
-        logger.error(`流式会话整体错误: ${error}`);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        logger.error(`流式会话整体错误: ${errMsg}`);
       }
     },
 
@@ -194,7 +193,7 @@ export const createMessagingActions = (
       let thinkingContent = '';
 
       try {
-        while (true) {
+        for (;;) {
           const { value, done } = await reader.read();
 
           if (done) {
@@ -270,7 +269,7 @@ export const createMessagingActions = (
         }
 
         const finalChunk = decoder.decode();
-        if (finalChunk && finalChunk.trim()) {
+        if (finalChunk.trim() !== '') {
           logger.debug(`[流式处理] 处理最终数据块 (${finalChunk.length}字符)，会话ID: ${sessionId}`);
 
           if (!finalChunk.includes('[DONE]') && !finalChunk.startsWith('错误:') && !finalChunk.startsWith('🤔思考: ')) {
@@ -301,8 +300,9 @@ export const createMessagingActions = (
         state.currentThinkingContent = '';
 
       } catch (e) {
-        logger.error(`[流式处理] 流读取错误: ${e}, 会话ID: ${sessionId}`);
-        actions._handleStreamError(assistantMessage, `读取流数据失败 - ${e}`);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        logger.error(`[流式处理] 流读取错误: ${errMsg}, 会话ID: ${sessionId}`);
+        actions._handleStreamError(assistantMessage, `读取流数据失败 - ${errMsg}`);
         state.isAIResponding = false;
         state.isStreamingContent = false;
         state.isThinking = false;
@@ -375,7 +375,7 @@ export const createMessagingActions = (
           messages: messagesToSend
         }, 3);
 
-        const assistantContent = response.data?.content ?? response.data?.message?.content;
+        const assistantContent = response.data.content ?? response.data.message?.content;
         if (assistantContent !== undefined && assistantContent !== '') {
           state.chatMessages.push({
             id: generateId(),

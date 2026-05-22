@@ -25,7 +25,7 @@ interface Props {
 }
 
 withDefaults(defineProps<Props>(), {
-  class: '',
+  className: '',
   shimmerColor: 'oklch(1 0 0)',
   shimmerSize: '0.05em',
   borderRadius: '0.75rem',

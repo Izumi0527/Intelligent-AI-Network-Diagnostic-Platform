@@ -59,7 +59,7 @@ api.interceptors.response.use(
         apiError.validationErrors = Array.isArray(detail) ? detail : [];
       }
     }
-    return Promise.reject(error);
+    return Promise.reject(error instanceof Error ? error : new Error(String(error)));
   }
 );
 
@@ -74,13 +74,9 @@ export function formatMessages(messages: ChatMessage[] | MessageHistoryItem[]): 
   }
 
   return messages.map(msg => {
-    // 确保每条消息都有role和content字段
-    if (msg === null || typeof msg !== 'object') {
-      logger.warn('消息格式无效，跳过:', msg);
-      return { role: 'user' as const, content: '无效消息' };
-    }
-
-    const role = (msg.role || 'user');
+    // 类型保证 msg 是对象，role 是 'user' | 'assistant' | 'system'，content 是 string；
+    // 此处只做空内容兜底，不做运行时 null/类型检查（dead code）。
+    const role = msg.role;
     // 确保content不为空或仅包含空白字符
     const content = msg.content && typeof msg.content === 'string'
       ? msg.content.trim()
@@ -197,9 +193,8 @@ export const aiService = {
                   const claude = parsed as ClaudeStreamChunk;
                   if (claude.event === 'content_block_delta' && claude.data?.delta?.text !== undefined && claude.data.delta.text !== '') {
                     content = claude.data.delta.text;
-                  }
-                  // 处理DeepSeek/OpenAI格式
-                  else {
+                  } else {
+                    // 处理DeepSeek/OpenAI格式
                     const oai = parsed as OpenAIStreamChunk;
                     if (oai.choices && oai.choices.length > 0) {
                       const delta = oai.choices[0]?.delta;
@@ -210,9 +205,8 @@ export const aiService = {
                       if (delta?.reasoning_content !== undefined && delta.reasoning_content !== '') {
                         thinking = delta.reasoning_content;
                       }
-                    }
-                    // 处理错误信息
-                    else {
+                    } else {
+                      // 处理错误信息
                       const err = parsed as StreamErrorChunk;
                       if (err.error !== undefined) {
                         const errText = typeof err.error === 'string'
@@ -259,7 +253,8 @@ export const aiService = {
                   }
                 }
               } catch (e) {
-                // 解析失败时，直接传递原始内容
+                // 解析失败时，记录原因并直接传递原始内容
+                logger.debug('SSE 行解析失败，按原文透传:', e);
                 if (contentLine && !contentLine.includes('[DONE]')) {
                   controller.enqueue(encoder.encode(contentLine));
                 }
@@ -308,9 +303,10 @@ export const aiService = {
 
           // 使用类型安全的错误处理
           if (isApiError(error)) {
-            errorMessage = `错误: 服务器返回${error.response?.status}错误`;
-            if (error.response?.data) {
-              errorMessage += ` - ${error.response.data}`;
+            errorMessage = `错误: 服务器返回${error.response.status}错误`;
+            if (error.response.data) {
+              // data 是结构化对象（含 detail 等字段），用 JSON.stringify 避免 [object Object]
+              errorMessage += ` - ${JSON.stringify(error.response.data)}`;
             }
           } else {
             errorMessage = `错误: ${extractErrorMessage(error)}`;
@@ -323,7 +319,7 @@ export const aiService = {
 
       return {
         data: errorStream,
-        status: isApiError(error) && error.response?.status !== undefined ? error.response.status : 500,
+        status: isApiError(error) ? error.response.status : 500,
         headers: {}
       };
     }
@@ -419,8 +415,8 @@ export const aiService = {
               data: data,
               params: {
                 model: params.model,
-                messageCount: params.messages?.length || 0,
-                messagesPreview: params.messages?.slice(0, 2).map(m => ({ role: m.role, contentLength: m.content?.length || 0 }))
+                messageCount: params.messages.length,
+                messagesPreview: params.messages.slice(0, 2).map(m => ({ role: m.role, contentLength: m.content.length }))
               }
             });
 

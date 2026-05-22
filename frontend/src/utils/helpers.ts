@@ -19,9 +19,20 @@ export function getCurrentTimestamp(): number {
 
 /**
  * 类型安全的错误检查
+ *
+ * 守卫返回时进一步收窄 `response` 为非空对象，使消费方可在
+ * `if (isApiError(error))` 之后直接访问 `error.response.status` /
+ * `error.response.data`，无需 `!` 或 `?.`。
  */
-export function isApiError(error: unknown): error is ApiError {
-  return error instanceof Error && 'response' in error;
+export function isApiError(
+  error: unknown
+): error is ApiError & { response: NonNullable<ApiError['response']> } {
+  return (
+    error instanceof Error &&
+    'response' in error &&
+    typeof (error as { response?: unknown }).response === 'object' &&
+    (error as { response?: unknown }).response !== null
+  );
 }
 
 /**

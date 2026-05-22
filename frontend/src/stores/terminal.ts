@@ -106,10 +106,10 @@ export const useTerminalStore = defineStore('terminal', {
         this.canCancelConnection = false;
 
         const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage && errorMessage.includes('timeout')) {
+        if (errorMessage.includes('timeout')) {
           this.terminalOutput.push('连接超时: 请检查设备地址和端口是否正确，或者设备是否响应缓慢');
           this.terminalOutput.push('建议: 请确认设备可访问性，或稍后重试');
-        } else if (errorMessage && errorMessage.includes('Network Error')) {
+        } else if (errorMessage.includes('Network Error')) {
           this.terminalOutput.push('网络错误: 无法连接到服务器或设备');
           this.terminalOutput.push('建议: 请检查网络连接和防火墙设置');
         } else {
@@ -219,7 +219,13 @@ export const useTerminalStore = defineStore('terminal', {
       this.terminalOutput = [];
     },
 
-    // 移除ANSI控制码的辅助方法
+    // 移除 ANSI 控制码的辅助方法
+    //
+    // 注：ESC (0x1B) 在 ECMAScript 规范中属"控制字符"，ESLint 默认开启
+    // no-control-regex 阻止其出现在正则字面量。但 ANSI 转义序列就是以 ESC
+    // 开头的 in-band 字节流（xterm.js 写入终端的标准方式），清理输出必须匹配
+    // 该字节，无替代写法。此处 disable 仅作用于本方法体，影响面最小。
+    /* eslint-disable no-control-regex */
     stripAnsiCodes(text: string): string {
       // 移除ANSI转义序列
       return text.replace(/\u001b\[\d{1,2}m/g, '')
@@ -228,5 +234,6 @@ export const useTerminalStore = defineStore('terminal', {
         .replace(/\u001b\[\??\d+[hl]/g, '')
         .replace(/\u001b\[\d+[ABCD]/g, '');
     }
+    /* eslint-enable no-control-regex */
   }
 });

@@ -20,7 +20,7 @@ export const createStorageActions = (state: AIAssistantState): StorageActions =>
     const chatData: ChatData = {
       id: state.conversationId,
       title: state.chatMessages.length > 0 ?
-        (state.chatMessages[state.chatMessages.length - 1]?.content?.substring(0, 50) ?? '新对话') + '...' :
+        (state.chatMessages[state.chatMessages.length - 1]?.content.substring(0, 50) ?? '新对话') + '...' :
         '新对话',
       messages: state.chatMessages,
       createdAt: new Date().toISOString(),

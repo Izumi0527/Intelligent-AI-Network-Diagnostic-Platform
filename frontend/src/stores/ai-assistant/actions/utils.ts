@@ -61,17 +61,19 @@ export const createUtilActions = (state: AIAssistantState): UtilActions => ({
   },
 
   handleMessageError(error: ApiError | Error, _content: string): void {
+    // _content: 调用方语义需要，但当前错误格式构造仅依赖 error；保留参数以兼容接口
+    void _content;
     logger.error('消息发送错误:', error);
 
     let errorMessage = '发生错误: ';
 
     if (isApiError(error)) {
-      const statusCode = error.response!.status;
+      const statusCode = error.response.status;
 
       if (statusCode === 422) {
         errorMessage += '请求参数验证失败';
-        const responseData = error.response!.data as { detail?: string | Array<{ msg: string }> };
-        if (responseData?.detail !== undefined) {
+        const responseData = (error.response.data ?? {}) as { detail?: string | Array<{ msg: string }> };
+        if (responseData.detail !== undefined) {
           const details = Array.isArray(responseData.detail)
             ? responseData.detail[0]?.msg
             : responseData.detail;
@@ -81,14 +83,14 @@ export const createUtilActions = (state: AIAssistantState): UtilActions => ({
         }
       } else if (statusCode === 500) {
         errorMessage += '服务器内部错误';
-        const responseData = error.response!.data as { detail?: string };
-        if (responseData?.detail !== undefined && responseData.detail !== '') {
+        const responseData = (error.response.data ?? {}) as { detail?: string };
+        if (responseData.detail !== undefined && responseData.detail !== '') {
           errorMessage += `: ${responseData.detail}`;
         }
       } else if (statusCode === 400) {
         errorMessage += '无效请求';
-        const responseData = error.response!.data as { detail?: string };
-        if (responseData?.detail !== undefined && responseData.detail !== '') {
+        const responseData = (error.response.data ?? {}) as { detail?: string };
+        if (responseData.detail !== undefined && responseData.detail !== '') {
           errorMessage += `: ${responseData.detail}`;
         }
       } else {

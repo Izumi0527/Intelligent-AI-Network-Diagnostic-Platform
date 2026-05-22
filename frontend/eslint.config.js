@@ -123,6 +123,13 @@ export default [
         localStorage: 'readonly',
         sessionStorage: 'readonly',
         fetch: 'readonly',
+        crypto: 'readonly',
+
+        // 定时器（同时存在于 browser 与 node 标准库）
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
 
         // Vite 全局变量
         import: 'readonly',
@@ -139,7 +146,9 @@ export default [
       'no-self-compare': 'error',
       'no-sequences': 'error',
       'no-throw-literal': 'error',
-      'no-void': 'error',
+      // allowAsStatement: 允许 `void promise;` 显式忽略返回值（fire-and-forget）
+      // 与 `void _unused;` 显式消费未使用参数；禁止表达式中的 void。
+      'no-void': ['error', { allowAsStatement: true }],
       'radix': 'error',
       'wrap-iife': 'error',
       'yoda': 'error',
@@ -184,7 +193,11 @@ export default [
       '.vscode/**',
       '.idea/**',
       '.vite/**',
-      '*.d.ts'
+      '*.d.ts',
+      // 项目根级文件未纳入 tsconfig 的 include（仅 src/** 受 typecheck）
+      // 这些是构建配置或未使用的 shadcn 模板代码，避免 parser project 报错
+      'vite.config.ts',
+      'lib/utils.ts'
     ]
   }
 ];

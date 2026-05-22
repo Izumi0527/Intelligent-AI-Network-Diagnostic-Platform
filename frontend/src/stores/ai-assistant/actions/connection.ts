@@ -15,7 +15,7 @@ export const createConnectionActions = (state: AIAssistantState): ConnectionActi
 
       logger.debug('模型连接检查响应:', response.data);
 
-      if (typeof response.data === 'object' && response.data !== null) {
+      if (typeof response.data === 'object') {
         if ('connected' in response.data) {
           state.isModelConnected = Boolean(response.data.connected);
           logger.debug('设置连接状态:', state.isModelConnected);

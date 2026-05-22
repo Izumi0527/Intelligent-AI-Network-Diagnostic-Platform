@@ -21,6 +21,7 @@ os.environ.setdefault("AI_ENABLED", "false")
 
 from app.api.deps import get_terminal_service
 from app.core import ssh as ssh_module
+from app.core.network.telnet.manager import TelnetManager as NetworkTelnetManager
 from app.core.ssh import SSHManager
 from app.core.telnet import TelnetManager
 from app.core.terminal import TerminalManager
@@ -86,6 +87,68 @@ async def test_terminal_cleanup_handles_datetime_last_activity(monkeypatch):
 
     assert await manager.cleanup_idle_sessions(idle_timeout=60) == 1
     assert "ssh-old" not in manager.sessions
+
+
+@pytest.mark.asyncio
+async def test_terminal_manager_does_not_start_session_check_on_init():
+    """TerminalManager 构造阶段不应隐式创建后台任务。"""
+    manager = TerminalManager()
+
+    assert getattr(manager, "session_check_task", None) is None
+
+
+@pytest.mark.asyncio
+async def test_terminal_manager_background_task_starts_and_stops_explicitly():
+    """TerminalManager 后台任务应由应用生命周期显式启动和关闭。"""
+    manager = TerminalManager()
+
+    manager.start_background_tasks()
+    task = getattr(manager, "session_check_task", None)
+
+    assert task is not None
+    assert not task.done()
+
+    await manager.shutdown()
+    assert task.cancelled() or task.done()
+
+
+@pytest.mark.asyncio
+async def test_telnet_manager_connect_does_not_start_cleanup_task(monkeypatch):
+    """Telnet 连接成功路径不应隐式创建周期清理任务。"""
+    manager = NetworkTelnetManager()
+
+    class FakeConnection:
+        session_id = "telnet-session"
+        last_activity_time = None
+
+        async def connect(self, _timeout: int):
+            return True, "ok"
+
+        def is_alive(self):
+            return True
+
+        def get_info(self):
+            return {"session_id": self.session_id}
+
+        async def disconnect(self):
+            return True, "ok"
+
+    monkeypatch.setattr(
+        manager,
+        "_create_connection",
+        lambda *_args, **_kwargs: FakeConnection(),
+    )
+
+    success, _, session_id = await manager.connect(
+        "192.0.2.10",
+        23,
+        "admin",
+        "password",
+    )
+
+    assert success is True
+    assert session_id == "telnet-session"
+    assert manager._cleanup_task is None
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import time
 from contextlib import asynccontextmanager
 
@@ -8,8 +9,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from app.api.api_v1.api import api_router
-from app.api.deps import get_terminal_service
 from app.config.settings import settings
+from app.services.ai.manager import AIServiceManager
+from app.services.deepseek_service import DeepseekService
+from app.services.terminal_service import TerminalService
 from app.utils.logger import get_logger
 
 # 使用统一的日志管理器获取logger
@@ -42,10 +45,33 @@ async def cleanup_idle_sessions(terminal_service):
         await asyncio.sleep(300)
 
 
+def _initialize_application_services(application: FastAPI) -> None:
+    """在应用实例范围内统一创建服务，避免模块级全局单例。"""
+    application.state.terminal_service = TerminalService()
+    application.state.ai_service_manager = AIServiceManager()
+    application.state.deepseek_service = DeepseekService()
+
+
+async def _cleanup_service(service) -> None:
+    """清理具备 cleanup 方法的服务实例。"""
+    cleanup = getattr(service, "cleanup", None)
+    if cleanup is None:
+        return
+
+    result = cleanup()
+    if inspect.isawaitable(result):
+        await result
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     """应用生命周期：统一启动和取消后台任务。"""
-    terminal_service = get_terminal_service()
+    _initialize_application_services(application)
+    terminal_service = application.state.terminal_service
+    start_terminal_tasks = getattr(terminal_service, "start_background_tasks", None)
+    if start_terminal_tasks:
+        start_terminal_tasks()
+
     application.state.cleanup_task = asyncio.create_task(
         cleanup_idle_sessions(terminal_service)
     )
@@ -60,6 +86,14 @@ async def lifespan(application: FastAPI):
                 await application.state.cleanup_task
             except asyncio.CancelledError:
                 logger.info("已取消定期会话清理任务")
+
+        for service_name in (
+            "terminal_service",
+            "deepseek_service",
+            "ai_service_manager",
+        ):
+            if hasattr(application.state, service_name):
+                await _cleanup_service(getattr(application.state, service_name))
 
 
 def _api_documentation_urls() -> dict[str, str | None]:

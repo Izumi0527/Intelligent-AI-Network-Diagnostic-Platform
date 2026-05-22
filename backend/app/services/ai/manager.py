@@ -203,7 +203,3 @@ class AIServiceManager:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
 
         logger.info("AI服务管理器资源清理完成")
-
-
-# 全局AI服务管理器实例
-ai_service_manager = AIServiceManager()

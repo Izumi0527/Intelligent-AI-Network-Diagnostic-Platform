@@ -4,14 +4,13 @@ AI服务核心模块
 """
 
 from .base import AIProviderBase, ProviderType
-from .manager import AIServiceManager, ai_service_manager
-from .providers import OpenAIProvider, ClaudeProvider
+from .manager import AIServiceManager
+from .providers import ClaudeProvider, OpenAIProvider
 
 __all__ = [
     'AIProviderBase',
     'ProviderType',
     'AIServiceManager',
-    'ai_service_manager',
-    'OpenAIProvider', 
+    'OpenAIProvider',
     'ClaudeProvider'
 ]

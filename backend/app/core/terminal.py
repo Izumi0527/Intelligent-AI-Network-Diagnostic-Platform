@@ -1,35 +1,57 @@
 import asyncio
-import logging
-from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime, timezone
+from typing import Any
 
-from app.utils.logger import get_logger
 from app.core.ssh import SSHManager
 from app.core.telnet import TelnetManager
 from app.models.terminal import (
-    SessionInfo, ConnectionType, ConnectionResponse,
-    CommandResponse
+    CommandResponse,
+    ConnectionResponse,
+    ConnectionType,
+    SessionInfo,
 )
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 class TerminalManager:
     """终端管理器，整合SSH和Telnet功能"""
-    
+
     def __init__(self):
         """初始化终端管理器"""
         self.ssh_manager = SSHManager()
         self.telnet_manager = TelnetManager()
-        self.sessions: Dict[str, SessionInfo] = {}
+        self.sessions: dict[str, SessionInfo] = {}
         self.lock = asyncio.Lock()
-        
-        # 启动会话检查任务（如果是在异步环境中初始化的）
-        try:
-            loop = asyncio.get_event_loop()
-            if not loop.is_closed():
-                self.session_check_task = loop.create_task(self._session_check_routine())
-        except Exception as e:
-            logger.warning(f"无法启动会话检查任务: {str(e)}")
+        self.session_check_task = None
+
+    def start_background_tasks(self) -> None:
+        """显式启动后台会话检查任务。"""
+        if self.session_check_task is None or self.session_check_task.done():
+            self.session_check_task = asyncio.create_task(self._session_check_routine())
+            logger.info("已启动终端会话检查任务")
+
+        start_telnet_tasks = getattr(
+            self.telnet_manager, "start_background_tasks", None
+        )
+        if start_telnet_tasks:
+            start_telnet_tasks()
+
+    async def shutdown(self) -> None:
+        """关闭后台任务并释放子管理器资源。"""
+        if self.session_check_task:
+            self.session_check_task.cancel()
+            try:
+                await self.session_check_task
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self.session_check_task = None
+
+        telnet_shutdown = getattr(self.telnet_manager, "shutdown", None)
+        if telnet_shutdown:
+            await telnet_shutdown()
 
     def _now(self) -> datetime:
         """返回统一的 UTC 时间，避免会话时间字段混用 float 与 datetime。"""
@@ -51,7 +73,7 @@ class TerminalManager:
         """计算会话距上次活动的秒数。"""
         last_activity = self._normalize_activity_time(session.last_activity)
         return (self._now() - last_activity).total_seconds()
-    
+
     async def _session_check_routine(self):
         """定期检查会话状态并执行保活操作"""
         try:
@@ -60,16 +82,16 @@ class TerminalManager:
                     await self._check_and_keep_alive_sessions()
                 except Exception as e:
                     logger.error(f"会话检查例程出错: {str(e)}")
-                    
+
                 # 每60秒检查一次
                 await asyncio.sleep(60)
         except asyncio.CancelledError:
             logger.info("会话检查任务已取消")
-    
+
     async def _check_and_keep_alive_sessions(self):
         """检查所有会话状态并执行保活操作"""
         ssh_session_ids = []
-        
+
         # 找出需要检查的SSH会话
         for session_id, session in self.sessions.items():
             if session.connection_type == "ssh":
@@ -77,23 +99,28 @@ class TerminalManager:
                 if self._seconds_since_activity(session) < 120:
                     continue
                 ssh_session_ids.append(session_id)
-        
+
         # 对每个SSH会话执行检查
         for session_id in ssh_session_ids:
             if session_id in self.sessions:  # 确保会话仍然存在
                 try:
                     # 检查会话状态
                     is_active = await self.ssh_manager.check_session_active(session_id)
-                    
+
                     if not is_active:
-                        logger.warning(f"SSH会话 {session_id} 已失效，将在下次使用时尝试恢复")
+                        logger.warning(
+                            f"SSH会话 {session_id} 已失效，将在下次使用时尝试恢复"
+                        )
                 except Exception as e:
                     logger.error(f"检查SSH会话 {session_id} 状态时出错: {str(e)}")
-        
+
     async def connect(
-        self, connection_type: ConnectionType, 
-        device_address: str, port: int, 
-        username: str, password: str
+        self,
+        connection_type: ConnectionType,
+        device_address: str,
+        port: int,
+        username: str,
+        password: str,
     ) -> ConnectionResponse:
         """创建新的终端连接"""
         try:
@@ -109,16 +136,14 @@ class TerminalManager:
                 return ConnectionResponse(
                     success=False,
                     message=f"不支持的连接类型: {connection_type}",
-                    session_id=None
+                    session_id=None,
                 )
-                
+
             if not success or not session_id:
                 return ConnectionResponse(
-                    success=False,
-                    message=message,
-                    session_id=None
+                    success=False, message=message, session_id=None
                 )
-            
+
             # 获取设备信息
             device_info = ""
             if connection_type == "ssh" and session_id:
@@ -129,7 +154,7 @@ class TerminalManager:
                 session_info = self.telnet_manager.get_session_info(session_id)
                 if session_info and "device_info" in session_info:
                     device_info = session_info["device_info"]
-            
+
             # 创建会话信息
             now = self._now()
             async with self.lock:
@@ -143,85 +168,79 @@ class TerminalManager:
                     connected_at=now,
                     last_activity=now,
                 )
-            
+
             return ConnectionResponse(
                 success=True,
                 session_id=session_id,
                 message=message,
-                device_info=device_info
+                device_info=device_info,
             )
-            
+
         except Exception as e:
             logger.error(f"创建终端连接时出错: {str(e)}")
             return ConnectionResponse(
-                success=False,
-                message=f"创建连接时出错: {str(e)}",
-                session_id=None
+                success=False, message=f"创建连接时出错: {str(e)}", session_id=None
             )
-    
+
     async def execute_command(self, session_id: str, command: str) -> CommandResponse:
         """在终端会话中执行命令"""
         if session_id not in self.sessions:
             return CommandResponse(
-                session_id=session_id,
-                output="错误: 会话不存在或已过期",
-                is_error=True
+                session_id=session_id, output="错误: 会话不存在或已过期", is_error=True
             )
-        
+
         session = self.sessions[session_id]
-        
+
         try:
             # 更新会话最后活动时间
             session.last_activity = self._now()
-            
+
             if session.connection_type == "ssh":
-                success, output = await self.ssh_manager.execute_command(session_id, command)
+                success, output = await self.ssh_manager.execute_command(
+                    session_id, command
+                )
             elif session.connection_type == "telnet":
-                success, output = await self.telnet_manager.execute_command(session_id, command)
+                success, output = await self.telnet_manager.execute_command(
+                    session_id, command
+                )
             else:
                 return CommandResponse(
                     session_id=session_id,
                     output=f"错误: 不支持的连接类型 {session.connection_type}",
-                    is_error=True
+                    is_error=True,
                 )
-            
+
             if not success:
                 # 如果是会话失效或连接中断错误，设置会话为非活跃
-                if "会话" in output and ("失效" in output or "不存在" in output or "已过期" in output):
+                if "会话" in output and (
+                    "失效" in output or "不存在" in output or "已过期" in output
+                ):
                     session.is_active = False
-                    
+
                 return CommandResponse(
-                    session_id=session_id,
-                    output=output,
-                    is_error=True
+                    session_id=session_id, output=output, is_error=True
                 )
-            
+
             # 命令执行成功，更新会话活跃状态
             session.is_active = True
-            return CommandResponse(
-                session_id=session_id,
-                output=output,
-                is_error=False
-            )
-            
+            return CommandResponse(session_id=session_id, output=output, is_error=False)
+
         except Exception as e:
             logger.error(f"执行命令时出错: {str(e)}")
             # 可能是会话或连接问题，标记为非活跃
             session.is_active = False
-            
+
             return CommandResponse(
-                session_id=session_id,
-                output=f"执行命令时出错: {str(e)}",
-                is_error=True
+                session_id=session_id, output=f"执行命令时出错: {str(e)}", is_error=True
             )
-    
-    async def disconnect(self, session_id: str) -> Tuple[bool, str]:
+
+    async def disconnect(self, session_id: str) -> tuple[bool, str]:
         """断开终端连接"""
         if session_id not in self.sessions:
             return False, "错误: 会话不存在或已过期"
-        
+
         session = self.sessions[session_id]
-        
+
         try:
             if session.connection_type == "ssh":
                 success, message = await self.ssh_manager.disconnect(session_id)
@@ -229,48 +248,48 @@ class TerminalManager:
                 success, message = await self.telnet_manager.disconnect(session_id)
             else:
                 return False, f"错误: 不支持的连接类型 {session.connection_type}"
-            
+
             # 无论成功与否，都移除会话
             async with self.lock:
                 if session_id in self.sessions:
                     del self.sessions[session_id]
-            
+
             return success, message
-            
+
         except Exception as e:
             logger.error(f"断开连接时出错: {str(e)}")
-            
+
             # 尝试强制移除会话
             async with self.lock:
                 if session_id in self.sessions:
                     del self.sessions[session_id]
-                    
+
             return False, f"断开连接时出错: {str(e)}"
-    
-    async def get_all_sessions(self) -> List[SessionInfo]:
+
+    async def get_all_sessions(self) -> list[SessionInfo]:
         """获取所有活跃会话"""
         return list(self.sessions.values())
-    
-    async def get_session(self, session_id: str) -> Optional[SessionInfo]:
+
+    async def get_session(self, session_id: str) -> SessionInfo | None:
         """获取指定会话信息"""
         return self.sessions.get(session_id)
-    
+
     async def cleanup_idle_sessions(self, idle_timeout: int = 600) -> int:
         """清理闲置的会话"""
         sessions_to_cleanup = []
-        
+
         # 找出闲置的会话
         for session_id, session in self.sessions.items():
             if self._seconds_since_activity(session) > idle_timeout:
                 sessions_to_cleanup.append(session_id)
-        
+
         # 断开这些会话
         cleaned_count = 0
         for session_id in sessions_to_cleanup:
             success, _ = await self.disconnect(session_id)
             if success:
                 cleaned_count += 1
-        
+
         # 同时让SSH和Telnet管理器进行它们自己的清理
         try:
             ssh_cleaned = await self.ssh_manager.cleanup_idle_sessions(idle_timeout)
@@ -296,5 +315,5 @@ class TerminalManager:
                         del self.sessions[session_id]
         except Exception as e:
             logger.error(f"Telnet会话清理出错: {str(e)}")
-            
+
         return cleaned_count

@@ -63,17 +63,17 @@
   - 目标：替代已弃用的 `@app.on_event`，统一创建和取消后台任务。
   - 验收：测试启动时创建清理任务；shutdown 后任务被取消且不产生未处理异常。
 
-- [ ] 统一服务实例生命周期
+- [x] 统一服务实例生命周期
   - 涉及范围：`backend/app/api/deps.py`、`backend/app/main.py`、服务管理测试。
   - 目标：减少模块级全局单例，优先通过 `app.state` 管理 `TerminalService`、`AIServiceManager` 等服务。
   - 验收：TestClient 生命周期内服务可替换、可清理；导入模块不提前创建网络资源。
 
-- [ ] 移除核心管理器构造阶段的隐式后台任务
+- [x] 移除核心管理器构造阶段的隐式后台任务
   - 涉及范围：`backend/app/core/terminal.py`、`backend/app/core/network/telnet/manager.py`。
   - 目标：`__init__` 和连接成功路径不直接 `create_task`，任务由应用生命周期统一控制。
   - 验收：单独实例化 manager 不创建后台任务；应用启动后只存在预期清理任务。
 
-- [ ] 服务层领域异常替代直接 HTTPException
+- [x] 服务层领域异常替代直接 HTTPException
   - 涉及范围：`backend/app/services/terminal_service.py`、API 路由异常映射测试。
   - 目标：新增领域异常，例如 `TerminalPolicyViolation`、`SessionNotFound`、`TerminalConnectionFailed`。
   - 验收：服务层不再依赖 FastAPI；路由层或全局 exception handler 负责映射 HTTP 状态码。
@@ -195,3 +195,5 @@ uv run --no-sync python -m ruff check app tests
 - 2026-05-22：完成 Phase 1 第 4-6 项整改：AI 请求限制消息数量、单条/总内容长度、`max_tokens`、`temperature`、`top_p`；第三方 AI 上游错误统一返回通用文案和 `request_id`，连接状态接口不再透传敏感上游错误；日志 formatter 增加普通文本、结构化字段和异常栈脱敏。验证 `tests/test_logger.py tests/test_backend_security_and_connection_policy.py` 为 `41 passed`，完整 `tests` 为 `57 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。
 - 2026-05-22：完成 Phase 1 最后一项整改：新增应用工厂，根据 `APP_ENV=production` 禁用 `/api/v1/docs`、`/api/v1/redoc`、`/api/v1/openapi.json`，根路径在生产环境只返回服务状态；验证 `tests/test_logger.py tests/test_backend_security_and_connection_policy.py` 为 `42 passed`，完整 `tests` 为 `58 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。
 - 2026-05-22：完成 Phase 2 第一项整改：将 FastAPI `startup/shutdown` 迁移为 `lifespan` 上下文，保留终端空闲会话清理任务的启动与取消逻辑，并新增无 `on_event` 弃用警告的回归测试；验证 `tests/test_backend_security_and_connection_policy.py` 为 `39 passed`，完整 `tests` 为 `59 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。
+- 2026-05-22：完成 Phase 2 第二项整改：服务实例统一由 `lifespan` 创建并挂载到 `app.state`，依赖函数优先从当前应用实例读取服务，移除 AI manager 导入即创建的模块级全局单例，并在 shutdown 时统一调用服务 `cleanup`；验证 `tests/test_backend_security_and_connection_policy.py` 为 `42 passed`，完整 `tests` 为 `62 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。
+- 2026-05-22：完成 Phase 2 第三、第四项整改：核心终端和 Telnet 管理器构造阶段不再隐式创建后台任务，任务由应用 `lifespan` 显式启动并在 shutdown 清理；新增终端领域异常层，`TerminalService` 不再导入 FastAPI 或直接抛 `HTTPException`，终端路由统一将领域异常映射为 HTTP 响应。验证 `tests/test_terminal_connection_regressions.py tests/test_backend_security_and_connection_policy.py` 为 `54 passed`，完整 `tests` 为 `68 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。

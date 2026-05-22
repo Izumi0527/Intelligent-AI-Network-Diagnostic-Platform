@@ -1,49 +1,66 @@
 import secrets
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Request, status
 
-from app.services.ai.manager import AIServiceManager, ai_service_manager
+from app.config.settings import settings
+from app.services.ai.manager import AIServiceManager
+from app.services.deepseek_service import DeepseekService
 from app.services.network_service import NetworkService
 from app.services.terminal_service import TerminalService
-from app.services.deepseek_service import DeepseekService
-from app.config.settings import settings
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 全局服务实例
-_network_service = None
-_terminal_service = None
-_deepseek_service = None
 
-def get_deepseek_service() -> DeepseekService:
+def _get_or_create_state_service(
+    request: Request,
+    attr_name: str,
+    factory: type[Any],
+) -> Any:
+    """从 app.state 获取服务；缺失时在当前应用实例内懒创建。"""
+    if hasattr(request.app.state, attr_name):
+        return getattr(request.app.state, attr_name)
+
+    service = factory()
+    setattr(request.app.state, attr_name, service)
+    return service
+
+
+def get_deepseek_service(request: Request) -> DeepseekService:
     """获取Deepseek服务实例"""
-    global _deepseek_service
-    if _deepseek_service is None and settings.DEEPSEEK_API_ENABLED:
-        _deepseek_service = DeepseekService()
-    elif _deepseek_service is None:
-        # 如果服务未启用，仍返回实例但功能受限
-        _deepseek_service = DeepseekService()
-    return _deepseek_service
+    return _get_or_create_state_service(
+        request,
+        "deepseek_service",
+        DeepseekService,
+    )
 
-def get_ai_service_manager() -> AIServiceManager:
+
+def get_ai_service_manager(request: Request) -> AIServiceManager:
     """获取AI服务管理器实例"""
-    return ai_service_manager
+    return _get_or_create_state_service(
+        request,
+        "ai_service_manager",
+        AIServiceManager,
+    )
 
-def get_network_service() -> NetworkService:
+
+def get_network_service(request: Request) -> NetworkService:
     """获取网络服务实例"""
-    global _network_service
-    if _network_service is None:
-        _network_service = NetworkService()
-    return _network_service
+    return _get_or_create_state_service(
+        request,
+        "network_service",
+        NetworkService,
+    )
 
-def get_terminal_service() -> TerminalService:
+
+def get_terminal_service(request: Request) -> TerminalService:
     """获取终端服务实例"""
-    global _terminal_service
-    if _terminal_service is None:
-        _terminal_service = TerminalService()
-    return _terminal_service
+    return _get_or_create_state_service(
+        request,
+        "terminal_service",
+        TerminalService,
+    )
 
 
 def _validate_internal_api_token(authorization: Optional[str]) -> None:

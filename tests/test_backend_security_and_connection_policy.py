@@ -1,8 +1,9 @@
 import os
 import warnings
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("APP_ENV", "test")
@@ -20,6 +21,8 @@ os.environ.setdefault("LOG_LEVEL", "INFO")
 os.environ.setdefault("LOG_FORMAT", "standard")
 os.environ.setdefault("AI_ENABLED", "false")
 
+from app import main as main_module
+from app.api import deps as deps_module
 from app.api.deps import (
     get_ai_service_manager,
     get_network_service,
@@ -39,7 +42,14 @@ from app.services.ai.base import ProviderType
 from app.services.ai.providers.claude_provider import ClaudeProvider
 from app.services.ai.providers.deepseek_provider import DeepseekProvider
 from app.services.ai.providers.openai_provider import OpenAIProvider
+from app.services.terminal_exceptions import (
+    SessionNotFound,
+    TerminalOperationFailed,
+    TerminalPolicyViolation,
+)
 from app.services.terminal_service import TerminalService
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class FakeTerminalConnectService:
@@ -93,6 +103,41 @@ class FakeAIManager:
 class SensitiveStatusAIManager(FakeAIManager):
     async def check_model_status(self, _model_id):
         return False, "upstream token=secret-token password=secret"
+
+
+class FakeLifecycleTerminalService:
+    def __init__(self):
+        self.cleanup_calls = 0
+        self.closed = False
+        self.background_started = False
+
+    def start_background_tasks(self):
+        self.background_started = True
+
+    async def cleanup_idle_sessions(self):
+        self.cleanup_calls += 1
+        return {"cleaned_count": 0, "message": "ok"}
+
+    async def cleanup(self):
+        self.closed = True
+
+
+class FakeLifecycleService:
+    def __init__(self):
+        self.closed = False
+
+    async def cleanup(self):
+        self.closed = True
+
+
+class PolicyRejectingTerminalService:
+    async def connect(self, _credentials):
+        raise TerminalPolicyViolation("终端连接必须配置允许主机或允许网段", 403)
+
+
+class MissingSessionTerminalService:
+    async def get_session(self, session_id: str):
+        raise SessionNotFound(f"会话不存在: {session_id}")
 
 
 class RejectingTerminalManager:
@@ -344,10 +389,13 @@ def test_cors_preflight_rejects_unlisted_headers():
     )
 
     assert response.status_code == 400
-    assert "x-debug-header" not in response.headers.get(
-        "access-control-allow-headers",
-        "",
-    ).lower()
+    assert (
+        "x-debug-header"
+        not in response.headers.get(
+            "access-control-allow-headers",
+            "",
+        ).lower()
+    )
 
 
 def test_production_requires_internal_api_auth(monkeypatch):
@@ -434,6 +482,117 @@ def test_create_app_uses_lifespan_without_on_event_deprecation(monkeypatch):
     assert not any("on_event is deprecated" in str(item.message) for item in captured)
 
 
+def test_lifespan_initializes_services_on_app_state_and_cleans_them(monkeypatch):
+    """应用生命周期应统一创建服务实例并在 shutdown 时清理。"""
+    terminal_service = FakeLifecycleTerminalService()
+    ai_manager = FakeLifecycleService()
+    deepseek_service = FakeLifecycleService()
+
+    monkeypatch.setattr(
+        main_module, "TerminalService", lambda: terminal_service, raising=False
+    )
+    monkeypatch.setattr(
+        main_module, "AIServiceManager", lambda: ai_manager, raising=False
+    )
+    monkeypatch.setattr(
+        main_module, "DeepseekService", lambda: deepseek_service, raising=False
+    )
+
+    application = create_app()
+    with TestClient(application):
+        assert application.state.terminal_service is terminal_service
+        assert application.state.ai_service_manager is ai_manager
+        assert application.state.deepseek_service is deepseek_service
+        assert application.state.cleanup_task is not None
+        assert terminal_service.background_started is True
+
+    assert terminal_service.closed is True
+    assert ai_manager.closed is True
+    assert deepseek_service.closed is True
+
+
+def test_dependencies_prefer_app_state_services():
+    """依赖函数应优先从 app.state 获取服务，方便 TestClient 生命周期内替换。"""
+    application = create_app()
+    request = SimpleNamespace(app=application)
+    terminal_service = object()
+    ai_manager = object()
+    deepseek_service = object()
+    network_service = object()
+
+    application.state.terminal_service = terminal_service
+    application.state.ai_service_manager = ai_manager
+    application.state.deepseek_service = deepseek_service
+    application.state.network_service = network_service
+
+    assert deps_module.get_terminal_service(request) is terminal_service
+    assert deps_module.get_ai_service_manager(request) is ai_manager
+    assert deps_module.get_deepseek_service(request) is deepseek_service
+    assert deps_module.get_network_service(request) is network_service
+
+
+def test_ai_manager_module_does_not_create_global_singleton():
+    """AI manager 模块导入时不应提前创建全局服务实例。"""
+    import app.services.ai.manager as manager_module
+
+    assert not hasattr(manager_module, "ai_service_manager")
+
+
+def test_terminal_service_module_does_not_import_fastapi():
+    """服务层应使用领域异常，不直接依赖 FastAPI HTTPException。"""
+    service_source = (
+        PROJECT_ROOT / "backend/app/services/terminal_service.py"
+    ).read_text(encoding="utf-8")
+
+    assert "fastapi" not in service_source
+    assert "HTTPException" not in service_source
+
+
+def test_terminal_route_maps_policy_violation_to_http_response(monkeypatch):
+    """路由层负责把终端领域异常映射为 HTTP 响应。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_terminal_service] = (
+        lambda: PolicyRejectingTerminalService()
+    )
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/api/v1/terminal/connect",
+            json={
+                "connection_type": "ssh",
+                "device_address": "192.0.2.10",
+                "port": 22,
+                "username": "admin",
+                "password": "password",
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "终端连接必须配置允许主机或允许网段"
+
+
+def test_terminal_route_maps_missing_session_to_404(monkeypatch):
+    """会话不存在属于领域异常，由路由层统一映射为 404。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_terminal_service] = (
+        lambda: MissingSessionTerminalService()
+    )
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).get(
+            "/api/v1/terminal/sessions/missing-session",
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "会话不存在: missing-session"
+
+
 def test_deepseek_generate_requires_internal_token(monkeypatch):
     """Deepseek 生成接口属于受保护能力，缺少 Token 应直接返回 401。"""
     _enable_internal_auth(monkeypatch)
@@ -500,8 +659,7 @@ def test_ai_chat_rejects_too_many_messages(monkeypatch):
             json={
                 "model": "deepseek-v4-pro",
                 "messages": [
-                    {"role": "user", "content": f"ping-{index}"}
-                    for index in range(51)
+                    {"role": "user", "content": f"ping-{index}"} for index in range(51)
                 ],
             },
             headers=_auth_headers(),
@@ -522,10 +680,7 @@ def test_ai_chat_rejects_total_message_content_over_limit(monkeypatch):
             "/api/v1/ai/chat",
             json={
                 "model": "deepseek-v4-pro",
-                "messages": [
-                    {"role": "user", "content": "x" * 8000}
-                    for _ in range(5)
-                ],
+                "messages": [{"role": "user", "content": "x" * 8000} for _ in range(5)],
             },
             headers=_auth_headers(),
         )
@@ -580,7 +735,9 @@ def test_deepseek_generate_rejects_invalid_sampling_parameters(monkeypatch):
 def test_ai_status_endpoint_does_not_expose_upstream_error_detail(monkeypatch):
     """模型连接状态接口不能把上游错误详情透传给客户端。"""
     _enable_internal_auth(monkeypatch)
-    app.dependency_overrides[get_ai_service_manager] = lambda: SensitiveStatusAIManager()
+    app.dependency_overrides[get_ai_service_manager] = (
+        lambda: SensitiveStatusAIManager()
+    )
 
     try:
         response = TestClient(app, raise_server_exceptions=False).get(
@@ -632,7 +789,7 @@ def test_ai_provider_error_response_does_not_expose_upstream_detail():
 
     response = provider._error_chat_response(
         request,
-        'upstream failed token=secret-token https://proxy.example.com/account',
+        "upstream failed token=secret-token https://proxy.example.com/account",
     )
 
     assert response.usage["error"] is True
@@ -643,7 +800,7 @@ def test_ai_provider_error_response_does_not_expose_upstream_detail():
     assert "proxy.example.com" not in response.message.content
 
     event = provider._error_stream_event(
-        'upstream failed token=secret-token https://proxy.example.com/account',
+        "upstream failed token=secret-token https://proxy.example.com/account",
     )
     assert event.type == "error"
     assert event.data["request_id"]
@@ -657,7 +814,7 @@ async def test_terminal_service_rejects_loopback_target_before_network():
     manager = RejectingTerminalManager()
     service = _build_terminal_service(manager)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(TerminalPolicyViolation) as exc_info:
         await service.connect(
             TerminalCredentials(
                 connection_type="ssh",
@@ -678,7 +835,7 @@ async def test_terminal_service_rejects_metadata_target_before_network():
     manager = RejectingTerminalManager()
     service = _build_terminal_service(manager)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(TerminalPolicyViolation) as exc_info:
         await service.connect(
             TerminalCredentials(
                 connection_type="ssh",
@@ -699,7 +856,7 @@ async def test_terminal_service_rejects_unapproved_ssh_port_before_network():
     manager = RejectingTerminalManager()
     service = _build_terminal_service(manager)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(TerminalPolicyViolation) as exc_info:
         await service.connect(
             TerminalCredentials(
                 connection_type="ssh",
@@ -722,7 +879,7 @@ async def test_terminal_service_requires_target_allowlist_before_network(monkeyp
     manager = RejectingTerminalManager()
     service = _build_terminal_service(manager)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(TerminalPolicyViolation) as exc_info:
         await service.connect(
             TerminalCredentials(
                 connection_type="ssh",
@@ -741,7 +898,9 @@ async def test_terminal_service_requires_target_allowlist_before_network(monkeyp
 async def test_terminal_service_allows_configured_target_cidr(monkeypatch):
     """配置命中允许网段时，应继续进入正式连接路径。"""
     monkeypatch.setattr(settings, "TERMINAL_ALLOWED_HOSTS", [], raising=False)
-    monkeypatch.setattr(settings, "TERMINAL_ALLOWED_CIDRS", ["192.0.2.0/24"], raising=False)
+    monkeypatch.setattr(
+        settings, "TERMINAL_ALLOWED_CIDRS", ["192.0.2.0/24"], raising=False
+    )
     manager = RejectingTerminalManager()
     service = _build_terminal_service(manager)
 
@@ -765,7 +924,7 @@ async def test_terminal_service_rejects_dangerous_command_before_shell():
     manager = RejectingTerminalManager()
     service = _build_terminal_service(manager)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(TerminalPolicyViolation) as exc_info:
         await service.execute_command(
             CommandRequest(session_id="session-1", command="reboot")
         )
@@ -794,9 +953,11 @@ async def test_terminal_service_rejects_sensitive_configuration_read_before_shel
     manager = RejectingTerminalManager()
     service = _build_terminal_service(manager)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(TerminalPolicyViolation) as exc_info:
         await service.execute_command(
-            CommandRequest(session_id="session-1", command="display current-configuration")
+            CommandRequest(
+                session_id="session-1", command="display current-configuration"
+            )
         )
 
     assert exc_info.value.status_code == 400
@@ -862,13 +1023,15 @@ def test_standard_formatter_redacts_sensitive_message_fields():
 async def test_terminal_service_uses_generic_500_message(monkeypatch):
     """终端服务内部异常不能把底层敏感错误直接暴露给用户。"""
     monkeypatch.setattr(settings, "TERMINAL_ALLOWED_HOSTS", [], raising=False)
-    monkeypatch.setattr(settings, "TERMINAL_ALLOWED_CIDRS", ["192.0.2.0/24"], raising=False)
+    monkeypatch.setattr(
+        settings, "TERMINAL_ALLOWED_CIDRS", ["192.0.2.0/24"], raising=False
+    )
     service = TerminalService.__new__(TerminalService)
     service.terminal_manager = BrokenTerminalManager()
     service.max_sessions = 5
     service.idle_timeout = 600
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(TerminalOperationFailed) as exc_info:
         await service.connect(
             TerminalCredentials(
                 connection_type="ssh",
@@ -880,5 +1043,5 @@ async def test_terminal_service_uses_generic_500_message(monkeypatch):
         )
 
     assert exc_info.value.status_code == 500
-    assert exc_info.value.detail == "内部服务器错误"
-    assert "sensitive" not in exc_info.value.detail
+    assert exc_info.value.client_message == "内部服务器错误"
+    assert "sensitive" not in exc_info.value.client_message

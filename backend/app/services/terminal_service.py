@@ -1,14 +1,26 @@
-from typing import Dict, Any
+from typing import Any
 
-from fastapi import HTTPException, status
 from pydantic import ValidationError
 
+from app.config.settings import settings
 from app.core.terminal import TerminalManager
 from app.models.terminal import (
-    TerminalCredentials, CommandRequest, CommandResponse,
-    SessionInfo, SessionList, ConnectionResponse
+    CommandRequest,
+    CommandResponse,
+    ConnectionResponse,
+    SessionInfo,
+    SessionList,
+    TerminalCredentials,
 )
-from app.config.settings import settings
+from app.services.terminal_exceptions import (
+    SessionNotFound,
+    TerminalConnectionFailed,
+    TerminalOperationFailed,
+    TerminalPolicyViolation,
+    TerminalServiceError,
+    TerminalSessionLimitExceeded,
+    TerminalValidationFailed,
+)
 from app.utils.logger import get_logger, redact_sensitive_text
 from app.utils.terminal_policy import (
     TerminalPolicyError,
@@ -18,15 +30,24 @@ from app.utils.terminal_policy import (
 
 logger = get_logger(__name__)
 
+
 class TerminalService:
     """终端服务层，处理API与核心终端功能之间的交互"""
-    
+
     def __init__(self):
         """初始化终端服务"""
         self.terminal_manager = TerminalManager()
         self.max_sessions = settings.MAX_TERMINAL_SESSIONS
         self.idle_timeout = settings.SESSION_IDLE_TIMEOUT
-    
+
+    def start_background_tasks(self) -> None:
+        """由应用生命周期显式启动终端后台任务。"""
+        self.terminal_manager.start_background_tasks()
+
+    async def cleanup(self) -> None:
+        """由应用生命周期统一清理终端资源。"""
+        await self.terminal_manager.shutdown()
+
     async def connect(self, credentials: TerminalCredentials) -> ConnectionResponse:
         """创建新的终端连接"""
         try:
@@ -36,16 +57,15 @@ class TerminalService:
                 credentials.port,
             )
         except TerminalPolicyError as e:
-            raise HTTPException(status_code=e.status_code, detail=str(e))
+            raise TerminalPolicyViolation(str(e), e.status_code) from e
 
         # 检查是否超过最大会话数
         sessions = await self.terminal_manager.get_all_sessions()
         if len(sessions) >= self.max_sessions:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"超过最大会话数限制 ({self.max_sessions})"
+            raise TerminalSessionLimitExceeded(
+                f"超过最大会话数限制 ({self.max_sessions})"
             )
-        
+
         try:
             # 创建连接
             response = await self.terminal_manager.connect(
@@ -53,42 +73,33 @@ class TerminalService:
                 device_address=credentials.device_address,
                 port=credentials.port,
                 username=credentials.username,
-                password=credentials.password
+                password=credentials.password,
             )
-            
+
             # 如果连接失败，抛出异常
             if not response.success:
                 logger.warning(f"终端连接失败: {response.message}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="终端连接失败，请检查连接参数或稍后重试"
-                )
-                
+                raise TerminalConnectionFailed("终端连接失败，请检查连接参数或稍后重试")
+
             return response
-            
+
         except ValidationError as e:
             logger.error(f"验证错误: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="请求参数验证失败"
-            )
+            raise TerminalValidationFailed() from e
 
-        except HTTPException:
+        except TerminalServiceError:
             raise
 
         except Exception as e:
             logger.error(f"连接出错: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="内部服务器错误"
-            )
-    
+            raise TerminalOperationFailed() from e
+
     async def execute_command(self, command_request: CommandRequest) -> CommandResponse:
         """在终端会话中执行命令"""
         try:
             command = validate_terminal_command(command_request.command)
         except TerminalPolicyError as e:
-            raise HTTPException(status_code=e.status_code, detail=str(e))
+            raise TerminalPolicyViolation(str(e), e.status_code) from e
 
         try:
             # 执行命令
@@ -96,7 +107,7 @@ class TerminalService:
                 session_id=command_request.session_id,
                 command=command,
             )
-            
+
             # 如果有错误，记录日志
             if response.is_error:
                 logger.warning(
@@ -104,93 +115,73 @@ class TerminalService:
                     command_request.session_id,
                     redact_sensitive_text(response.output, max_length=120),
                 )
-                
+
             return response
-            
+
         except Exception as e:
             logger.error(f"执行命令出错: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="内部服务器错误"
-            )
-    
-    async def disconnect(self, session_id: str) -> Dict[str, Any]:
+            raise TerminalOperationFailed() from e
+
+    async def disconnect(self, session_id: str) -> dict[str, Any]:
         """断开终端连接"""
         try:
             # 断开连接
             success, message = await self.terminal_manager.disconnect(session_id)
-            
+
             if not success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=message
-                )
-                
+                if "不存在" in message or "过期" in message:
+                    raise SessionNotFound(f"会话不存在: {session_id}")
+                raise TerminalConnectionFailed(message)
+
             return {"success": True, "message": message}
-            
-        except HTTPException:
+
+        except TerminalServiceError:
             raise
-            
+
         except Exception as e:
             logger.error(f"断开连接出错: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="内部服务器错误"
-            )
-    
+            raise TerminalOperationFailed() from e
+
     async def get_sessions(self) -> SessionList:
         """获取所有活跃会话"""
         try:
             sessions = await self.terminal_manager.get_all_sessions()
             return SessionList(sessions=sessions, count=len(sessions))
-            
+
         except Exception as e:
             logger.error(f"获取会话列表出错: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="内部服务器错误"
-            )
-    
+            raise TerminalOperationFailed() from e
+
     async def get_session(self, session_id: str) -> SessionInfo:
         """获取特定会话的信息"""
         try:
             session = await self.terminal_manager.get_session(session_id)
-            
+
             if not session:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"会话不存在: {session_id}"
-                )
-                
+                raise SessionNotFound(f"会话不存在: {session_id}")
+
             return session
-            
-        except HTTPException:
+
+        except TerminalServiceError:
             raise
-            
+
         except Exception as e:
             logger.error(f"获取会话信息出错: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="内部服务器错误"
-            )
-    
-    async def cleanup_idle_sessions(self) -> Dict[str, Any]:
+            raise TerminalOperationFailed() from e
+
+    async def cleanup_idle_sessions(self) -> dict[str, Any]:
         """清理闲置的会话"""
         try:
             cleaned_count = await self.terminal_manager.cleanup_idle_sessions(
                 idle_timeout=self.idle_timeout
             )
-            
+
             return {
                 "success": True,
                 "message": f"已清理 {cleaned_count} 个闲置会话",
-                "cleaned_count": cleaned_count
+                "cleaned_count": cleaned_count,
             }
-            
+
         except Exception as e:
             logger.error(f"清理闲置会话出错: {str(e)}", exc_info=True)
-            return {
-                "success": False,
-                "message": "清理闲置会话失败",
-                "cleaned_count": 0
-            }
+            raise TerminalOperationFailed("清理闲置会话失败") from e

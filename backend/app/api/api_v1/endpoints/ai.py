@@ -1,14 +1,10 @@
-import json
-import time
-from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import ValidationError
 
 from app.api.deps import (
-    get_ai_service_manager,
+    get_ai_application_service,
     get_deepseek_service,
     require_development_internal_api_token,
     require_internal_api_token,
@@ -17,337 +13,117 @@ from app.models.ai import (
     ChatRequest,
     ChatResponse,
     DeepseekGenerateRequest,
-    Message,
     ModelConnectionStatus,
     ModelsResponse,
 )
-from app.services.ai.base import safe_ai_client_message
-from app.services.ai.manager import AIServiceManager
+from app.services.ai.application_service import (
+    AIApplicationError,
+    AIApplicationService,
+    AIStreamingResult,
+    AIValidationError,
+)
 from app.services.deepseek_service import DeepseekService
-from app.utils.logger import get_logger, redact_sensitive_text
 
 router = APIRouter()
-logger = get_logger(__name__)
+
+
+def _ai_error_response(error: AIApplicationError):
+    """将 AI 应用服务异常转换为 HTTP 响应。"""
+    if isinstance(error, AIValidationError):
+        return JSONResponse(status_code=error.status_code, content={"detail": error.detail})
+
+    raise HTTPException(status_code=error.status_code, detail=error.client_message) from error
+
 
 @router.get("/models", response_model=ModelsResponse)
 async def get_models(
-    ai_manager: AIServiceManager = Depends(get_ai_service_manager)
+    ai_service: AIApplicationService = Depends(get_ai_application_service),
 ):
     """获取可用的AI模型列表"""
-    return await ai_manager.get_models_response()
+    return await ai_service.get_models_response()
+
 
 @router.get("/models/{model_id}/status", response_model=ModelConnectionStatus)
 async def check_model_status(
     model_id: str,
-    ai_manager: AIServiceManager = Depends(get_ai_service_manager)
+    ai_service: AIApplicationService = Depends(get_ai_application_service),
 ):
     """检查模型连接状态"""
-    is_connected, message = await ai_manager.check_model_status(model_id)
-    return ModelConnectionStatus(
-        connected=is_connected,
-        message=message if is_connected else safe_ai_client_message(message),
-        last_check=datetime.now().isoformat()
-    )
+    return await ai_service.check_model_status(model_id)
+
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    ai_manager: AIServiceManager = Depends(get_ai_service_manager)
+    ai_service: AIApplicationService = Depends(get_ai_application_service),
 ):
     """AI聊天API（非流式）"""
     try:
-        if not request.model:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="必须指定模型"
-            )
+        return await ai_service.chat(request)
+    except AIApplicationError as error:
+        return _ai_error_response(error)
 
-        # 记录请求信息，帮助排查问题
-        logger.info(f"接收聊天请求: 模型={request.model}, 消息数量={len(request.messages)}")
-
-        # 只记录消息长度，避免日志落盘用户提示词明文。
-        message_summary = []
-        for i, msg in enumerate(request.messages):
-            message_summary.append(f"[{i}] {msg.role}: {len(msg.content)} chars")
-
-        logger.debug(f"消息详情: {'; '.join(message_summary)}")
-
-        # 格式化请求消息，确保时间戳正确
-        for msg in request.messages:
-            if not msg.timestamp:
-                msg.timestamp = None  # 让模型自动设置默认值
-
-        # 获取聊天响应
-        response = await ai_manager.chat(request)
-
-        # 确保content字段存在，方便前端访问
-        if not hasattr(response, 'content') or not response.content:
-            response.content = response.message.content
-
-        return response
-    except ValidationError as e:
-        # 记录详细验证错误
-        logger.error(f"请求参数验证错误: {str(e)}")
-
-        # 提取并记录原始请求数据，帮助排查问题
-        try:
-            if hasattr(request, "__dict__"):
-                req_dict = {
-                    k: redact_sensitive_text(v, max_length=100)
-                    for k, v in request.__dict__.items()
-                }
-                logger.error(f"原始请求数据: {req_dict}")
-        except Exception as ex:
-            logger.error(f"无法记录原始请求数据: {str(ex)}")
-
-        # 尝试提取更具体的错误信息
-        error_detail = str(e)
-        loc = ["body", "request"]
-
-        # 如果错误包含字段位置信息，提取出来
-        if hasattr(e, "errors") and isinstance(e.errors(), list):
-            errors = e.errors()
-            if errors and "loc" in errors[0]:
-                loc = errors[0]["loc"]
-                error_detail = errors[0].get("msg", str(e))
-
-        # 返回更友好的错误信息
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={
-                "detail": [
-                    {
-                        "loc": loc,
-                        "msg": f"请求参数验证失败: {error_detail}",
-                        "type": "value_error"
-                    }
-                ]
-            }
-        )
-    except Exception as e:
-        logger.error(f"处理聊天请求时出错: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="内部服务器错误"
-        ) from e
-
-def encode_event(event: dict) -> str:
-    """将事件编码为SSE格式字符串"""
-    if isinstance(event, str):
-        # 如果已经是字符串（可能是SSE格式）
-        return event
-
-    # 如果是字典，转换为SSE格式
-    if "event" in event:
-        output = [f"event: {event['event']}"]
-    else:
-        output = ["event: message"]
-
-    if "data" in event:
-        data = event["data"]
-        json_data = json.dumps(data)
-        output.append(f"data: {json_data}")
-
-    return "\n".join(output) + "\n\n"
 
 @router.post("/chat/stream")
 async def chat_stream(
     request: ChatRequest,
-    req: Request,
-    ai_manager: AIServiceManager = Depends(get_ai_service_manager)
+    ai_service: AIApplicationService = Depends(get_ai_application_service),
 ):
-    """AI聊天API（流式响应） - 修复版本"""
+    """AI聊天API（流式响应）"""
     try:
-        if not request.model:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="必须指定模型"
-            )
+        result = ai_service.chat_stream(request)
+        return StreamingResponse(result.chunks, media_type="text/event-stream")
+    except AIApplicationError as error:
+        return _ai_error_response(error)
 
-        # 记录请求信息
-        logger.info(f"接收流式聊天请求: 模型={request.model}, 消息数量={len(request.messages)}")
 
-        # 生成会话ID用于跟踪此次对话
-        session_id = f"stream_{int(time.time() * 1000)}"
-        logger.info(f"开始新的流式会话: {session_id}")
-
-        # 确保请求是流式的
-        request.stream = True
-
-        # 简化流式处理：正确处理异步生成器
-        async def generate_text_stream():
-            try:
-                # 使用异步生成器，调用正确的chat_stream方法
-                async for event in ai_manager.chat_stream(request):
-                    if event.type == "content":
-                        # 提取内容数据
-                        content = event.data.get("content", "")
-                        if content:
-                            yield content
-                    elif event.type == "thinking":
-                        # 处理思考内容 - 发送 SSE 格式的思考事件
-                        thinking = event.data.get("thinking", "")
-                        if thinking:
-                            import json
-                            # 发送JSON格式的思考事件给前端
-                            thinking_event = json.dumps({
-                                "type": "thinking",
-                                "data": {"thinking": thinking}
-                            }, ensure_ascii=False)
-                            yield f"data: {thinking_event}\n\n"
-                    elif event.type == "error":
-                        error_msg = event.data.get("error", "未知错误")
-                        logger.error(f"流式生成内容时出错: {error_msg}")
-                        yield f"错误: {error_msg}"
-                        break
-                    elif event.type == "done":
-                        # 流式响应结束
-                        logger.info(f"流式会话 {session_id} 已完成")
-                        break
-
-            except Exception as e:
-                logger.error(f"流式生成内容时出错: {e}", exc_info=True)
-                yield "错误: 内部服务器错误"
-
-        # 返回文本流响应
-        return StreamingResponse(
-            generate_text_stream(),
-            media_type="text/event-stream",
-        )
-
-    except Exception as e:
-        logger.error(f"处理流式聊天请求时出错: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="内部服务器错误"
-        ) from e
-
-# 添加一个辅助接口，用于调试消息格式
 @router.post("/debug/request-format")
 async def debug_request_format(
     raw_request: dict[str, Any] = Body(...),
+    ai_service: AIApplicationService = Depends(get_ai_application_service),
     _auth: None = Depends(require_development_internal_api_token),
 ):
     """调试API - 回显请求格式，帮助排查格式问题"""
-    try:
-        # 尝试验证请求格式
-        messages = []
-        for msg_data in raw_request.get("messages", []):
-            try:
-                # 尝试创建消息对象
-                msg = Message(**msg_data)
-                messages.append(msg.dict())
-            except ValidationError as e:
-                messages.append({
-                    "original": msg_data,
-                    "errors": str(e)
-                })
+    return ai_service.debug_request_format(raw_request)
 
-        # 返回请求解析结果
-        return {
-            "original_request": raw_request,
-            "parsed_messages": messages,
-            "is_valid": len([m for m in messages if "errors" in m]) == 0
-        }
-    except Exception as e:
-        logger.error(f"调试请求格式解析失败: {str(e)}", exc_info=True)
-        return {
-            "error": "解析请求时出错",
-            "original_request": raw_request
-        }
 
 @router.get("/deepseek/status")
 async def check_deepseek_connection(
-    ai_manager: AIServiceManager = Depends(get_ai_service_manager)
+    ai_service: AIApplicationService = Depends(get_ai_application_service),
 ):
     """检查Deepseek API连接状态"""
-    # 通过AI管理器检查Deepseek模型状态
-    deepseek_models = [model for model in ai_manager.get_available_models()
-                      if model.value.startswith('deepseek-')]
+    return await ai_service.check_deepseek_connection()
 
-    if not deepseek_models:
-        return {
-            "connected": False,
-            "message": "未找到Deepseek模型",
-            "models": []
-        }
-
-    # 检查第一个Deepseek模型的连接状态
-    model_id = deepseek_models[0].value
-    is_connected, message = await ai_manager.check_model_status(model_id)
-
-    return {
-        "connected": is_connected,
-        "message": message if is_connected else safe_ai_client_message(message),
-        "models": [model.value for model in deepseek_models]
-    }
 
 @router.post("/deepseek/generate")
 async def generate_text(
     payload: DeepseekGenerateRequest,
-    ai_manager: AIServiceManager = Depends(get_ai_service_manager),
+    ai_service: AIApplicationService = Depends(get_ai_application_service),
     _auth: None = Depends(require_internal_api_token),
 ):
     """使用AI Manager调用Deepseek生成文本"""
     try:
-        # 创建ChatRequest
-        request = ChatRequest(
-            model=payload.model,
-            messages=payload.messages,
-            max_tokens=payload.max_tokens,
-            temperature=payload.temperature,
-            top_p=payload.top_p,
-            stream=payload.stream
-        )
+        result = await ai_service.generate_text(payload)
+        if isinstance(result, AIStreamingResult):
+            return StreamingResponse(result.chunks, media_type="text/event-stream")
+        return result
+    except AIApplicationError as error:
+        return _ai_error_response(error)
 
-        if payload.stream:
-            # 使用流式响应
-            async def generate_stream():
-                try:
-                    async for event in ai_manager.chat_stream(request):
-                        if event.type == "content":
-                            content = event.data.get("content", "")
-                            if content:
-                                yield f"data: {json.dumps({'content': content})}\n\n"
-                        elif event.type == "done":
-                            yield f"data: {json.dumps({'done': True})}\n\n"
-                            break
-                        elif event.type == "error":
-                            error_msg = event.data.get("error", "未知错误")
-                            yield f"data: {json.dumps({'error': error_msg})}\n\n"
-                            break
-                except Exception as e:
-                    logger.error(f"Deepseek流式文本生成失败: {str(e)}", exc_info=True)
-                    yield f"data: {json.dumps({'error': '内部服务器错误'})}\n\n"
-
-            return StreamingResponse(generate_stream(), media_type="text/event-stream")
-        else:
-            # 非流式响应
-            response = await ai_manager.chat(request)
-            return {
-                "content": response.message.content,
-                "model": response.model,
-                "usage": response.usage,
-                "id": getattr(response, 'id', None)
-            }
-
-    except Exception as e:
-        logger.error(f"Deepseek文本生成失败: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="文本生成失败"
-        ) from e
 
 @router.post("/deepseek/analyze-network-log")
 async def analyze_network_log(
     log_content: str = Body(..., description="网络日志内容", embed=True),
     query: str = Body(..., description="用户查询", embed=True),
-    model: str = Body("deepseek-v4-pro", description="使用的模型名称，可选: deepseek-v4-pro 或 deepseek-v4-flash"),
+    model: str = Body(
+        "deepseek-v4-pro",
+        description="使用的模型名称，可选: deepseek-v4-pro 或 deepseek-v4-flash",
+    ),
     deepseek_service: DeepseekService = Depends(get_deepseek_service),
     _auth: None = Depends(require_internal_api_token),
 ):
     """使用Deepseek分析网络日志"""
     return StreamingResponse(
         deepseek_service.analyze_network_log(log_content, query, model),
-        media_type="text/event-stream"
+        media_type="text/event-stream",
     )

@@ -78,12 +78,12 @@
   - 目标：新增领域异常，例如 `TerminalPolicyViolation`、`SessionNotFound`、`TerminalConnectionFailed`。
   - 验收：服务层不再依赖 FastAPI；路由层或全局 exception handler 负责映射 HTTP 状态码。
 
-- [ ] 拆薄 AI 路由层
+- [x] 拆薄 AI 路由层
   - 涉及范围：`backend/app/api/api_v1/endpoints/ai.py`、AI 应用服务或 helper。
   - 目标：路由只负责依赖注入和协议响应，聊天编排、DeepSeek 兼容入口、日志摘要、响应补齐下沉到服务层。
   - 验收：路由单测可用 fake service 验证委托行为；业务分支不散落在路由函数中。
 
-- [ ] 统一 SSE 事件编码契约
+- [x] 统一 SSE 事件编码契约
   - 涉及范围：AI 流式响应 helper、前后端契约测试。
   - 目标：为 `content`、`thinking`、`error`、`done` 定义稳定 SSE 输出格式。
   - 验收：流式接口不混合裸文本和 SSE；错误事件也保持一致事件结构。
@@ -197,3 +197,5 @@ uv run --no-sync python -m ruff check app tests
 - 2026-05-22：完成 Phase 2 第一项整改：将 FastAPI `startup/shutdown` 迁移为 `lifespan` 上下文，保留终端空闲会话清理任务的启动与取消逻辑，并新增无 `on_event` 弃用警告的回归测试；验证 `tests/test_backend_security_and_connection_policy.py` 为 `39 passed`，完整 `tests` 为 `59 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。
 - 2026-05-22：完成 Phase 2 第二项整改：服务实例统一由 `lifespan` 创建并挂载到 `app.state`，依赖函数优先从当前应用实例读取服务，移除 AI manager 导入即创建的模块级全局单例，并在 shutdown 时统一调用服务 `cleanup`；验证 `tests/test_backend_security_and_connection_policy.py` 为 `42 passed`，完整 `tests` 为 `62 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。
 - 2026-05-22：完成 Phase 2 第三、第四项整改：核心终端和 Telnet 管理器构造阶段不再隐式创建后台任务，任务由应用 `lifespan` 显式启动并在 shutdown 清理；新增终端领域异常层，`TerminalService` 不再导入 FastAPI 或直接抛 `HTTPException`，终端路由统一将领域异常映射为 HTTP 响应。验证 `tests/test_terminal_connection_regressions.py tests/test_backend_security_and_connection_policy.py` 为 `54 passed`，完整 `tests` 为 `68 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。
+- 2026-05-22：完成 Phase 2 第五项整改：新增 `AIApplicationService` 承载模型状态脱敏、聊天请求摘要、响应补齐、流式输出适配与 DeepSeek 兼容生成编排，AI 路由收敛为依赖注入、HTTP 响应包装和异常映射；新增 fake 应用服务路由委托测试，验证 `tests/test_backend_security_and_connection_policy.py` 为 `48 passed`，完整 `tests` 为 `71 passed`，局部 `ruff check` 通过。
+- 2026-05-22：完成 Phase 2 第六项整改：新增统一 SSE 编码 helper，AI 聊天流和 DeepSeek 兼容流均输出 `event: content|thinking|error|done` 与 JSON `data`，移除裸文本和 data-only 混用；错误事件保持统一结构并脱敏。验证 SSE 契约测试通过，`tests/test_backend_security_and_connection_policy.py` 为 `51 passed`，完整 `tests` 为 `74 passed`，局部 `ruff check` 通过。

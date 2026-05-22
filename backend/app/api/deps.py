@@ -1,9 +1,10 @@
 import secrets
 from typing import Any, Optional
 
-from fastapi import Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 
 from app.config.settings import settings
+from app.services.ai.application_service import AIApplicationService
 from app.services.ai.manager import AIServiceManager
 from app.services.deepseek_service import DeepseekService
 from app.services.network_service import NetworkService
@@ -43,6 +44,13 @@ def get_ai_service_manager(request: Request) -> AIServiceManager:
         "ai_service_manager",
         AIServiceManager,
     )
+
+
+def get_ai_application_service(
+    ai_manager: AIServiceManager = Depends(get_ai_service_manager),
+) -> AIApplicationService:
+    """获取 AI 应用服务实例。"""
+    return AIApplicationService(ai_manager)
 
 
 def get_network_service(request: Request) -> NetworkService:

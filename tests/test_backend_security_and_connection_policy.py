@@ -24,6 +24,7 @@ os.environ.setdefault("AI_ENABLED", "false")
 from app import main as main_module
 from app.api import deps as deps_module
 from app.api.deps import (
+    get_ai_application_service,
     get_ai_service_manager,
     get_network_service,
     get_terminal_service,
@@ -31,7 +32,14 @@ from app.api.deps import (
 from app.config.settings import Settings, settings
 from app.utils import logger as logger_utils
 from app.main import app, create_app
-from app.models.ai import ChatRequest, ChatResponse, Message, ModelsResponse
+from app.models.ai import (
+    ChatRequest,
+    ChatResponse,
+    DeepseekGenerateRequest,
+    Message,
+    ModelsResponse,
+)
+from app.services.ai.application_service import AIApplicationService, AIStreamingResult
 from app.models.terminal import (
     CommandRequest,
     CommandResponse,
@@ -103,6 +111,42 @@ class FakeAIManager:
 class SensitiveStatusAIManager(FakeAIManager):
     async def check_model_status(self, _model_id):
         return False, "upstream token=secret-token password=secret"
+
+
+class ErrorStreamAIManager(FakeAIManager):
+    async def chat_stream(self, _request):
+        yield type(
+            "Event",
+            (),
+            {"type": "error", "data": {"error": "upstream token=secret-token"}},
+        )()
+
+
+class FakeAIApplicationService:
+    def __init__(self):
+        self.chat_calls = 0
+        self.generate_calls = 0
+        self.chat_request = None
+        self.generate_payload = None
+
+    async def chat(self, request):
+        self.chat_calls += 1
+        self.chat_request = request
+        return ChatResponse(
+            message=Message(role="assistant", content="delegated"),
+            model=request.model,
+            content="delegated",
+        )
+
+    async def generate_text(self, payload):
+        self.generate_calls += 1
+        self.generate_payload = payload
+        return {
+            "content": "generated",
+            "model": payload.model,
+            "usage": {"delegated": True},
+            "id": "fake-generation",
+        }
 
 
 class FakeLifecycleTerminalService:
@@ -180,6 +224,10 @@ def _build_terminal_service(manager):
     service.max_sessions = 5
     service.idle_timeout = 600
     return service
+
+
+async def _collect_stream(chunks):
+    return "".join([chunk async for chunk in chunks])
 
 
 def _set_required_config(monkeypatch):
@@ -536,6 +584,122 @@ def test_ai_manager_module_does_not_create_global_singleton():
     import app.services.ai.manager as manager_module
 
     assert not hasattr(manager_module, "ai_service_manager")
+
+
+def test_ai_route_no_longer_orchestrates_manager_directly():
+    """AI 路由应只做协议适配，不直接编排 AI manager 业务分支。"""
+    route_source = (PROJECT_ROOT / "backend/app/api/api_v1/endpoints/ai.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ai_manager.chat(" not in route_source
+    assert "ai_manager.chat_stream(" not in route_source
+    assert "ai_manager.check_model_status(" not in route_source
+    assert "ai_manager.get_available_models(" not in route_source
+    assert "safe_ai_client_message" not in route_source
+
+
+def test_ai_chat_route_delegates_to_application_service(monkeypatch):
+    """AI chat 路由应通过应用服务完成业务处理。"""
+    _enable_internal_auth(monkeypatch)
+    fake_service = FakeAIApplicationService()
+    app.dependency_overrides[get_ai_application_service] = lambda: fake_service
+
+    try:
+        response = TestClient(app).post(
+            "/api/v1/ai/chat",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [{"role": "user", "content": "ping"}],
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["content"] == "delegated"
+    assert fake_service.chat_calls == 1
+    assert fake_service.chat_request.model == "deepseek-v4-pro"
+
+
+def test_deepseek_generate_route_delegates_to_application_service(monkeypatch):
+    """DeepSeek 兼容生成入口也应下沉到应用服务。"""
+    _enable_internal_auth(monkeypatch)
+    fake_service = FakeAIApplicationService()
+    app.dependency_overrides[get_ai_application_service] = lambda: fake_service
+
+    try:
+        response = TestClient(app).post(
+            "/api/v1/ai/deepseek/generate",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [{"role": "user", "content": "ping"}],
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["content"] == "generated"
+    assert fake_service.generate_calls == 1
+    assert fake_service.generate_payload.model == "deepseek-v4-pro"
+
+
+@pytest.mark.asyncio
+async def test_ai_chat_stream_uses_consistent_sse_events():
+    """AI 聊天流不能混合裸文本和 SSE 事件。"""
+    service = AIApplicationService(FakeAIManager())
+    request = ChatRequest(
+        model="deepseek-v4-pro",
+        messages=[Message(role="user", content="ping")],
+    )
+
+    result = service.chat_stream(request)
+    body = await _collect_stream(result.chunks)
+
+    assert body.startswith("event: content\n")
+    assert "event: done\n" in body
+    assert "\nok\n" not in body
+    assert '"content": "ok"' in body
+
+
+@pytest.mark.asyncio
+async def test_ai_chat_stream_error_uses_sse_and_redacts_detail():
+    """AI 流式错误也必须使用统一 SSE 结构并脱敏。"""
+    service = AIApplicationService(ErrorStreamAIManager())
+    request = ChatRequest(
+        model="deepseek-v4-pro",
+        messages=[Message(role="user", content="ping")],
+    )
+
+    result = service.chat_stream(request)
+    body = await _collect_stream(result.chunks)
+
+    assert body.startswith("event: error\n")
+    assert '"error": "AI 服务暂时不可用，请稍后重试"' in body
+    assert "secret-token" not in body
+
+
+@pytest.mark.asyncio
+async def test_deepseek_generate_stream_uses_same_sse_contract():
+    """DeepSeek 兼容流式生成也应输出同一 SSE 事件契约。"""
+    service = AIApplicationService(FakeAIManager())
+
+    result = await service.generate_text(
+        DeepseekGenerateRequest(
+            model="deepseek-v4-pro",
+            messages=[Message(role="user", content="ping")],
+            stream=True,
+        )
+    )
+
+    assert isinstance(result, AIStreamingResult)
+    body = await _collect_stream(result.chunks)
+    assert body.startswith("event: content\n")
+    assert "event: done\n" in body
+    assert '"content": "ok"' in body
 
 
 def test_terminal_service_module_does_not_import_fastapi():

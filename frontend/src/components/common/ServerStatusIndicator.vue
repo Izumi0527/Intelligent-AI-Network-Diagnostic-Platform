@@ -10,28 +10,16 @@
 
 <script setup lang="ts">
 import { useAppStore } from '@/stores/app';
-import { computed, onMounted, onUnmounted } from 'vue';
+import { useIntervalFn } from '@vueuse/core';
+import { computed } from 'vue';
 
 const appStore = useAppStore();
 
-const statusText = computed(() => 
+const statusText = computed(() =>
   appStore.isServerConnected ? '服务器已连接' : '服务器未连接'
 );
 
-// 定期检查服务器连接状态
-let intervalId: NodeJS.Timeout;
-
-onMounted(() => {
-  // 立即检查一次
+useIntervalFn(() => {
   appStore.checkServerConnection();
-  
-  // 每30秒检查一次
-  intervalId = setInterval(() => {
-    appStore.checkServerConnection();
-  }, 30000);
-});
-
-onUnmounted(() => {
-  clearInterval(intervalId);
-});
+}, 30000, { immediateCallback: true });
 </script> 

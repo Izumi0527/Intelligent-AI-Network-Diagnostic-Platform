@@ -1,13 +1,22 @@
 import { localStorageUtils } from '@/utils/localStorageUtils';
 import type { AIAssistantState, ChatData } from '@/types/chat';
 
-export const createStorageActions = (state: AIAssistantState) => ({
-  saveToStorage(chatData: ChatData) {
+interface StorageActions {
+  saveToStorage(chatData: ChatData): void;
+  saveConversationToStorage(): void;
+  loadFromStorage(id: string): ChatData | null;
+  loadConversationFromStorage(): void;
+  removeFromStorage(id: string): void;
+  clearConversation(): void;
+}
+
+export const createStorageActions = (state: AIAssistantState): StorageActions => ({
+  saveToStorage(chatData: ChatData): void {
     const storageKey = `chat_history_${state.selectedModel}`;
     localStorageUtils.saveChat(storageKey, chatData);
   },
 
-  saveConversationToStorage() {
+  saveConversationToStorage(): void {
     const chatData: ChatData = {
       id: state.conversationId,
       title: state.chatMessages.length > 0 ?
@@ -57,7 +66,7 @@ export const createStorageActions = (state: AIAssistantState) => ({
     return null;
   },
 
-  loadConversationFromStorage() {
+  loadConversationFromStorage(): void {
     const storageKey = `chat_history_${state.selectedModel}`;
     const savedData = localStorageUtils.loadChat(storageKey);
 
@@ -74,12 +83,12 @@ export const createStorageActions = (state: AIAssistantState) => ({
     }
   },
 
-  removeFromStorage(id: string) {
+  removeFromStorage(id: string): void {
     const storageKey = `chat_history_${id}`;
     localStorageUtils.removeChat(storageKey);
   },
 
-  clearConversation() {
+  clearConversation(): void {
     state.chatMessages = [];
     // Note: saveConversationToStorage will be called by the main store
   }

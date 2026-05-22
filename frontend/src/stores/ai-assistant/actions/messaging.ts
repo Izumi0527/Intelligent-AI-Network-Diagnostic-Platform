@@ -4,13 +4,26 @@ import { generateId } from '../../../utils/helpers';
 import { logger } from '../../../utils/logger';
 import { nextTick } from 'vue';
 
+interface MessagingActions {
+  sendMessage(content: string): Promise<void>;
+  sendMessageStream(content: string): Promise<void>;
+  _handleStreamResponse(
+    stream: ReadableStream<Uint8Array>,
+    assistantMessage: ChatMessage,
+    sessionId: string
+  ): Promise<void>;
+  _addContentCharByChar(assistantMessage: ChatMessage, chunk: string): Promise<void>;
+  _handleStreamError(assistantMessage: ChatMessage, errorMsg: string): void;
+  sendMessageRegular(content: string): Promise<void>;
+}
+
 export const createMessagingActions = (
   state: AIAssistantState,
   utilActions: StoreActions['utilActions'],
   storageActions: StoreActions['storageActions']
-) => {
-  const actions = {
-    async sendMessage(content: string) {
+): MessagingActions => {
+  const actions: MessagingActions = {
+    async sendMessage(content: string): Promise<void> {
       if (!content.trim() || !state.isModelConnected || state.isAIResponding) {
         logger.debug('[消息发送] 拒绝发送消息，原因:', {
           noContent: !content.trim(),
@@ -81,7 +94,7 @@ export const createMessagingActions = (
       }
     },
 
-    async sendMessageStream(content: string) {
+    async sendMessageStream(content: string): Promise<void> {
       const sessionId = Date.now().toString();
       logger.debug(`开始流式会话 ${sessionId}`);
 
@@ -172,7 +185,7 @@ export const createMessagingActions = (
       }
     },
 
-    async _handleStreamResponse(stream: ReadableStream<Uint8Array>, assistantMessage: ChatMessage, sessionId: string) {
+    async _handleStreamResponse(stream: ReadableStream<Uint8Array>, assistantMessage: ChatMessage, sessionId: string): Promise<void> {
       const reader = stream.getReader();
       const decoder = new TextDecoder('utf-8');
 
@@ -301,7 +314,7 @@ export const createMessagingActions = (
     },
 
     // 逐字符添加内容的方法
-    async _addContentCharByChar(assistantMessage: ChatMessage, chunk: string) {
+    async _addContentCharByChar(assistantMessage: ChatMessage, chunk: string): Promise<void> {
       const chars = chunk.split('');
 
       for (let i = 0; i < chars.length; i++) {
@@ -319,7 +332,7 @@ export const createMessagingActions = (
       }
     },
 
-    _handleStreamError(assistantMessage: ChatMessage, errorMsg: string) {
+    _handleStreamError(assistantMessage: ChatMessage, errorMsg: string): void {
       const index = state.chatMessages.indexOf(assistantMessage);
       if (index !== -1) {
         state.chatMessages.splice(index, 1);
@@ -339,7 +352,7 @@ export const createMessagingActions = (
       state.currentThinkingContent = '';
     },
 
-    async sendMessageRegular(content: string) {
+    async sendMessageRegular(content: string): Promise<void> {
       try {
         state.isLoading = true;
         state.error = null;

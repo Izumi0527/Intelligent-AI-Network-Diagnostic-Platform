@@ -1,4 +1,4 @@
-import { defineComponent, h } from 'vue';
+import { defineComponent, h, type VNode } from 'vue';
 import ConnectIcon from './ConnectIcon.vue';
 import DisconnectIcon from './DisconnectIcon.vue';
 
@@ -6,7 +6,7 @@ import DisconnectIcon from './DisconnectIcon.vue';
 export const SendIcon = defineComponent({
   name: 'SendIcon',
   setup() {
-    return () => h('svg', {
+    return (): VNode => h('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
       viewBox: '0 0 24 24',
       fill: 'none',
@@ -25,7 +25,7 @@ export const SendIcon = defineComponent({
 export const ClearIcon = defineComponent({
   name: 'ClearIcon',
   setup() {
-    return () => h('svg', {
+    return (): VNode => h('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
       viewBox: '0 0 24 24',
       fill: 'none',
@@ -47,7 +47,7 @@ export const ClearIcon = defineComponent({
 export const SunIcon = defineComponent({
   name: 'SunIcon',
   setup() {
-    return () => h('svg', {
+    return (): VNode => h('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
       viewBox: '0 0 24 24',
       fill: 'none',
@@ -73,7 +73,7 @@ export const SunIcon = defineComponent({
 export const MoonIcon = defineComponent({
   name: 'MoonIcon',
   setup() {
-    return () => h('svg', {
+    return (): VNode => h('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
       viewBox: '0 0 24 24',
       fill: 'none',

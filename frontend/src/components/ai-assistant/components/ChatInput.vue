@@ -99,7 +99,7 @@ const errorMessage = computed(() => {
   return '';
 });
 
-const handleSend = () => {
+const handleSend = (): void => {
   if (!canSend.value) { return; }
   const content = message.value.trim();
   if (content) {
@@ -109,20 +109,20 @@ const handleSend = () => {
   }
 };
 
-const handleKeyDown = (event: KeyboardEvent) => {
+const handleKeyDown = (event: KeyboardEvent): void => {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
     handleSend();
   }
 };
 
-const handleInput = () => {
+const handleInput = (): void => {
   emit('input', message.value);
   adjustTextareaHeight();
 };
 
-const focus = () => { messageInput.value?.focus(); };
-const clear = () => { message.value = ''; adjustTextareaHeight(); };
+const focus = (): void => { messageInput.value?.focus(); };
+const clear = (): void => { message.value = ''; adjustTextareaHeight(); };
 
 watch(() => props.disabled, (disabled) => { if (!disabled) { focus(); } });
 

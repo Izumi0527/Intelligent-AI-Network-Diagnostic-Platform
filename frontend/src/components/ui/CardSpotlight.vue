@@ -53,7 +53,7 @@ const gradientStyle = computed(() => {
   };
 });
 
-const handleMouseMove = (event: MouseEvent) => {
+const handleMouseMove = (event: MouseEvent): void => {
   if (!cardRef.value) { return; }
 
   const rect = cardRef.value.getBoundingClientRect();
@@ -62,7 +62,7 @@ const handleMouseMove = (event: MouseEvent) => {
   isHovered.value = true;
 };
 
-const handleMouseLeave = () => {
+const handleMouseLeave = (): void => {
   isHovered.value = false;
 };
 

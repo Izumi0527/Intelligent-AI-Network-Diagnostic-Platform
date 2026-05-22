@@ -13,6 +13,13 @@ import { isStreamEvent } from '@/types/api';
 import { extractErrorMessage, isApiError } from './helpers';
 import { logger } from './logger';
 
+/** 流式响应的统一返回 shape：data 是 SSE 解析后的 Uint8Array 可读流 */
+interface StreamSendResult {
+  data: ReadableStream<Uint8Array>;
+  status: number;
+  headers: unknown;
+}
+
 const api = axios.create({
   baseURL: '/api',
   timeout: 60000,
@@ -92,15 +99,15 @@ export function formatMessages(messages: ChatMessage[] | MessageHistoryItem[]): 
 }
 
 export const aiService = {
-  async checkModelConnection(model: string) {
+  async checkModelConnection(model: string): Promise<AxiosResponse<ModelStatusResponse>> {
     return api.get<ModelStatusResponse>(`/ai/models/${model}/status`);
   },
 
-  async getAvailableModels() {
+  async getAvailableModels(): Promise<AxiosResponse<ModelsListResponse>> {
     return api.get<ModelsListResponse>('/ai/models');
   },
 
-  async sendMessageStream(params: SendMessageParams) {
+  async sendMessageStream(params: SendMessageParams): Promise<StreamSendResult> {
     // 确保消息格式正确
     const formattedParams = {
       ...params,
@@ -121,13 +128,13 @@ export const aiService = {
       });
 
       // 创建一个可读流，用于处理SSE格式的数据
-      const stream = new ReadableStream({
-        start(controller) {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller): void {
           const encoder = new TextEncoder();
 
           try {
             // 处理单行SSE数据
-            const processLine = (line: string) => {
+            const processLine = (line: string): void => {
               if (line === 'data: [DONE]' || line === '[DONE]') {
                 logger.debug('接收到流结束标记');
                 return;
@@ -294,8 +301,8 @@ export const aiService = {
       logger.error('流式请求失败:', error);
 
       // 错误信息也转换为流返回
-      const errorStream = new ReadableStream({
-        start(controller) {
+      const errorStream = new ReadableStream<Uint8Array>({
+        start(controller): void {
           const encoder = new TextEncoder();
           let errorMessage = '错误: 无法连接到服务器';
 
@@ -322,7 +329,7 @@ export const aiService = {
     }
   },
 
-  async sendMessage(params: SendMessageParams) {
+  async sendMessage(params: SendMessageParams): Promise<AxiosResponse<ChatCompletionResponse>> {
     // 确保消息格式正确
     const formattedParams = {
       ...params,

@@ -66,7 +66,7 @@ const appStore = useAppStore();
 const isDarkMode = ref(false);  // 明确设置为false，确保浅色主题
 
 // 切换主题
-const toggleTheme = () => {
+const toggleTheme = (): void => {
   isDarkMode.value = !isDarkMode.value;
   appStore.setDarkMode(isDarkMode.value);
 };
@@ -84,7 +84,7 @@ onMounted(() => {
   // 监听系统主题变化
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-  const handleChange = () => {
+  const handleChange = (): void => {
     if (localStorage.getItem('theme') === null) {
       // 即使系统是深色，也默认使用浅色
       isDarkMode.value = false;

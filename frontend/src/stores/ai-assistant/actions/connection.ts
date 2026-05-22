@@ -2,8 +2,13 @@ import { aiService } from '@/utils/aiService';
 import type { AIAssistantState, AIModel } from '@/types/chat';
 import { logger } from '@/utils/logger';
 
-export const createConnectionActions = (state: AIAssistantState) => ({
-  async checkModelConnection() {
+interface ConnectionActions {
+  checkModelConnection(): Promise<boolean>;
+  loadAvailableModels(): Promise<void>;
+}
+
+export const createConnectionActions = (state: AIAssistantState): ConnectionActions => ({
+  async checkModelConnection(): Promise<boolean> {
     try {
       state.isModelConnected = false;
       const response = await aiService.checkModelConnection(state.selectedModel);
@@ -35,7 +40,7 @@ export const createConnectionActions = (state: AIAssistantState) => ({
     }
   },
 
-  async loadAvailableModels() {
+  async loadAvailableModels(): Promise<void> {
     const MODELS_CACHE_KEY = 'ai_available_models';
 
     try {

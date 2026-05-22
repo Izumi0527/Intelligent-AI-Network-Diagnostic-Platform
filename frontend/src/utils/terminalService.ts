@@ -1,4 +1,4 @@
-import axios, { AxiosHeaders } from 'axios';
+import axios, { AxiosHeaders, type AxiosResponse } from 'axios';
 import type { TerminalConnectResponse, TerminalExecuteResponse } from '@/types/api';
 
 const api = axios.create({
@@ -28,7 +28,7 @@ export interface TerminalConnectParams {
 }
 
 export const terminalService = {
-  async connect(params: TerminalConnectParams) {
+  async connect(params: TerminalConnectParams): Promise<AxiosResponse<TerminalConnectResponse>> {
     return api.post<TerminalConnectResponse>('/terminal/connect', {
       connection_type: params.type,
       device_address: params.address,
@@ -40,26 +40,26 @@ export const terminalService = {
     });
   },
 
-  async execute(sessionId: string, command: string) {
+  async execute(sessionId: string, command: string): Promise<AxiosResponse<TerminalExecuteResponse>> {
     return api.post<TerminalExecuteResponse>('/terminal/execute', {
       session_id: sessionId,
       command: command
     });
   },
 
-  async disconnect(sessionId: string) {
+  async disconnect(sessionId: string): Promise<AxiosResponse> {
     return api.post('/terminal/disconnect', {
       session_id: sessionId
     });
   },
 
   // 新增: 检查连接状态
-  async checkConnectionStatus(sessionId: string) {
+  async checkConnectionStatus(sessionId: string): Promise<AxiosResponse> {
     return api.get(`/terminal/sessions/${sessionId}`);
   },
 
   // 新增: 取消正在进行的连接
-  async cancelConnection() {
+  async cancelConnection(): Promise<AxiosResponse> {
     return api.post('/terminal/cancel-connect');
   }
 };

@@ -51,7 +51,7 @@ const emit = defineEmits<{
   'model-change': [value: string]
 }>();
 
-const handleModelChange = (event: Event) => {
+const handleModelChange = (event: Event): void => {
   const target = event.target as HTMLSelectElement;
   emit('model-change', target.value);
 };

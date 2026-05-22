@@ -40,7 +40,7 @@ interface Particle {
 
 const particles = ref<Particle[]>([]);
 
-const createParticles = () => {
+const createParticles = (): void => {
   const particleCount = 8;
   const newParticles: Particle[] = [];
 

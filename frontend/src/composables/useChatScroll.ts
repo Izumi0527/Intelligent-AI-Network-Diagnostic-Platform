@@ -1,4 +1,4 @@
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, type Ref } from 'vue';
 
 interface UseChatScrollOptions {
   /** 返回当前消息总数的 getter，用于在新消息到达时滚动 */
@@ -7,6 +7,11 @@ interface UseChatScrollOptions {
   isTyping: () => boolean
   /** 返回 "正在接收流式内容" 状态的 getter，用于流式时持续粘底 */
   isStreamingContent: () => boolean
+}
+
+interface UseChatScrollReturn {
+  containerRef: Ref<HTMLElement | null>;
+  scrollToBottom: () => Promise<void>;
 }
 
 /**
@@ -19,7 +24,7 @@ interface UseChatScrollOptions {
  *
  * 通过返回的 `scrollToBottom` 也可在外部主动触发（例如发送后立即滚动）。
  */
-export function useChatScroll(options: UseChatScrollOptions) {
+export function useChatScroll(options: UseChatScrollOptions): UseChatScrollReturn {
   const containerRef = ref<HTMLElement | null>(null);
 
   const scrollToBottom = async (): Promise<void> => {

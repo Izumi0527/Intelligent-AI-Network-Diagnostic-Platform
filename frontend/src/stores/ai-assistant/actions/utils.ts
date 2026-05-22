@@ -1,9 +1,21 @@
-import type { AIAssistantState, ChatMessage, ApiError } from '@/types/chat';
+import type { AIAssistantState, ChatMessage, ApiError, FormattedMessage } from '@/types/chat';
 import { generateId, isApiError } from '../../../utils/helpers';
 import { logger } from '../../../utils/logger';
 
-export const createUtilActions = (state: AIAssistantState) => ({
-  formatMessagesForAPI(messages: ChatMessage[]) {
+interface UtilActions {
+  formatMessagesForAPI(messages: ChatMessage[]): FormattedMessage[];
+  addUserMessage(content: string): ChatMessage;
+  addAssistantMessage(content: string): void;
+  addMessage(message: ChatMessage): void;
+  toggleStreamingMode(): void;
+  setSelectedModel(modelValue: string): void;
+  handleMessageError(error: ApiError | Error, _content: string): void;
+  updateLastActivity(): void;
+  validateMessage(content: string): boolean;
+}
+
+export const createUtilActions = (state: AIAssistantState): UtilActions => ({
+  formatMessagesForAPI(messages: ChatMessage[]): FormattedMessage[] {
     if (!messages || !Array.isArray(messages)) { return []; }
 
     return messages.map(msg => {
@@ -26,7 +38,7 @@ export const createUtilActions = (state: AIAssistantState) => ({
     return userMessage;
   },
 
-  addAssistantMessage(content: string) {
+  addAssistantMessage(content: string): void {
     const assistantMessage: ChatMessage = {
       id: generateId(),
       role: 'assistant',
@@ -36,15 +48,15 @@ export const createUtilActions = (state: AIAssistantState) => ({
     state.chatMessages.push(assistantMessage);
   },
 
-  addMessage(message: ChatMessage) {
+  addMessage(message: ChatMessage): void {
     state.chatMessages.push(message);
   },
 
-  toggleStreamingMode() {
+  toggleStreamingMode(): void {
     state.streamingEnabled = !state.streamingEnabled;
   },
 
-  setSelectedModel(modelValue: string) {
+  setSelectedModel(modelValue: string): void {
     state.selectedModel = modelValue;
   },
 

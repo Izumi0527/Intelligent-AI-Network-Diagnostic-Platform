@@ -1,5 +1,12 @@
-import { ref } from 'vue';
+import { ref, type Ref } from 'vue';
 import { useTerminalStore } from '@/stores/terminal';
+
+interface UseCommandHistoryReturn {
+  command: Ref<string>;
+  showPrevious: () => void;
+  showNext: () => void;
+  reset: () => void;
+}
 
 /**
  * 终端命令输入框的本地 ref 与历史导航。
@@ -8,7 +15,7 @@ import { useTerminalStore } from '@/stores/terminal';
  * 历史栈本身由 terminal store 维护，本 composable 只做"当前输入框值"与
  * 历史调用之间的桥接，便于在 input 元素上 v-model。
  */
-export function useCommandHistory() {
+export function useCommandHistory(): UseCommandHistoryReturn {
   const store = useTerminalStore();
   const command = ref('');
 

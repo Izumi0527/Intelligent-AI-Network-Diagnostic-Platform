@@ -14,7 +14,7 @@ export const useAppStore = defineStore('app', () => {
   );
 
   // 检查服务器连接状态
-  const checkServerConnection = async () => {
+  const checkServerConnection = async (): Promise<boolean> => {
     try {
       const response = await fetch('/api/health');
       isServerConnected.value = response.ok;
@@ -27,7 +27,7 @@ export const useAppStore = defineStore('app', () => {
   };
 
   // 设置暗黑模式
-  const setDarkMode = (value: boolean) => {
+  const setDarkMode = (value: boolean): void => {
     isDarkMode.value = value;
     localStorage.setItem('theme', value ? 'dark' : 'light');
 

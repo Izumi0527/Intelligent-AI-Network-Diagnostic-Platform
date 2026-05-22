@@ -2,6 +2,7 @@ import axios, { AxiosHeaders, AxiosResponse } from 'axios';
 import type { ChatMessage, FormattedMessage, MessageHistoryItem } from '@/types';
 import type { ApiError } from '@/types/chat';
 import { extractErrorMessage, isApiError } from './helpers';
+import { logger } from './logger';
 
 const api = axios.create({
   baseURL: '/api',
@@ -36,7 +37,7 @@ api.interceptors.response.use(
       const apiError = error as ApiError;
       // 特别处理422错误
       if (apiError.response && apiError.response.status === 422) {
-        console.error('请求参数验证失败:', apiError.response.data);
+        logger.error('请求参数验证失败:', apiError.response.data);
         // 保留原始错误数据以便更详细的处理
         apiError.validationErrors = (apiError.response.data as any)?.detail || [];
       }
@@ -51,14 +52,14 @@ api.interceptors.response.use(
 export function formatMessages(messages: ChatMessage[] | MessageHistoryItem[]): FormattedMessage[] {
   // 安全检查：确保messages是非空数组
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    console.warn('formatMessages接收到空消息列表，这可能导致请求失败');
+    logger.warn('formatMessages接收到空消息列表，这可能导致请求失败');
     return [];
   }
 
   return messages.map(msg => {
     // 确保每条消息都有role和content字段
     if (!msg || typeof msg !== 'object') {
-      console.warn('消息格式无效，跳过:', msg);
+      logger.warn('消息格式无效，跳过:', msg);
       return { role: 'user' as const, content: '无效消息' };
     }
 
@@ -70,7 +71,7 @@ export function formatMessages(messages: ChatMessage[] | MessageHistoryItem[]): 
 
     // 只对用户消息警告空内容，助手消息在流式对话时可能初始为空
     if ((!msg.content || msg.content.trim() === '') && role === 'user') {
-      console.warn(`发现空内容用户消息，role=${role}`);
+      logger.warn(`发现空内容用户消息，role=${role}`);
     }
 
     return {
@@ -98,7 +99,7 @@ export const aiService = {
     };
 
     try {
-      console.log('发送流式请求:', {
+      logger.debug('发送流式请求:', {
         model: formattedParams.model,
         messageCount: formattedParams.messages.length
       });
@@ -118,7 +119,7 @@ export const aiService = {
             // 处理单行SSE数据
             const processLine = (line: string) => {
               if (line === 'data: [DONE]' || line === '[DONE]') {
-                console.debug('接收到流结束标记');
+                logger.debug('接收到流结束标记');
                 return;
               }
 
@@ -139,7 +140,7 @@ export const aiService = {
 
                   // 优先处理后端返回的 StreamEvent 格式
                   if (data.type && data.data) {
-                    console.debug(`[StreamEvent] 接收到事件类型: ${data.type}`, data.data);
+                    logger.debug(`[StreamEvent] 接收到事件类型: ${data.type}`, data.data);
 
                     if (data.type === 'thinking' && data.data.thinking) {
                       // 处理思考内容
@@ -166,7 +167,7 @@ export const aiService = {
                       return;
                     } else if (data.type === 'done' || data.type === 'finish') {
                       // 处理完成事件
-                      console.debug('流式响应完成');
+                      logger.debug('流式响应完成');
                       return;
                     }
                   }
@@ -239,7 +240,7 @@ export const aiService = {
 
             // 处理文本响应，将其转换为流
             const textData = response.data;
-            console.debug('收到文本响应，长度：', textData.length);
+            logger.debug('收到文本响应，长度：', textData.length);
 
             // 将文本按行分割
             if (typeof textData === 'string') {
@@ -257,7 +258,7 @@ export const aiService = {
             controller.close();
 
           } catch (error: unknown) {
-            console.error('处理流数据时出错:', error);
+            logger.error('处理流数据时出错:', error);
             controller.error(error);
           }
         }
@@ -269,7 +270,7 @@ export const aiService = {
         headers: response.headers
       };
     } catch (error: unknown) {
-      console.error('流式请求失败:', error);
+      logger.error('流式请求失败:', error);
 
       // 错误信息也转换为流返回
       const errorStream = new ReadableStream({
@@ -310,7 +311,7 @@ export const aiService = {
     try {
       return api.post('/ai/chat', formattedParams);
     } catch (error: unknown) {
-      console.error('消息发送错误:', error);
+      logger.error('消息发送错误:', error);
       throw error;
     }
   },
@@ -322,14 +323,14 @@ export const aiService = {
     // 参数验证
     if (!params.model) {
       const error = new Error('未指定模型参数');
-      console.error('发送消息失败:', error);
+      logger.error('发送消息失败:', error);
       throw error;
     }
 
     // 确保消息列表不为空
     if (!params.messages || !Array.isArray(params.messages) || params.messages.length === 0) {
       const error = new Error('消息列表不能为空');
-      console.error('发送消息失败:', error);
+      logger.error('发送消息失败:', error);
       throw error;
     }
 
@@ -339,7 +340,7 @@ export const aiService = {
     // 格式化后的消息列表不能为空
     if (formattedMessages.length === 0) {
       const error = new Error('格式化后的消息列表为空，无法发送请求');
-      console.error('发送消息失败:', error);
+      logger.error('发送消息失败:', error);
       throw error;
     }
 
@@ -353,7 +354,7 @@ export const aiService = {
           messages: formattedMessages
         };
 
-        console.log(`发送聊天请求 (尝试 ${retries + 1}/${maxRetries}):`, {
+        logger.debug(`发送聊天请求 (尝试 ${retries + 1}/${maxRetries}):`, {
           model: formattedParams.model,
           messageCount: formattedParams.messages.length
         });
@@ -369,7 +370,7 @@ export const aiService = {
 
           // 如果仍然没有content，记录响应并标记为错误
           if (!response.data.content) {
-            console.error('响应中缺少content字段', response.data);
+            logger.error('响应中缺少content字段', response.data);
             throw new Error('响应格式异常：缺少内容');
           }
         }
@@ -385,7 +386,7 @@ export const aiService = {
 
           // 特别处理422错误，详细记录错误信息
           if (statusCode === 422) {
-            console.error('请求参数验证失败 (422错误):', {
+            logger.error('请求参数验证失败 (422错误):', {
               status: statusCode,
               data: data,
               params: {
@@ -399,12 +400,12 @@ export const aiService = {
             throw error;
           }
 
-          console.error(`请求失败 (尝试 ${retries + 1}/${maxRetries}):`, {
+          logger.error(`请求失败 (尝试 ${retries + 1}/${maxRetries}):`, {
             status: statusCode,
             data: data
           });
         } else {
-          console.error(`请求失败 (尝试 ${retries + 1}/${maxRetries}):`, error);
+          logger.error(`请求失败 (尝试 ${retries + 1}/${maxRetries}):`, error);
         }
 
         // 网络错误或服务器错误才重试
@@ -413,7 +414,7 @@ export const aiService = {
           if (retries < maxRetries) {
             // 延迟重试，随重试次数增加等待时间
             const delay = 1000 * retries;
-            console.log(`等待 ${delay}ms 后重试...`);
+            logger.debug(`等待 ${delay}ms 后重试...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }

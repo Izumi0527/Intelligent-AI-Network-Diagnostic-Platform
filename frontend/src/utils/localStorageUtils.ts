@@ -1,4 +1,5 @@
 import type { ChatData, ChatMessage } from '@/types/chat';
+import { logger } from './logger';
 
 export const localStorageUtils = {
   saveChat(key: string, chatData: ChatData | ChatMessage[]): boolean {
@@ -6,7 +7,7 @@ export const localStorageUtils = {
       localStorage.setItem(key, JSON.stringify(chatData));
       return true;
     } catch (error) {
-      console.error('保存聊天记录失败:', error);
+      logger.error('保存聊天记录失败:', error);
       return false;
     }
   },
@@ -16,7 +17,7 @@ export const localStorageUtils = {
       const data = localStorage.getItem(key);
       return data ? JSON.parse(data) as (ChatData | ChatMessage[]) : null;
     } catch (error) {
-      console.error('加载聊天记录失败:', error);
+      logger.error('加载聊天记录失败:', error);
       return null;
     }
   },
@@ -26,7 +27,7 @@ export const localStorageUtils = {
       localStorage.removeItem(key);
       return true;
     } catch (error) {
-      console.error('删除聊天记录失败:', error);
+      logger.error('删除聊天记录失败:', error);
       return false;
     }
   },
@@ -36,7 +37,7 @@ export const localStorageUtils = {
       localStorage.removeItem(key);
       return true;
     } catch (error) {
-      console.error('清除聊天记录失败:', error);
+      logger.error('清除聊天记录失败:', error);
       return false;
     }
   },
@@ -55,7 +56,7 @@ export const localStorageUtils = {
       keys.forEach(key => localStorage.removeItem(key));
       return true;
     } catch (error) {
-      console.error('清除所有聊天记录失败:', error);
+      logger.error('清除所有聊天记录失败:', error);
       return false;
     }
   },
@@ -74,7 +75,7 @@ export const localStorageUtils = {
         }
       }
     } catch (error) {
-      console.error('获取所有聊天记录失败:', error);
+      logger.error('获取所有聊天记录失败:', error);
     }
     return chats;
   }

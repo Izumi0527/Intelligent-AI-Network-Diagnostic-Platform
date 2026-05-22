@@ -77,3 +77,54 @@ def test_file_logs_remain_plain_text_when_console_is_colored(monkeypatch, tmp_pa
     assert "\033[" not in content
     assert "WARNING" in content
     assert "AI服务API密钥" in content
+
+
+def test_standard_formatter_redacts_exception_traceback():
+    """标准日志格式化器必须脱敏异常栈中的敏感字段。"""
+    formatter = logger_module.SensitiveFormatter("%(message)s\n%(exc_text)s")
+
+    try:
+        raise RuntimeError("upstream token=secret-token password=secret")
+    except RuntimeError:
+        record = logger_module.logging.LogRecord(
+            name="security-test",
+            level=logger_module.logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="provider failed",
+            args=(),
+            exc_info=sys.exc_info(),
+        )
+
+    formatted = formatter.format(record)
+
+    assert "secret-token" not in formatted
+    assert "password=secret" not in formatted
+    assert "***" in formatted
+
+
+def test_formatters_redact_structured_message_values():
+    """字符串和 JSON 格式化器都应脱敏 dict/list 形式的结构化日志。"""
+    payload = {
+        "Authorization": "Bearer secret-token",
+        "api_key": "secret-key",
+        "messages": [{"content": "敏感提示词"}],
+    }
+    record = logger_module.logging.LogRecord(
+        name="security-test",
+        level=logger_module.logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="payload=%s",
+        args=(payload,),
+        exc_info=None,
+    )
+
+    standard = logger_module.SensitiveFormatter("%(message)s").format(record)
+    json_text = logger_module.JsonFormatter().format(record)
+
+    for formatted in (standard, json_text):
+        assert "secret-token" not in formatted
+        assert "secret-key" not in formatted
+        assert "敏感提示词" not in formatted
+        assert "***" in formatted

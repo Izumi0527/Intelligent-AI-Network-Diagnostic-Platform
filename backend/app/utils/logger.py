@@ -1,14 +1,13 @@
+import json
 import logging
 import logging.handlers
-import json
 import re
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, Any
 import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from app.config.settings import settings
-
 
 STANDARD_LOG_FORMAT = (
     "%(asctime)s - %(name)s - %(levelname)s - "
@@ -25,15 +24,52 @@ LEVEL_COLORS = {
 }
 
 SENSITIVE_LOG_PATTERNS = [
-    (re.compile(r"(Authorization\s*:\s*Bearer\s+)[^\s,;]+", re.IGNORECASE), r"\1***"),
-    (re.compile(r"((?:password|passwd|token|api[_-]?key|secret)\s*[=:]\s*)[^\s,;]+", re.IGNORECASE), r"\1***"),
-    (re.compile(r"(content\s*[=:]\s*)[^,;]+", re.IGNORECASE), r"\1***"),
+    (re.compile(r"((?:Authorization)['\"]?\s*[:=]\s*['\"]?Bearer\s+)[^'\"\s,;}]+", re.IGNORECASE), r"\1***"),
+    (re.compile(r"((?:password|passwd|token|api[_-]?key|secret)['\"]?\s*[:=]\s*['\"]?)[^'\"\s,;}]+", re.IGNORECASE), r"\1***"),
+    (re.compile(r"(content['\"]?\s*[:=]\s*['\"]?)[^'\",;}]+", re.IGNORECASE), r"\1***"),
 ]
+SENSITIVE_FIELD_NAMES = {
+    "authorization",
+    "password",
+    "passwd",
+    "token",
+    "api_key",
+    "api-key",
+    "secret",
+    "content",
+}
+
+
+def redact_sensitive_value(value: Any) -> Any:
+    """递归脱敏结构化日志字段，保留整体形态便于排查。"""
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            normalized_key = str(key).lower()
+            if normalized_key in SENSITIVE_FIELD_NAMES:
+                redacted[key] = "***"
+            else:
+                redacted[key] = redact_sensitive_value(item)
+        return redacted
+
+    if isinstance(value, list):
+        return [redact_sensitive_value(item) for item in value]
+
+    if isinstance(value, tuple):
+        return tuple(redact_sensitive_value(item) for item in value)
+
+    if isinstance(value, str):
+        text = value
+        for pattern, replacement in SENSITIVE_LOG_PATTERNS:
+            text = pattern.sub(replacement, text)
+        return text
+
+    return value
 
 
 def redact_sensitive_text(value: Any, max_length: int = 500) -> str:
     """脱敏日志文本，避免记录 Token、密码、Prompt 或模型输出明文。"""
-    text = str(value)
+    text = str(redact_sensitive_value(value))
     for pattern, replacement in SENSITIVE_LOG_PATTERNS:
         text = pattern.sub(replacement, text)
 
@@ -44,20 +80,20 @@ def redact_sensitive_text(value: Any, max_length: int = 500) -> str:
 
 class LoggerManager:
     """日志管理器 - 统一管理所有日志配置"""
-    
+
     def __init__(self, log_base_dir: str = "../logs"):
         self.log_base_dir = Path(log_base_dir)
-        self.loggers: Dict[str, logging.Logger] = {}
-        
+        self.loggers: dict[str, logging.Logger] = {}
+
         # 确保日志目录存在
         self._create_log_directories()
-    
+
     def _create_log_directories(self):
         """创建日志目录结构"""
         directories = ["app", "access", "error", "backend", "frontend"]
         for directory in directories:
             (self.log_base_dir / directory).mkdir(parents=True, exist_ok=True)
-    
+
     def get_logger(
         self,
         name: str,
@@ -99,7 +135,7 @@ class LoggerManager:
             formatter = JsonFormatter()
             console_formatter = formatter
         else:
-            formatter = logging.Formatter(
+            formatter = SensitiveFormatter(
                 STANDARD_LOG_FORMAT,
                 datefmt=STANDARD_DATE_FORMAT
             )
@@ -143,11 +179,11 @@ class LoggerManager:
 
         self.loggers[name] = logger
         return logger
-    
+
     def _get_log_file_path(self, logger_name: str) -> Path:
         """根据日志器名称确定日志文件路径"""
         today = datetime.now().strftime('%Y-%m-%d')
-        
+
         if "backend" in logger_name.lower():
             return self.log_base_dir / "backend" / f"backend-{today}.log"
         elif "frontend" in logger_name.lower():
@@ -158,45 +194,45 @@ class LoggerManager:
             return self.log_base_dir / "error" / f"error-{today}.log"
         else:
             return self.log_base_dir / "app" / f"{logger_name}-{today}.log"
-    
+
     def configure_uvicorn_logging(self, log_level: str = None):
         """配置Uvicorn的日志输出到文件"""
         if log_level is None:
             log_level = settings.LOG_LEVEL
-            
+
         # 配置访问日志
         access_logger = self.get_logger(
-            "uvicorn.access", 
-            log_level, 
+            "uvicorn.access",
+            log_level,
             log_to_console=False
         )
-        
+
         # 配置错误日志
         error_logger = self.get_logger("uvicorn.error", log_level)
-        
+
         # 应用到uvicorn
         uvicorn_access = logging.getLogger("uvicorn.access")
         uvicorn_error = logging.getLogger("uvicorn.error")
-        
+
         uvicorn_access.handlers = access_logger.handlers
         uvicorn_error.handlers = error_logger.handlers
-        
+
         uvicorn_access.propagate = False
         uvicorn_error.propagate = False
-    
+
     def get_file_logger_only(self, name: str, level: str = None) -> logging.Logger:
         """获取仅输出到文件的日志器（用于后台任务）"""
         if level is None:
             level = settings.LOG_LEVEL
         return self.get_logger(name, level, log_to_file=True, log_to_console=False)
-    
+
     def cleanup_old_logs(self, days_to_keep: int = 30):
         """清理过期的日志文件"""
         import time
-        
+
         cutoff_time = time.time() - (days_to_keep * 24 * 60 * 60)
         cleaned_count = 0
-        
+
         for log_dir in ["app", "access", "error", "backend", "frontend"]:
             log_path = self.log_base_dir / log_dir
             if log_path.exists():
@@ -207,38 +243,74 @@ class LoggerManager:
                             cleaned_count += 1
                     except OSError:
                         pass  # 文件可能正在使用
-        
+
         if cleaned_count > 0:
             print(f"已清理 {cleaned_count} 个过期日志文件")
 
 
 class JsonFormatter(logging.Formatter):
     """JSON格式的日志格式化器"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         """将日志记录格式化为JSON"""
-        log_data: Dict[str, Any] = {
+        message = redact_sensitive_text(_get_redacted_message(record))
+        log_data: dict[str, Any] = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
-            "message": record.getMessage(),
+            "message": message,
             "logger": record.name,
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
         }
-        
+
         # 添加异常信息（如果有）
         if record.exc_info:
-            log_data["exception"] = self.formatException(record.exc_info)
-        
+            log_data["exception"] = redact_sensitive_text(
+                self.formatException(record.exc_info)
+            )
+
         # 添加额外字段
         if hasattr(record, "extra") and isinstance(record.extra, dict):
-            log_data.update(record.extra)
-        
+            log_data.update(
+                {
+                    key: redact_sensitive_text(value)
+                    for key, value in record.extra.items()
+                }
+            )
+
         return json.dumps(log_data, ensure_ascii=False)
 
 
-class ColoredConsoleFormatter(logging.Formatter):
+class SensitiveFormatter(logging.Formatter):
+    """标准日志格式化器：输出前统一脱敏消息文本。"""
+
+    def formatException(self, ei) -> str:
+        """格式化异常栈时同步脱敏，避免 exc_info 明文落盘。"""
+        return redact_sensitive_text(super().formatException(ei), max_length=4000)
+
+    def format(self, record: logging.LogRecord) -> str:
+        original_msg = record.msg
+        original_args = record.args
+        try:
+            record.msg = redact_sensitive_text(_get_redacted_message(record))
+            record.args = ()
+            return super().format(record)
+        finally:
+            record.msg = original_msg
+            record.args = original_args
+
+
+def _get_redacted_message(record: logging.LogRecord) -> str:
+    original_args = record.args
+    try:
+        record.args = redact_sensitive_value(original_args)
+        return record.getMessage()
+    finally:
+        record.args = original_args
+
+
+class ColoredConsoleFormatter(SensitiveFormatter):
     """控制台日志格式化器：仅为终端输出的日志级别添加颜色。"""
 
     def format(self, record: logging.LogRecord) -> str:

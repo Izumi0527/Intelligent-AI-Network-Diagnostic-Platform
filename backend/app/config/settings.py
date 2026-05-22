@@ -1,7 +1,9 @@
 import json
 import os
+from typing import Any, Optional
+
 from pydantic_settings import BaseSettings
-from typing import Optional, Any, List
+
 
 class Settings(BaseSettings):
     """应用配置"""
@@ -12,17 +14,17 @@ class Settings(BaseSettings):
     API_V1_STR: Optional[str] = os.getenv("API_V1_STR")
     PROJECT_NAME: Optional[str] = os.getenv("APP_NAME")
     APP_VERSION: Optional[str] = os.getenv("APP_VERSION")
-    
+
     # CORS设置
-    BACKEND_CORS_ORIGINS: List[str] = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else []
-    
+    BACKEND_CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else []
+
     # 安全设置
     SECRET_KEY: Optional[str] = os.getenv("SECRET_KEY")
     JWT_ALGORITHM: Optional[str] = os.getenv("JWT_ALGORITHM")
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "0"))
     API_AUTH_ENABLED: bool = os.getenv("API_AUTH_ENABLED", "false").lower() == "true"
     INTERNAL_API_TOKEN: Optional[str] = os.getenv("INTERNAL_API_TOKEN")
-    
+
     # 服务器设置
     HOST: Optional[str] = os.getenv("HOST")
     PORT: int = int(os.getenv("PORT", "0"))
@@ -33,7 +35,7 @@ class Settings(BaseSettings):
         if os.getenv("SSH_AUTO_ADD_HOST_KEY") is not None
         else os.getenv("APP_ENV", "development").lower() != "production"
     )
-    
+
     # 会话设置
     SESSION_IDLE_TIMEOUT: int = int(os.getenv("SESSION_IDLE_TIMEOUT", "0"))
     MAX_TERMINAL_SESSIONS: int = int(os.getenv("MAX_TERMINAL_SESSIONS", "0"))
@@ -44,29 +46,36 @@ class Settings(BaseSettings):
     TERMINAL_ALLOWED_SSH_PORTS: Any = os.getenv("TERMINAL_ALLOWED_SSH_PORTS", "22,2222")
     TERMINAL_ALLOWED_TELNET_PORTS: Any = os.getenv("TERMINAL_ALLOWED_TELNET_PORTS", "23,2323")
     TERMINAL_COMMAND_MAX_LENGTH: int = int(os.getenv("TERMINAL_COMMAND_MAX_LENGTH", "256"))
+    TERMINAL_ALLOWED_COMMAND_PATTERNS: Any = os.getenv(
+        "TERMINAL_ALLOWED_COMMAND_PATTERNS",
+        r"^\s*(display|show)\b,"
+        r"^\s*(ping|traceroute|tracert)\b",
+    )
     TERMINAL_BLOCKED_COMMAND_PATTERNS: Any = os.getenv(
         "TERMINAL_BLOCKED_COMMAND_PATTERNS",
         r"^\s*(reboot|reload|reset|shutdown)\b,"
         r"^\s*(delete|format|erase|rm)\b,"
-        r"^\s*(system-view|configure|conf\s+t)\b",
+        r"^\s*(system-view|configure|conf\s+t)\b,"
+        r"\b(save|copy|backup|restore|write)\b,"
+        r"\b(current-configuration|running-config|startup-config|saved-configuration)\b",
     )
-    
+
     # 日志设置
     LOG_LEVEL: Optional[str] = os.getenv("LOG_LEVEL")
     LOG_FORMAT: Optional[str] = os.getenv("LOG_FORMAT")
-    
+
     # AI设置
     AI_ENABLED: bool = os.getenv("AI_ENABLED", "false").lower() == "true"
-    
+
     # API密钥 - Anthropic (Claude)
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
     ANTHROPIC_API_BASE: Optional[str] = os.getenv("ANTHROPIC_API_BASE")
     CLAUDE_MODEL_VERSION: Optional[str] = os.getenv("CLAUDE_MODEL_VERSION")
-    
+
     # API密钥 - OpenAI (GPT)
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
     OPENAI_API_BASE: Optional[str] = os.getenv("OPENAI_API_BASE")
-    
+
     # API密钥 - Deepseek
     DEEPSEEK_API_ENABLED: bool = os.getenv("DEEPSEEK_API_ENABLED", "false").lower() == "true"
     DEEPSEEK_API_KEY: Optional[str] = os.getenv("DEEPSEEK_API_KEY")
@@ -74,13 +83,13 @@ class Settings(BaseSettings):
     DEEPSEEK_MODEL_VERSION: Optional[str] = os.getenv("DEEPSEEK_MODEL_VERSION")
     DEEPSEEK_TIMEOUT: int = int(os.getenv("DEEPSEEK_TIMEOUT", "0"))
     DEEPSEEK_MAX_TOKENS: int = int(os.getenv("DEEPSEEK_MAX_TOKENS", "0"))
-    
+
     # 模型列表配置
     OPENAI_MODELS: Optional[str] = os.getenv("OPENAI_MODELS")
     OPENAI_MODEL_NAMES: Optional[str] = os.getenv("OPENAI_MODEL_NAMES")
     OPENAI_MODEL_DESCRIPTIONS: Optional[str] = os.getenv("OPENAI_MODEL_DESCRIPTIONS")
     OPENAI_MODEL_MAX_TOKENS: Optional[str] = os.getenv("OPENAI_MODEL_MAX_TOKENS")
-    
+
     CLAUDE_MODELS: Optional[str] = os.getenv("CLAUDE_MODELS")
     CLAUDE_MODEL_NAMES: Optional[str] = os.getenv("CLAUDE_MODEL_NAMES")
     CLAUDE_MODEL_DESCRIPTIONS: Optional[str] = os.getenv("CLAUDE_MODEL_DESCRIPTIONS")
@@ -124,7 +133,7 @@ class Settings(BaseSettings):
         self._validate_ai_config()
 
     @staticmethod
-    def _normalize_cors_origins(value: Any) -> List[str]:
+    def _normalize_cors_origins(value: Any) -> list[str]:
         """规范化 CORS origin，凭证模式下不允许通配符。"""
         if value is None:
             return []
@@ -198,7 +207,7 @@ class Settings(BaseSettings):
             )
 
     @staticmethod
-    def _normalize_csv(value: Any) -> List[str]:
+    def _normalize_csv(value: Any) -> list[str]:
         """把逗号分隔配置规范化为去空白列表。"""
         if value is None:
             return []
@@ -209,7 +218,7 @@ class Settings(BaseSettings):
         return [str(value).strip()] if str(value).strip() else []
 
     @classmethod
-    def _normalize_int_csv(cls, value: Any) -> List[int]:
+    def _normalize_int_csv(cls, value: Any) -> list[int]:
         """把端口配置规范化为整数列表，非法项直接触发配置错误。"""
         ports = []
         for item in cls._normalize_csv(value):
@@ -223,12 +232,12 @@ class Settings(BaseSettings):
         return ports
 
     def _validate_security_config(self) -> None:
-        """生产环境必须显式启用内部接口鉴权并使用真实 Token。"""
-        if (self.APP_ENV or "").lower() != "production":
+        """非 test 环境必须显式启用内部接口鉴权并使用真实 Token。"""
+        if (self.APP_ENV or "").lower() == "test":
             return
 
         if not self.API_AUTH_ENABLED:
-            raise ValueError("生产环境必须启用内部 API 鉴权(API_AUTH_ENABLED=true)")
+            raise ValueError("非 test 环境必须启用内部 API 鉴权(API_AUTH_ENABLED=true)")
 
         invalid_tokens = {
             "",
@@ -239,7 +248,7 @@ class Settings(BaseSettings):
         }
         token = (self.INTERNAL_API_TOKEN or "").strip()
         if token.lower() in invalid_tokens:
-            raise ValueError("生产环境 INTERNAL_API_TOKEN 必须配置为非占位值")
+            raise ValueError("非 test 环境 INTERNAL_API_TOKEN 必须配置为非占位值")
 
     def _normalize_terminal_policy_config(self) -> None:
         """规范化终端连接和命令安全策略。"""
@@ -250,6 +259,9 @@ class Settings(BaseSettings):
         )
         self.TERMINAL_ALLOWED_TELNET_PORTS = self._normalize_int_csv(
             self.TERMINAL_ALLOWED_TELNET_PORTS
+        )
+        self.TERMINAL_ALLOWED_COMMAND_PATTERNS = self._normalize_csv(
+            self.TERMINAL_ALLOWED_COMMAND_PATTERNS
         )
         self.TERMINAL_BLOCKED_COMMAND_PATTERNS = self._normalize_csv(
             self.TERMINAL_BLOCKED_COMMAND_PATTERNS
@@ -320,4 +332,4 @@ class Settings(BaseSettings):
             )
 
 # 创建全局设置实例
-settings = Settings() 
+settings = Settings()

@@ -56,19 +56,18 @@ def validate_terminal_target(connection_type: str, device_address: str, port: in
 
     normalized_host = host.lower().rstrip(".")
     allowed_hosts = {item.lower().rstrip(".") for item in settings.TERMINAL_ALLOWED_HOSTS}
-    if allowed_hosts and normalized_host not in allowed_hosts:
-        ip_address = _parse_ip_address(normalized_host)
-        if not ip_address or not _cidr_contains(
-            ip_address,
-            settings.TERMINAL_ALLOWED_CIDRS,
-        ):
-            raise TerminalPolicyError("设备地址不在允许列表中", 403)
+    allowed_cidrs = settings.TERMINAL_ALLOWED_CIDRS
+
+    if not allowed_hosts and not allowed_cidrs:
+        raise TerminalPolicyError("终端连接必须配置允许主机或允许网段", 403)
 
     if normalized_host in {"localhost"}:
         raise TerminalPolicyError("不允许连接本机地址", 403)
 
     ip_address = _parse_ip_address(normalized_host)
     if not ip_address:
+        if normalized_host not in allowed_hosts:
+            raise TerminalPolicyError("设备域名不在允许列表中", 403)
         return
 
     if ip_address.is_loopback:
@@ -78,10 +77,9 @@ def validate_terminal_target(connection_type: str, device_address: str, port: in
     if ip_address.is_unspecified or ip_address.is_multicast:
         raise TerminalPolicyError("不允许连接无效或组播地址", 403)
 
-    if settings.TERMINAL_ALLOWED_CIDRS and not _cidr_contains(
-        ip_address,
-        settings.TERMINAL_ALLOWED_CIDRS,
-    ):
+    host_allowed = normalized_host in allowed_hosts
+    cidr_allowed = bool(allowed_cidrs) and _cidr_contains(ip_address, allowed_cidrs)
+    if not host_allowed and not cidr_allowed:
         raise TerminalPolicyError("设备地址不在允许网段中", 403)
 
 
@@ -98,4 +96,8 @@ def validate_terminal_command(command: str) -> str:
         if re.search(pattern, command_text, re.IGNORECASE):
             raise TerminalPolicyError("命令包含高风险操作，已拒绝执行")
 
-    return command_text
+    for pattern in settings.TERMINAL_ALLOWED_COMMAND_PATTERNS:
+        if re.search(pattern, command_text, re.IGNORECASE):
+            return command_text
+
+    raise TerminalPolicyError("命令不在只读诊断命令白名单中")

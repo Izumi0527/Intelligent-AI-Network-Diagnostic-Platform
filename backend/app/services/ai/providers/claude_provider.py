@@ -5,33 +5,33 @@ Anthropic Claude服务提供商实现
 
 import json
 import uuid
-from typing import List, Dict, Any, AsyncGenerator, Tuple
-import aiohttp
+from collections.abc import AsyncGenerator
+from typing import Any
 
-from app.services.ai.base import AIProviderBase, ProviderType
-from app.models.ai import AIModel, Message, ChatRequest, ChatResponse, StreamEvent
 from app.config.settings import settings
-from app.utils.model_config import ModelConfigParser
+from app.models.ai import AIModel, ChatRequest, ChatResponse, Message, StreamEvent
+from app.services.ai.base import AIProviderBase, ProviderType, safe_ai_client_message
 from app.utils.logger import get_logger
+from app.utils.model_config import ModelConfigParser
 
 logger = get_logger(__name__)
 
 
 class ClaudeProvider(AIProviderBase):
     """Anthropic Claude服务提供商"""
-    
+
     def __init__(self, api_key: str):
         super().__init__(api_key, ProviderType.ANTHROPIC)
         self.base_url = settings.ANTHROPIC_API_BASE
         # 从配置动态加载模型
         self.models = ModelConfigParser.parse_claude_models()
         logger.info(f"Claude Provider加载了 {len(self.models)} 个模型")
-    
-    def get_available_models(self) -> List[AIModel]:
+
+    def get_available_models(self) -> list[AIModel]:
         """获取可用模型列表"""
         return self.models if self.is_available() else []
-    
-    async def check_connection(self) -> Tuple[bool, str]:
+
+    async def check_connection(self) -> tuple[bool, str]:
         """检查Claude API连接状态"""
         try:
             if not self.api_key:
@@ -71,86 +71,75 @@ class ClaudeProvider(AIProviderBase):
                 else:
                     error_msg = self._handle_api_error(response.status, await response.text())
                     logger.error(f"Claude API连接失败: {error_msg}")
-                    return False, error_msg
+                    return False, safe_ai_client_message(error_msg)
 
         except Exception as e:
             error_msg = f"Claude API连接异常: {str(e)}"
             logger.error(error_msg)
-            return False, error_msg
-    
+            return False, safe_ai_client_message(error_msg)
+
     async def chat(self, request: ChatRequest) -> ChatResponse:
         """非流式对话"""
         try:
             await self.initialize()
-            
+
             payload = self._build_claude_payload(request, stream=False)
             headers = self._create_headers({
                 "x-api-key": self.api_key,
                 "anthropic-version": "2023-06-01"
             })
-            
+
             async with self.session.post(
                 f"{self.base_url}/messages",
                 headers=headers,
                 json=payload
             ) as response:
-                
+
                 if response.status == 200:
                     result = await response.json()
                     return self._parse_claude_response(result)
                 else:
                     error_msg = self._handle_api_error(response.status, await response.text())
-                    return ChatResponse(
-                        id=str(uuid.uuid4()),
-                        model=request.model,
-                        message=Message(role="assistant", content=f"错误: {error_msg}"),
-                        usage={"error": True}
-                    )
-                    
+                    return self._error_chat_response(request, error_msg)
+
         except Exception as e:
             error_msg = f"Claude对话请求异常: {str(e)}"
-            logger.error(error_msg)
-            return ChatResponse(
-                id=str(uuid.uuid4()),
-                model=request.model,
-                message=Message(role="assistant", content=f"异常: {error_msg}"),
-                usage={"error": True}
-            )
-    
+            return self._error_chat_response(request, error_msg, "provider_exception")
+
     async def chat_stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]:
         """流式对话"""
         try:
             await self.initialize()
-            
+
             payload = self._build_claude_payload(request, stream=True)
             headers = self._create_headers({
                 "x-api-key": self.api_key,
                 "anthropic-version": "2023-06-01",
                 "Accept": "text/event-stream"
             })
-            
+
             async with self.session.post(
                 f"{self.base_url}/messages",
                 headers=headers,
                 json=payload
             ) as response:
-                
+
                 if response.status != 200:
                     error_msg = self._handle_api_error(response.status, await response.text())
-                    yield StreamEvent(type="error", data={"error": error_msg})
+                    yield self._error_stream_event(error_msg)
                     return
-                
+
                 # 处理Claude的Server-Sent Events格式
                 async for line in response.content:
                     line_text = line.decode('utf-8').strip()
-                    
+
                     if line_text.startswith('data: '):
                         data_text = line_text[6:]  # 去掉 'data: ' 前缀
-                        
+
                         if data_text == '[DONE]':
                             yield StreamEvent(type="done", data={})
                             break
-                        
+
                         try:
                             data = json.loads(data_text)
                             event = self._parse_claude_stream_chunk(data)
@@ -158,13 +147,12 @@ class ClaudeProvider(AIProviderBase):
                                 yield event
                         except json.JSONDecodeError:
                             continue
-                            
+
         except Exception as e:
             error_msg = f"Claude流式对话异常: {str(e)}"
-            logger.error(error_msg)
-            yield StreamEvent(type="error", data={"error": error_msg})
-    
-    def _build_claude_payload(self, request: ChatRequest, stream: bool = False) -> Dict[str, Any]:
+            yield self._error_stream_event(error_msg, "provider_exception")
+
+    def _build_claude_payload(self, request: ChatRequest, stream: bool = False) -> dict[str, Any]:
         """构建Claude API请求负载"""
         messages = []
         for msg in request.messages:
@@ -172,45 +160,44 @@ class ClaudeProvider(AIProviderBase):
                 "role": msg.role,
                 "content": msg.content
             })
-        
+
         payload = {
             "model": request.model,
             "messages": messages,
-            "max_tokens": getattr(request, 'max_tokens', 1000),
-            "temperature": getattr(request, 'temperature', 0.7),
-            "stream": stream
+            "stream": stream,
+            **self._generation_options(request, default_max_tokens=1000),
         }
-        
+
         return payload
-    
-    def _parse_claude_response(self, response_data: Dict[str, Any]) -> ChatResponse:
+
+    def _parse_claude_response(self, response_data: dict[str, Any]) -> ChatResponse:
         """解析Claude响应"""
         content = response_data.get('content', [])
-        
+
         # Claude的响应格式中，content是一个数组
         message_content = ""
         for block in content:
             if block.get('type') == 'text':
                 message_content += block.get('text', '')
-        
+
         message = Message(
             role="assistant",
             content=message_content
         )
-        
+
         usage = response_data.get('usage', {})
-        
+
         return ChatResponse(
             id=response_data.get('id', str(uuid.uuid4())),
             model=response_data.get('model', ''),
             message=message,
             usage=usage
         )
-    
-    def _parse_claude_stream_chunk(self, chunk_data: Dict[str, Any]) -> StreamEvent:
+
+    def _parse_claude_stream_chunk(self, chunk_data: dict[str, Any]) -> StreamEvent:
         """解析Claude流式响应块"""
         event_type = chunk_data.get('type')
-        
+
         if event_type == 'content_block_delta':
             delta = chunk_data.get('delta', {})
             if delta.get('type') == 'text_delta':
@@ -220,11 +207,11 @@ class ClaudeProvider(AIProviderBase):
                         type="content",
                         data={"content": text}
                     )
-        
+
         elif event_type == 'message_stop':
             return StreamEvent(
                 type="finish",
                 data={"reason": "stop"}
             )
-        
+
         return None

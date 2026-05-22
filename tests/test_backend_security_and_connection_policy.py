@@ -1,4 +1,5 @@
 import os
+import warnings
 
 import pytest
 from fastapi import HTTPException
@@ -26,14 +27,18 @@ from app.api.deps import (
 )
 from app.config.settings import Settings, settings
 from app.utils import logger as logger_utils
-from app.main import app
-from app.models.ai import ChatResponse, Message, ModelsResponse
+from app.main import app, create_app
+from app.models.ai import ChatRequest, ChatResponse, Message, ModelsResponse
 from app.models.terminal import (
     CommandRequest,
     CommandResponse,
     ConnectionResponse,
     TerminalCredentials,
 )
+from app.services.ai.base import ProviderType
+from app.services.ai.providers.claude_provider import ClaudeProvider
+from app.services.ai.providers.deepseek_provider import DeepseekProvider
+from app.services.ai.providers.openai_provider import OpenAIProvider
 from app.services.terminal_service import TerminalService
 
 
@@ -83,6 +88,11 @@ class FakeAIManager:
 
     async def check_model_status(self, _model_id):
         return True, "ok"
+
+
+class SensitiveStatusAIManager(FakeAIManager):
+    async def check_model_status(self, _model_id):
+        return False, "upstream token=secret-token password=secret"
 
 
 class RejectingTerminalManager:
@@ -347,7 +357,7 @@ def test_production_requires_internal_api_auth(monkeypatch):
     monkeypatch.setenv("API_AUTH_ENABLED", "false")
     monkeypatch.setenv("INTERNAL_API_TOKEN", "prod-token")
 
-    with pytest.raises(ValueError, match="生产环境必须启用内部 API 鉴权"):
+    with pytest.raises(ValueError, match="非 test 环境必须启用内部 API 鉴权"):
         Settings()
 
 
@@ -357,6 +367,28 @@ def test_production_rejects_placeholder_internal_token(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("API_AUTH_ENABLED", "true")
     monkeypatch.setenv("INTERNAL_API_TOKEN", "change-me-internal-api-token")
+
+    with pytest.raises(ValueError, match="INTERNAL_API_TOKEN"):
+        Settings()
+
+
+def test_non_test_environment_rejects_disabled_internal_api_auth(monkeypatch):
+    """非 test 环境必须启用内部接口鉴权，不能依赖默认放行。"""
+    _set_required_config(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("API_AUTH_ENABLED", "false")
+    monkeypatch.setenv("INTERNAL_API_TOKEN", "dev-token")
+
+    with pytest.raises(ValueError, match="非 test 环境必须启用内部 API 鉴权"):
+        Settings()
+
+
+def test_non_test_environment_rejects_missing_internal_api_token(monkeypatch):
+    """非 test 环境启用鉴权后必须提供真实内部 Token。"""
+    _set_required_config(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("API_AUTH_ENABLED", "true")
+    monkeypatch.delenv("INTERNAL_API_TOKEN", raising=False)
 
     with pytest.raises(ValueError, match="INTERNAL_API_TOKEN"):
         Settings()
@@ -376,6 +408,32 @@ def test_debug_request_format_hidden_outside_development(monkeypatch):
     assert response.status_code in {403, 404}
 
 
+def test_production_disables_api_documentation(monkeypatch):
+    """production 环境必须关闭 API 文档和 OpenAPI 枚举入口。"""
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    production_app = create_app()
+    client = TestClient(production_app, raise_server_exceptions=False)
+
+    for path in (
+        f"{settings.API_V1_STR}/docs",
+        f"{settings.API_V1_STR}/redoc",
+        f"{settings.API_V1_STR}/openapi.json",
+    ):
+        response = client.get(path)
+        assert response.status_code == 404
+
+
+def test_create_app_uses_lifespan_without_on_event_deprecation(monkeypatch):
+    """应用启动/关闭逻辑应使用 lifespan，避免继续注册 on_event。"""
+    monkeypatch.setattr(settings, "APP_ENV", "test")
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always", DeprecationWarning)
+        create_app()
+
+    assert not any("on_event is deprecated" in str(item.message) for item in captured)
+
+
 def test_deepseek_generate_requires_internal_token(monkeypatch):
     """Deepseek 生成接口属于受保护能力，缺少 Token 应直接返回 401。"""
     _enable_internal_auth(monkeypatch)
@@ -386,6 +444,211 @@ def test_deepseek_generate_requires_internal_token(monkeypatch):
     )
 
     assert response.status_code == 401
+
+
+def test_ai_chat_rejects_oversized_message_content(monkeypatch):
+    """AI 对话必须拒绝超长单条消息，避免成本放大和请求体滥用。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/api/v1/ai/chat",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [{"role": "user", "content": "x" * 8001}],
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_ai_chat_rejects_invalid_sampling_parameters(monkeypatch):
+    """AI 对话必须限制 max_tokens、temperature 和 top_p 的安全范围。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/api/v1/ai/chat",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 100000,
+                "temperature": 3,
+                "top_p": 2,
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_ai_chat_rejects_too_many_messages(monkeypatch):
+    """AI 对话必须限制消息数量，避免批量请求放大资源消耗。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/api/v1/ai/chat",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [
+                    {"role": "user", "content": f"ping-{index}"}
+                    for index in range(51)
+                ],
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_ai_chat_rejects_total_message_content_over_limit(monkeypatch):
+    """AI 对话必须限制消息总长度，避免拆分多条绕过单条长度限制。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/api/v1/ai/chat",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [
+                    {"role": "user", "content": "x" * 8000}
+                    for _ in range(5)
+                ],
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_deepseek_generate_rejects_oversized_message(monkeypatch):
+    """Deepseek 兼容生成接口应复用 AI 请求边界约束。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/api/v1/ai/deepseek/generate",
+            json={
+                "messages": [{"role": "user", "content": "x" * 8001}],
+                "max_tokens": 2048,
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_deepseek_generate_rejects_invalid_sampling_parameters(monkeypatch):
+    """Deepseek 兼容生成接口应限制采样参数和 max_tokens。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/api/v1/ai/deepseek/generate",
+            json={
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 100000,
+                "temperature": 3,
+                "top_p": 2,
+            },
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_ai_status_endpoint_does_not_expose_upstream_error_detail(monkeypatch):
+    """模型连接状态接口不能把上游错误详情透传给客户端。"""
+    _enable_internal_auth(monkeypatch)
+    app.dependency_overrides[get_ai_service_manager] = lambda: SensitiveStatusAIManager()
+
+    try:
+        response = TestClient(app, raise_server_exceptions=False).get(
+            "/api/v1/ai/models/deepseek-v4-pro/status",
+            headers=_auth_headers(),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["connected"] is False
+    assert response.json()["message"] == "AI 服务暂时不可用，请稍后重试"
+    assert "secret-token" not in response.text
+    assert "password=secret" not in response.text
+
+
+def test_ai_provider_payload_uses_safe_defaults_and_top_p():
+    """provider 请求体不能向上游发送 None 参数，且应透传已校验的 top_p。"""
+    request = ChatRequest(
+        model="deepseek-v4-pro",
+        messages=[Message(role="user", content="ping")],
+        top_p=0.8,
+    )
+    providers = [
+        OpenAIProvider("test-key"),
+        DeepseekProvider("test-key"),
+        ClaudeProvider("test-key"),
+    ]
+
+    payloads = [
+        providers[0]._build_chat_payload(request),
+        providers[1]._build_deepseek_payload(request),
+        providers[2]._build_claude_payload(request),
+    ]
+
+    for payload in payloads:
+        assert payload["max_tokens"] is not None
+        assert payload["temperature"] is not None
+        assert payload["top_p"] == 0.8
+
+
+def test_ai_provider_error_response_does_not_expose_upstream_detail():
+    """AI provider 返回给客户端的错误不能包含上游原文敏感信息。"""
+    provider = OpenAIProvider("test-key")
+    request = ChatRequest(
+        model="gpt-test",
+        messages=[Message(role="user", content="ping")],
+    )
+
+    response = provider._error_chat_response(
+        request,
+        'upstream failed token=secret-token https://proxy.example.com/account',
+    )
+
+    assert response.usage["error"] is True
+    assert response.usage["provider"] == ProviderType.OPENAI.value
+    assert response.id == response.usage["request_id"]
+    assert response.message.content == "AI 服务暂时不可用，请稍后重试"
+    assert "secret-token" not in response.message.content
+    assert "proxy.example.com" not in response.message.content
+
+    event = provider._error_stream_event(
+        'upstream failed token=secret-token https://proxy.example.com/account',
+    )
+    assert event.type == "error"
+    assert event.data["request_id"]
+    assert event.data["error"] == "AI 服务暂时不可用，请稍后重试"
+    assert "secret-token" not in event.data["error"]
 
 
 @pytest.mark.asyncio
@@ -452,6 +715,51 @@ async def test_terminal_service_rejects_unapproved_ssh_port_before_network():
 
 
 @pytest.mark.asyncio
+async def test_terminal_service_requires_target_allowlist_before_network(monkeypatch):
+    """未配置终端允许主机或网段时，必须 fail-closed 拒绝连接。"""
+    monkeypatch.setattr(settings, "TERMINAL_ALLOWED_HOSTS", [], raising=False)
+    monkeypatch.setattr(settings, "TERMINAL_ALLOWED_CIDRS", [], raising=False)
+    manager = RejectingTerminalManager()
+    service = _build_terminal_service(manager)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.connect(
+            TerminalCredentials(
+                connection_type="ssh",
+                device_address="192.0.2.10",
+                port=22,
+                username="admin",
+                password="password",
+            )
+        )
+
+    assert exc_info.value.status_code == 403
+    assert manager.connect_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_terminal_service_allows_configured_target_cidr(monkeypatch):
+    """配置命中允许网段时，应继续进入正式连接路径。"""
+    monkeypatch.setattr(settings, "TERMINAL_ALLOWED_HOSTS", [], raising=False)
+    monkeypatch.setattr(settings, "TERMINAL_ALLOWED_CIDRS", ["192.0.2.0/24"], raising=False)
+    manager = RejectingTerminalManager()
+    service = _build_terminal_service(manager)
+
+    response = await service.connect(
+        TerminalCredentials(
+            connection_type="ssh",
+            device_address="192.0.2.10",
+            port=22,
+            username="admin",
+            password="password",
+        )
+    )
+
+    assert response.success is True
+    assert manager.connect_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_terminal_service_rejects_dangerous_command_before_shell():
     """破坏性设备命令必须在写入 SSH/Telnet shell 前被拒绝。"""
     manager = RejectingTerminalManager()
@@ -460,6 +768,35 @@ async def test_terminal_service_rejects_dangerous_command_before_shell():
     with pytest.raises(HTTPException) as exc_info:
         await service.execute_command(
             CommandRequest(session_id="session-1", command="reboot")
+        )
+
+    assert exc_info.value.status_code == 400
+    assert manager.command_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_terminal_service_allows_readonly_diagnostic_command():
+    """只读诊断命令应被允许进入终端执行路径。"""
+    manager = RejectingTerminalManager()
+    service = _build_terminal_service(manager)
+
+    response = await service.execute_command(
+        CommandRequest(session_id="session-1", command="display version")
+    )
+
+    assert response.is_error is False
+    assert manager.command_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_terminal_service_rejects_sensitive_configuration_read_before_shell():
+    """读取完整配置等敏感命令必须在写入 shell 前被拒绝。"""
+    manager = RejectingTerminalManager()
+    service = _build_terminal_service(manager)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_command(
+            CommandRequest(session_id="session-1", command="display current-configuration")
         )
 
     assert exc_info.value.status_code == 400
@@ -481,9 +818,51 @@ def test_sensitive_log_redaction_removes_tokens_passwords_and_content():
     assert "***" in redacted
 
 
+def test_json_formatter_redacts_sensitive_message_fields():
+    """JSON 日志格式化器必须全局脱敏普通 logger 消息。"""
+    record = logger_utils.logging.LogRecord(
+        name="security-test",
+        level=logger_utils.logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="Authorization: Bearer secret-token password=secret content=敏感提示词",
+        args=(),
+        exc_info=None,
+    )
+
+    formatted = logger_utils.JsonFormatter().format(record)
+
+    assert "secret-token" not in formatted
+    assert "password=secret" not in formatted
+    assert "敏感提示词" not in formatted
+    assert "***" in formatted
+
+
+def test_standard_formatter_redacts_sensitive_message_fields():
+    """标准日志格式化器同样必须在 formatter 层脱敏。"""
+    formatter = logger_utils.SensitiveFormatter("%(message)s")
+    record = logger_utils.logging.LogRecord(
+        name="security-test",
+        level=logger_utils.logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="api_key=secret-key content=敏感输出",
+        args=(),
+        exc_info=None,
+    )
+
+    formatted = formatter.format(record)
+
+    assert "secret-key" not in formatted
+    assert "敏感输出" not in formatted
+    assert "***" in formatted
+
+
 @pytest.mark.asyncio
-async def test_terminal_service_uses_generic_500_message():
+async def test_terminal_service_uses_generic_500_message(monkeypatch):
     """终端服务内部异常不能把底层敏感错误直接暴露给用户。"""
+    monkeypatch.setattr(settings, "TERMINAL_ALLOWED_HOSTS", [], raising=False)
+    monkeypatch.setattr(settings, "TERMINAL_ALLOWED_CIDRS", ["192.0.2.0/24"], raising=False)
     service = TerminalService.__new__(TerminalService)
     service.terminal_manager = BrokenTerminalManager()
     service.max_sessions = 5

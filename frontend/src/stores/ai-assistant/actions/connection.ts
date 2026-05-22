@@ -1,5 +1,6 @@
 import { aiService } from '@/utils/aiService';
 import type { AIAssistantState } from '@/types/chat';
+import { logger } from '@/utils/logger';
 
 export const createConnectionActions = (state: AIAssistantState) => ({
   async checkModelConnection() {
@@ -7,28 +8,28 @@ export const createConnectionActions = (state: AIAssistantState) => ({
       state.isModelConnected = false;
       const response = await aiService.checkModelConnection(state.selectedModel);
 
-      console.log('模型连接检查响应:', response.data);
+      logger.debug('模型连接检查响应:', response.data);
 
       if (response.data && typeof response.data === 'object') {
         if ('connected' in response.data) {
           state.isModelConnected = Boolean(response.data.connected);
-          console.log('设置连接状态:', state.isModelConnected);
+          logger.debug('设置连接状态:', state.isModelConnected);
         } else if ('status' in response.data) {
           state.isModelConnected = response.data.status === 'connected';
-          console.log('基于status设置连接状态:', state.isModelConnected);
+          logger.debug('基于status设置连接状态:', state.isModelConnected);
         } else {
-          console.error('无法识别的响应格式:', response.data);
+          logger.error('无法识别的响应格式:', response.data);
           state.isModelConnected = false;
         }
 
         return state.isModelConnected;
       } else {
-        console.error('响应数据不是有效对象:', response.data);
+        logger.error('响应数据不是有效对象:', response.data);
         state.isModelConnected = false;
         return false;
       }
     } catch (error) {
-      console.error('检查AI模型连接失败:', error);
+      logger.error('检查AI模型连接失败:', error);
       state.isModelConnected = false;
       return false;
     }
@@ -38,7 +39,7 @@ export const createConnectionActions = (state: AIAssistantState) => ({
     const MODELS_CACHE_KEY = 'ai_available_models';
 
     try {
-      console.log('开始从后端加载模型列表...');
+      logger.debug('开始从后端加载模型列表...');
       const response = await aiService.getAvailableModels();
 
       if (response.data && Array.isArray(response.data.models)) {
@@ -51,18 +52,18 @@ export const createConnectionActions = (state: AIAssistantState) => ({
 
         try {
           localStorage.setItem(MODELS_CACHE_KEY, JSON.stringify(state.availableModels));
-          console.log('模型列表已缓存到localStorage');
+          logger.debug('模型列表已缓存到localStorage');
         } catch (storageError) {
-          console.warn('保存模型列表到localStorage失败:', storageError);
+          logger.warn('保存模型列表到localStorage失败:', storageError);
         }
 
-        console.log('成功加载模型列表:', state.availableModels.length, '个模型');
+        logger.debug('成功加载模型列表:', state.availableModels.length, '个模型');
       } else {
-        console.warn('后端返回的模型数据格式异常');
+        logger.warn('后端返回的模型数据格式异常');
         throw new Error('后端模型数据格式无效');
       }
     } catch (error: unknown) {
-      console.error('从后端加载模型失败，尝试使用缓存:', error);
+      logger.error('从后端加载模型失败，尝试使用缓存:', error);
 
       try {
         const cachedModels = localStorage.getItem(MODELS_CACHE_KEY);
@@ -70,19 +71,19 @@ export const createConnectionActions = (state: AIAssistantState) => ({
           const parsedModels = JSON.parse(cachedModels);
           if (Array.isArray(parsedModels) && parsedModels.length > 0) {
             state.availableModels = parsedModels;
-            console.log('使用缓存的模型列表:', parsedModels.length, '个模型');
+            logger.debug('使用缓存的模型列表:', parsedModels.length, '个模型');
             return;
           }
         }
       } catch (cacheError) {
-        console.warn('读取缓存的模型列表失败:', cacheError);
+        logger.warn('读取缓存的模型列表失败:', cacheError);
       }
 
-      console.warn('模型加载失败，使用最小默认配置');
+      logger.warn('模型加载失败，使用最小默认配置');
     }
 
     if (state.availableModels.length === 0) {
-      console.warn('没有可用模型，使用最小默认配置');
+      logger.warn('没有可用模型，使用最小默认配置');
       state.availableModels = [
         { label: 'DeepSeek-V4-Pro', value: 'deepseek-v4-pro', available: true }
       ];

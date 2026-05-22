@@ -1,6 +1,7 @@
 import { aiService } from '@/utils/aiService';
 import type { AIAssistantState, ChatMessage, StoreActions, ApiError } from '@/types/chat';
 import { generateId } from '../../../utils/helpers';
+import { logger } from '../../../utils/logger';
 import { nextTick } from 'vue';
 
 export const createMessagingActions = (
@@ -11,7 +12,7 @@ export const createMessagingActions = (
   const actions = {
     async sendMessage(content: string) {
       if (!content.trim() || !state.isModelConnected || state.isAIResponding) {
-        console.log('[消息发送] 拒绝发送消息，原因:', {
+        logger.debug('[消息发送] 拒绝发送消息，原因:', {
           noContent: !content.trim(),
           notConnected: !state.isModelConnected,
           isResponding: state.isAIResponding
@@ -19,7 +20,7 @@ export const createMessagingActions = (
         return;
       }
 
-      console.log('[消息发送] 开始发送消息，流式模式:', state.streamingEnabled);
+      logger.debug('[消息发送] 开始发送消息，流式模式:', state.streamingEnabled);
 
       state.chatMessages.push({
         id: generateId(),
@@ -46,23 +47,23 @@ export const createMessagingActions = (
       // 设置为思考状态
       state.isAIResponding = true;
       state.isStreamingContent = false;
-      console.log('[消息发送] 设置思考状态 - isAIResponding: true, isStreamingContent: false');
+      logger.debug('[消息发送] 设置思考状态 - isAIResponding: true, isStreamingContent: false');
 
       try {
         if (state.streamingEnabled) {
-          console.log('[消息发送] 调用流式发送方法');
+          logger.debug('[消息发送] 调用流式发送方法');
           await actions.sendMessageStream(content);
         } else {
-          console.log('[消息发送] 调用非流式发送方法');
+          logger.debug('[消息发送] 调用非流式发送方法');
           await actions.sendMessageRegular(content);
         }
       } catch (error: unknown) {
-        console.error('消息发送错误:', error);
+        logger.error('消息发送错误:', error);
         utilActions.handleMessageError(error as ApiError | Error, content);
       } finally {
         state.isAIResponding = false;
         state.isStreamingContent = false;  // 确保流式状态也被重置
-        console.log('[消息发送] 重置所有状态 - isAIResponding: false, isStreamingContent: false');
+        logger.debug('[消息发送] 重置所有状态 - isAIResponding: false, isStreamingContent: false');
         storageActions.saveToStorage({
           id: state.conversationId,
           title: content.substring(0, 50) + '...',
@@ -82,7 +83,7 @@ export const createMessagingActions = (
 
     async sendMessageStream(content: string) {
       const sessionId = Date.now().toString();
-      console.log(`开始流式会话 ${sessionId}`);
+      logger.debug(`开始流式会话 ${sessionId}`);
 
       try {
         const assistantMessage: ChatMessage = {
@@ -101,7 +102,7 @@ export const createMessagingActions = (
             content: msg.content
           }));
 
-        console.log(`发送流式请求，消息数: ${messageHistory.length}，会话ID: ${sessionId}`);
+        logger.debug(`发送流式请求，消息数: ${messageHistory.length}，会话ID: ${sessionId}`);
 
         try {
           const response = await aiService.sendMessageStream({
@@ -110,10 +111,10 @@ export const createMessagingActions = (
             stream: true
           });
 
-          console.log('[流式诊断] 响应对象:', response);
-          console.log('[流式诊断] response.data 类型:', typeof response.data);
-          console.log('[流式诊断] 是否为 ReadableStream:', response.data instanceof ReadableStream);
-          console.log('[流式诊断] 构造函数名称:', response.data?.constructor?.name);
+          logger.debug('[流式诊断] 响应对象:', response);
+          logger.debug('[流式诊断] response.data 类型:', typeof response.data);
+          logger.debug('[流式诊断] 是否为 ReadableStream:', response.data instanceof ReadableStream);
+          logger.debug('[流式诊断] 构造函数名称:', response.data?.constructor?.name);
 
           if (!response?.data) {
             throw new Error('流式响应无效');
@@ -121,27 +122,27 @@ export const createMessagingActions = (
 
           if (response.data instanceof ReadableStream) {
             // 立即切换到流式接收状态 - 添加详细日志
-            console.log(`[流式状态] 开始接收流式内容，会话ID: ${sessionId}`);
-            console.log(`[流式状态] 切换前状态 - isAIResponding: ${state.isAIResponding}, isStreamingContent: ${state.isStreamingContent}`);
+            logger.debug(`[流式状态] 开始接收流式内容，会话ID: ${sessionId}`);
+            logger.debug(`[流式状态] 切换前状态 - isAIResponding: ${state.isAIResponding}, isStreamingContent: ${state.isStreamingContent}`);
 
             // 更新状态：停止思考，开始流式接收
             state.isAIResponding = false;  // 不再显示"思考中"
             state.isStreamingContent = true;  // 开始流式内容接收
 
-            console.log(`[流式状态] 切换后状态 - isAIResponding: ${state.isAIResponding}, isStreamingContent: ${state.isStreamingContent}`);
+            logger.debug(`[流式状态] 切换后状态 - isAIResponding: ${state.isAIResponding}, isStreamingContent: ${state.isStreamingContent}`);
 
             // 强制触发响应式更新
             await nextTick();
-            console.log(`[流式状态] nextTick后状态 - isAIResponding: ${state.isAIResponding}, isStreamingContent: ${state.isStreamingContent}`);
+            logger.debug(`[流式状态] nextTick后状态 - isAIResponding: ${state.isAIResponding}, isStreamingContent: ${state.isStreamingContent}`);
 
             await actions._handleStreamResponse(response.data, assistantMessage, sessionId);
           } else {
-            console.error(`[流式错误] 响应不是ReadableStream，会话ID: ${sessionId}`);
-            console.error(`[流式错误] 实际类型: ${typeof response.data}`);
+            logger.error(`[流式错误] 响应不是ReadableStream，会话ID: ${sessionId}`);
+            logger.error(`[流式错误] 实际类型: ${typeof response.data}`);
             const dataType = response.data ? Object.prototype.toString.call(response.data) : 'null';
-            console.error(`[流式错误] 构造函数: ${dataType}`);
+            logger.error(`[流式错误] 构造函数: ${dataType}`);
 
-            console.error('[流式错误] 响应数据:', response.data);
+            logger.error('[流式错误] 响应数据:', response.data);
             actions._handleStreamError(assistantMessage, '服务器返回的不是流式数据');
           }
 
@@ -159,15 +160,15 @@ export const createMessagingActions = (
               model: state.selectedModel
             }
           });
-          console.log(`流式响应处理完成，会话ID: ${sessionId}`);
+          logger.debug(`流式响应处理完成，会话ID: ${sessionId}`);
         } catch (error) {
-          console.error(`流式响应错误: ${error}, 会话ID: ${sessionId}`);
+          logger.error(`流式响应错误: ${error}, 会话ID: ${sessionId}`);
           actions._handleStreamError(assistantMessage, (error as Error).message || '请求失败');
         }
       } catch (error) {
         state.isAIResponding = false;
         state.isStreamingContent = false;
-        console.error(`流式会话整体错误: ${error}`);
+        logger.error(`流式会话整体错误: ${error}`);
       }
     },
 
@@ -175,7 +176,7 @@ export const createMessagingActions = (
       const reader = stream.getReader();
       const decoder = new TextDecoder('utf-8');
 
-      console.log(`[流式处理] 开始读取流，会话ID: ${sessionId}`);
+      logger.debug(`[流式处理] 开始读取流，会话ID: ${sessionId}`);
 
       let contentReceived = false;
       let isFirstChunk = true;
@@ -186,7 +187,7 @@ export const createMessagingActions = (
           const { value, done } = await reader.read();
 
           if (done) {
-            console.log(`[流式处理] 流读取完成，会话ID: ${sessionId}`);
+            logger.debug(`[流式处理] 流读取完成，会话ID: ${sessionId}`);
             break;
           }
 
@@ -195,17 +196,17 @@ export const createMessagingActions = (
 
             if (chunk) {
               if (isFirstChunk) {
-                console.log(`[流式处理] 接收到首个数据块 (${chunk.length}字符)，会话ID: ${sessionId}`);
+                logger.debug(`[流式处理] 接收到首个数据块 (${chunk.length}字符)，会话ID: ${sessionId}`);
                 isFirstChunk = false;
               }
 
               if (chunk.includes('[DONE]')) {
-                console.log('[流式处理] 收到流结束标记');
+                logger.debug('[流式处理] 收到流结束标记');
                 continue;
               }
 
               if (chunk.startsWith('错误:')) {
-                console.error(`[流式处理] 收到错误消息: ${chunk}`);
+                logger.error(`[流式处理] 收到错误消息: ${chunk}`);
                 assistantMessage.content += `\n${chunk}`;
                 contentReceived = true;
 
@@ -252,7 +253,7 @@ export const createMessagingActions = (
               contentReceived = true;
 
               if (chunk.length > 50) {
-                console.debug(`[流式处理] 接收到较大数据块: ${chunk.length}字符`);
+                logger.debug(`[流式处理] 接收到较大数据块: ${chunk.length}字符`);
               }
             }
           }
@@ -260,7 +261,7 @@ export const createMessagingActions = (
 
         const finalChunk = decoder.decode();
         if (finalChunk && finalChunk.trim()) {
-          console.log(`[流式处理] 处理最终数据块 (${finalChunk.length}字符)，会话ID: ${sessionId}`);
+          logger.debug(`[流式处理] 处理最终数据块 (${finalChunk.length}字符)，会话ID: ${sessionId}`);
 
           if (!finalChunk.includes('[DONE]') && !finalChunk.startsWith('错误:') && !finalChunk.startsWith('🤔思考: ')) {
             await actions._addContentCharByChar(assistantMessage, finalChunk);
@@ -276,21 +277,21 @@ export const createMessagingActions = (
         }
 
         if (!contentReceived || !assistantMessage.content.trim()) {
-          console.warn(`[流式处理] 未接收到有效内容，会话ID: ${sessionId}`);
+          logger.warn(`[流式处理] 未接收到有效内容，会话ID: ${sessionId}`);
           actions._handleStreamError(assistantMessage, '未接收到有效内容');
         } else {
-          console.log(`[流式处理] 成功接收内容，总长度: ${assistantMessage.content.length}字符，会话ID: ${sessionId}`);
+          logger.debug(`[流式处理] 成功接收内容，总长度: ${assistantMessage.content.length}字符，会话ID: ${sessionId}`);
         }
 
         // 流式内容接收完成，重置状态
-        console.log(`[流式状态] 流式接收完成，重置状态，会话ID: ${sessionId}`);
+        logger.debug(`[流式状态] 流式接收完成，重置状态，会话ID: ${sessionId}`);
         state.isAIResponding = false;
         state.isStreamingContent = false;
         state.isThinking = false;
         state.currentThinkingContent = '';
 
       } catch (e) {
-        console.error(`[流式处理] 流读取错误: ${e}, 会话ID: ${sessionId}`);
+        logger.error(`[流式处理] 流读取错误: ${e}, 会话ID: ${sessionId}`);
         actions._handleStreamError(assistantMessage, `读取流数据失败 - ${e}`);
         state.isAIResponding = false;
         state.isStreamingContent = false;
@@ -350,14 +351,14 @@ export const createMessagingActions = (
         let messagesToSend = [...messageHistory];
 
         if (messagesToSend.length === 0) {
-          console.warn('消息历史为空，将只发送当前用户消息');
+          logger.warn('消息历史为空，将只发送当前用户消息');
           messagesToSend = [{
             role: 'user',
             content: content
           }];
         }
 
-        console.log(`发送非流式请求，消息数: ${messagesToSend.length}`);
+        logger.debug(`发送非流式请求，消息数: ${messagesToSend.length}`);
 
         const response = await aiService.sendMessageWithRetry({
           model: state.selectedModel,
@@ -373,7 +374,7 @@ export const createMessagingActions = (
             timestamp: Date.now()
           });
         } else {
-          console.error('响应格式异常，无法获取内容:', response.data);
+          logger.error('响应格式异常，无法获取内容:', response.data);
           throw new Error('响应格式异常：缺少内容');
         }
 

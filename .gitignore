@@ -54,3 +54,6 @@ Thumbs.db
 *.sw?
 
 .claude/
+
+# Playwright MCP session artifacts (console logs / page snapshots)
+.playwright-mcp/

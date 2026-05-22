@@ -58,9 +58,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { SendIcon } from '@/components/common/icons'
 import ShimmerButton from '@/components/ui/ShimmerButton.vue'
+import { useAutoResizeTextarea } from '@/composables'
 
 const props = withDefaults(defineProps<{
   disabled?: boolean
@@ -80,7 +81,7 @@ const emit = defineEmits<{
 }>()
 
 const message = ref('')
-const messageInput = ref<HTMLTextAreaElement>()
+const { textareaRef: messageInput, resize: adjustTextareaHeight } = useAutoResizeTextarea({ maxHeight: 120 })
 
 const canSend = computed(() => {
   return !props.disabled && message.value.trim().length > 0 && message.value.length <= props.maxLength
@@ -115,16 +116,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
 const handleInput = () => {
   emit('input', message.value)
   adjustTextareaHeight()
-}
-
-const adjustTextareaHeight = async () => {
-  await nextTick()
-  if (messageInput.value) {
-    messageInput.value.style.height = 'auto'
-    const scrollHeight = messageInput.value.scrollHeight
-    const maxHeight = 120
-    messageInput.value.style.height = Math.min(scrollHeight, maxHeight) + 'px'
-  }
 }
 
 const focus = () => { messageInput.value?.focus() }

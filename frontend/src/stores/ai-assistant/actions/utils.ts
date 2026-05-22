@@ -1,5 +1,6 @@
 import type { AIAssistantState, ChatMessage, ApiError } from '@/types/chat';
 import { generateId, isApiError } from '../../../utils/helpers';
+import { logger } from '../../../utils/logger';
 
 export const createUtilActions = (state: AIAssistantState) => ({
   formatMessagesForAPI(messages: ChatMessage[]) {
@@ -48,7 +49,7 @@ export const createUtilActions = (state: AIAssistantState) => ({
   },
 
   handleMessageError(error: ApiError | Error, _content: string): void {
-    console.error('消息发送错误:', error);
+    logger.error('消息发送错误:', error);
 
     let errorMessage = '发生错误: ';
 
@@ -104,7 +105,7 @@ export const createUtilActions = (state: AIAssistantState) => ({
 
   updateLastActivity(): void {
     // 更新最后活动时间
-    console.log('更新最后活动时间:', new Date().toISOString());
+    logger.debug('更新最后活动时间:', new Date().toISOString());
   },
 
   validateMessage(content: string): boolean {

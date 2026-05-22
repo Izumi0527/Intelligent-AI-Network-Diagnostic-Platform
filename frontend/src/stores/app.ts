@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { logger } from '@/utils/logger';
 
 export const useAppStore = defineStore('app', () => {
   // 服务器连接状态
@@ -19,7 +20,7 @@ export const useAppStore = defineStore('app', () => {
       isServerConnected.value = response.ok;
       return response.ok;
     } catch (error) {
-      console.error('服务器连接检查失败:', error);
+      logger.error('服务器连接检查失败:', error);
       isServerConnected.value = false;
       return false;
     }

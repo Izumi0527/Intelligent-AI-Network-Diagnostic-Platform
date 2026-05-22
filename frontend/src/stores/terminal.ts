@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { terminalService } from '@/utils/terminalService';
 import type { TimeoutRef } from '@/types';
 import { extractErrorMessage } from '@/utils/helpers';
+import { logger } from '@/utils/logger';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 type ConnectionType = 'ssh' | 'telnet';
@@ -114,7 +115,7 @@ export const useTerminalStore = defineStore('terminal', {
         } else {
           this.terminalOutput.push(`连接错误: ${errorMessage || '未知错误'}`);
         }
-        console.error('连接错误:', error);
+        logger.error('连接错误:', error);
       }
     },
 
@@ -128,7 +129,7 @@ export const useTerminalStore = defineStore('terminal', {
         await terminalService.cancelConnection();
         this.terminalOutput.push('已取消连接尝试');
       } catch (error: unknown) {
-        console.error('取消连接出错:', error);
+        logger.error('取消连接出错:', error);
       } finally {
         this.connectionStatus = 'disconnected';
         this.canCancelConnection = false;
@@ -145,7 +146,7 @@ export const useTerminalStore = defineStore('terminal', {
         this.terminalOutput.push(`已断开与 ${this.deviceAddress} 的连接`);
       } catch (error: unknown) {
         this.terminalOutput.push(`断开连接时发生错误: ${extractErrorMessage(error)}`);
-        console.error('断开连接错误:', error);
+        logger.error('断开连接错误:', error);
       } finally {
         this.connectionStatus = 'disconnected';
         this.sessionId = null;
@@ -191,7 +192,7 @@ export const useTerminalStore = defineStore('terminal', {
         }
       } catch (error: unknown) {
         this.terminalOutput.push(`执行命令错误: ${extractErrorMessage(error)}`);
-        console.error('执行命令错误:', error);
+        logger.error('执行命令错误:', error);
       }
     },
 

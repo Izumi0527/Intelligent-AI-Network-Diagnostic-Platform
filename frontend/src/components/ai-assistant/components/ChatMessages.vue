@@ -162,6 +162,7 @@ import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { useChatScroll } from '@/composables';
 import type { ChatMessage } from '@/types/chat';
+import { logger } from '@/utils/logger';
 
 export interface StreamState {
   isTyping: boolean
@@ -191,7 +192,7 @@ const formatMessage = (content: string): string => {
       ADD_ATTR: ['class', 'target', 'rel']
     });
   } catch (error) {
-    console.error('Markdown 渲染错误:', error);
+    logger.error('Markdown 渲染错误:', error);
     return DOMPurify.sanitize(content);
   }
 };

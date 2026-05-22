@@ -33,6 +33,7 @@ import { ChatHeader, ModelSelector, StreamToggle, ChatMessages, ChatInput } from
 import { useAiAssistantStore } from '@/stores/ai-assistant';
 import { useAiKeyboard } from '@/composables';
 import type { ChatMessage } from '@/types/chat';
+import { logger } from '@/utils/logger';
 
 const store = useAiAssistantStore();
 const chatMessagesRef = ref<InstanceType<typeof ChatMessages> | null>(null);
@@ -60,7 +61,7 @@ const handleClear = async (): Promise<void> => {
   try {
     await store.clearConversation();
   } catch (error) {
-    console.error('清空对话失败:', error);
+    logger.error('清空对话失败:', error);
   }
 };
 
@@ -70,7 +71,7 @@ const handleModelChange = async (value: string): Promise<void> => {
     store.loadConversationFromStorage();
     await store.checkModelConnection();
   } catch (error) {
-    console.error('模型切换失败:', error);
+    logger.error('模型切换失败:', error);
   }
 };
 
@@ -80,7 +81,7 @@ const handleSendMessage = async (content: string): Promise<void> => {
     await store.sendMessage(content);
     chatMessagesRef.value?.scrollToBottom();
   } catch (error) {
-    console.error('发送消息失败:', error);
+    logger.error('发送消息失败:', error);
   }
 };
 
@@ -94,7 +95,7 @@ onMounted(async () => {
       await store.checkModelConnection();
     }
   } catch (error) {
-    console.error('AI助手初始化失败:', error);
+    logger.error('AI助手初始化失败:', error);
   } finally {
     store.isLoading = false;
   }
@@ -108,7 +109,7 @@ watch(
       store.loadConversationFromStorage();
       await store.checkModelConnection();
     } catch (error) {
-      console.error('检查模型连接失败:', error);
+      logger.error('检查模型连接失败:', error);
     }
   }
 );

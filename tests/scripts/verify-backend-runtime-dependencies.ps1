@@ -1,4 +1,4 @@
-# 后端运行时依赖验证：确保 uv run 会安装 run.py 启动所需包。
+# Static check for backend runtime dependencies used by uv run python run.py.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -25,7 +25,7 @@ function Get-Section {
 
     $pattern = "(?ms)^\[$([regex]::Escape($SectionName))\]\s*(.*?)(?=^\[|\z)"
     $match = [regex]::Match($Toml, $pattern)
-    Assert-True $match.Success "未找到 [$SectionName] 配置段"
+    Assert-True $match.Success "Missing [$SectionName] section"
     return $match.Groups[1].Value
 }
 
@@ -48,10 +48,11 @@ $RuntimePackages = @(
 )
 
 foreach ($package in $RuntimePackages) {
-    Assert-True ($ProjectSection -match "`"$([regex]::Escape($package))([=><!~\[]|`")") "运行时依赖未声明在 [project].dependencies: $package"
+    $escapedPackage = [regex]::Escape($package)
+    Assert-True ($ProjectSection -match "`"$escapedPackage([=><!~\[]|`")") "Missing runtime dependency in [project].dependencies: $package"
 }
 
 $WheelSection = Get-Section -Toml $Content -SectionName "tool.hatch.build.targets.wheel"
-Assert-True (-not ($WheelSection -match "(?m)^dependencies\s*=")) "[tool.hatch.build.targets.wheel] 不应声明 dependencies，运行时依赖应放在 [project].dependencies"
+Assert-True (-not ($WheelSection -match "(?m)^dependencies\s*=")) "[tool.hatch.build.targets.wheel] must not declare dependencies"
 
-Write-Host "后端运行时依赖声明验证通过" -ForegroundColor Green
+Write-Host "Backend runtime dependency verification passed" -ForegroundColor Green

@@ -1,6 +1,4 @@
-import logging
-import time
-from typing import Dict, List, Optional, Any
+from typing import Dict, Any
 
 from fastapi import HTTPException, status
 from pydantic import ValidationError
@@ -11,7 +9,12 @@ from app.models.terminal import (
     SessionInfo, SessionList, ConnectionResponse
 )
 from app.config.settings import settings
-from app.utils.logger import get_logger
+from app.utils.logger import get_logger, redact_sensitive_text
+from app.utils.terminal_policy import (
+    TerminalPolicyError,
+    validate_terminal_command,
+    validate_terminal_target,
+)
 
 logger = get_logger(__name__)
 
@@ -26,6 +29,15 @@ class TerminalService:
     
     async def connect(self, credentials: TerminalCredentials) -> ConnectionResponse:
         """创建新的终端连接"""
+        try:
+            validate_terminal_target(
+                credentials.connection_type,
+                credentials.device_address,
+                credentials.port,
+            )
+        except TerminalPolicyError as e:
+            raise HTTPException(status_code=e.status_code, detail=str(e))
+
         # 检查是否超过最大会话数
         sessions = await self.terminal_manager.get_all_sessions()
         if len(sessions) >= self.max_sessions:
@@ -74,15 +86,24 @@ class TerminalService:
     async def execute_command(self, command_request: CommandRequest) -> CommandResponse:
         """在终端会话中执行命令"""
         try:
+            command = validate_terminal_command(command_request.command)
+        except TerminalPolicyError as e:
+            raise HTTPException(status_code=e.status_code, detail=str(e))
+
+        try:
             # 执行命令
             response = await self.terminal_manager.execute_command(
                 session_id=command_request.session_id,
-                command=command_request.command
+                command=command,
             )
             
             # 如果有错误，记录日志
             if response.is_error:
-                logger.warning(f"命令执行错误: {response.output}")
+                logger.warning(
+                    "命令执行错误: session_id=%s, output=%s",
+                    command_request.session_id,
+                    redact_sensitive_text(response.output, max_length=120),
+                )
                 
             return response
             

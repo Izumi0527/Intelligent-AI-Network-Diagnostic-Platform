@@ -1,7 +1,7 @@
 import json
 import os
 from pydantic_settings import BaseSettings
-from typing import Optional, Dict, Any, List
+from typing import Optional, Any, List
 
 class Settings(BaseSettings):
     """应用配置"""
@@ -37,6 +37,19 @@ class Settings(BaseSettings):
     # 会话设置
     SESSION_IDLE_TIMEOUT: int = int(os.getenv("SESSION_IDLE_TIMEOUT", "0"))
     MAX_TERMINAL_SESSIONS: int = int(os.getenv("MAX_TERMINAL_SESSIONS", "0"))
+
+    # 终端连接与命令安全策略
+    TERMINAL_ALLOWED_HOSTS: Any = os.getenv("TERMINAL_ALLOWED_HOSTS", "")
+    TERMINAL_ALLOWED_CIDRS: Any = os.getenv("TERMINAL_ALLOWED_CIDRS", "")
+    TERMINAL_ALLOWED_SSH_PORTS: Any = os.getenv("TERMINAL_ALLOWED_SSH_PORTS", "22,2222")
+    TERMINAL_ALLOWED_TELNET_PORTS: Any = os.getenv("TERMINAL_ALLOWED_TELNET_PORTS", "23,2323")
+    TERMINAL_COMMAND_MAX_LENGTH: int = int(os.getenv("TERMINAL_COMMAND_MAX_LENGTH", "256"))
+    TERMINAL_BLOCKED_COMMAND_PATTERNS: Any = os.getenv(
+        "TERMINAL_BLOCKED_COMMAND_PATTERNS",
+        r"^\s*(reboot|reload|reset|shutdown)\b,"
+        r"^\s*(delete|format|erase|rm)\b,"
+        r"^\s*(system-view|configure|conf\s+t)\b",
+    )
     
     # 日志设置
     LOG_LEVEL: Optional[str] = os.getenv("LOG_LEVEL")
@@ -93,6 +106,8 @@ class Settings(BaseSettings):
 
         # 验证必需的基础配置项
         self._validate_required_config()
+        self._validate_security_config()
+        self._normalize_terminal_policy_config()
 
         # 规范化 API_PREFIX：确保以 / 开头、无结尾 /
         prefix = (self.API_PREFIX or "/api").strip()
@@ -178,9 +193,67 @@ class Settings(BaseSettings):
 
         if error_messages:
             raise ValueError(
-                f"配置验证失败:\n" + "\n".join(error_messages) +
-                f"\n请检查.env文件并确保所有必需的配置项都已正确设置。"
+                "配置验证失败:\n" + "\n".join(error_messages) +
+                "\n请检查.env文件并确保所有必需的配置项都已正确设置。"
             )
+
+    @staticmethod
+    def _normalize_csv(value: Any) -> List[str]:
+        """把逗号分隔配置规范化为去空白列表。"""
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        if isinstance(value, (list, tuple, set)):
+            return [str(item).strip() for item in value if str(item).strip()]
+        return [str(value).strip()] if str(value).strip() else []
+
+    @classmethod
+    def _normalize_int_csv(cls, value: Any) -> List[int]:
+        """把端口配置规范化为整数列表，非法项直接触发配置错误。"""
+        ports = []
+        for item in cls._normalize_csv(value):
+            try:
+                port = int(item)
+            except ValueError as exc:
+                raise ValueError(f"端口配置必须为整数: {item}") from exc
+            if port < 1 or port > 65535:
+                raise ValueError(f"端口配置超出范围: {port}")
+            ports.append(port)
+        return ports
+
+    def _validate_security_config(self) -> None:
+        """生产环境必须显式启用内部接口鉴权并使用真实 Token。"""
+        if (self.APP_ENV or "").lower() != "production":
+            return
+
+        if not self.API_AUTH_ENABLED:
+            raise ValueError("生产环境必须启用内部 API 鉴权(API_AUTH_ENABLED=true)")
+
+        invalid_tokens = {
+            "",
+            "change-me",
+            "change-me-internal-api-token",
+            "your-token",
+            "test-token",
+        }
+        token = (self.INTERNAL_API_TOKEN or "").strip()
+        if token.lower() in invalid_tokens:
+            raise ValueError("生产环境 INTERNAL_API_TOKEN 必须配置为非占位值")
+
+    def _normalize_terminal_policy_config(self) -> None:
+        """规范化终端连接和命令安全策略。"""
+        self.TERMINAL_ALLOWED_HOSTS = self._normalize_csv(self.TERMINAL_ALLOWED_HOSTS)
+        self.TERMINAL_ALLOWED_CIDRS = self._normalize_csv(self.TERMINAL_ALLOWED_CIDRS)
+        self.TERMINAL_ALLOWED_SSH_PORTS = self._normalize_int_csv(
+            self.TERMINAL_ALLOWED_SSH_PORTS
+        )
+        self.TERMINAL_ALLOWED_TELNET_PORTS = self._normalize_int_csv(
+            self.TERMINAL_ALLOWED_TELNET_PORTS
+        )
+        self.TERMINAL_BLOCKED_COMMAND_PATTERNS = self._normalize_csv(
+            self.TERMINAL_BLOCKED_COMMAND_PATTERNS
+        )
 
     def _validate_ai_config(self) -> None:
         """验证AI相关配置的完整性"""
@@ -242,8 +315,8 @@ class Settings(BaseSettings):
 
         if error_messages:
             raise ValueError(
-                f"AI配置验证失败:\n" + "\n".join(error_messages) +
-                f"\n请检查.env文件并确保所有必需的AI配置项都已正确设置。"
+                "AI配置验证失败:\n" + "\n".join(error_messages) +
+                "\n请检查.env文件并确保所有必需的AI配置项都已正确设置。"
             )
 
 # 创建全局设置实例

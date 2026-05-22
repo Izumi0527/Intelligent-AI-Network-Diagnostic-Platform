@@ -18,5 +18,18 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, '/api/v1')
       }
     }
+  },
+  build: {
+    sourcemap: true,
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vue: ['vue', 'pinia'],
+          markdown: ['marked', 'dompurify'],
+          vendor: ['axios', '@vueuse/core', 'clsx', 'tailwind-merge'],
+        }
+      }
+    }
   }
 })

@@ -18,68 +18,76 @@
 
 ```
 frontend/
-├── .vscode/                    # VS Code配置
-├── lib/                        # 第三方库和工具
-│   └── utils.ts               # 通用工具函数
-├── public/                     # 公共静态资源
-├── src/                        # 源代码目录
-│   ├── assets/                # 静态资源和样式
-│   │   └── main.css          # 主要样式文件
-│   ├── components/            # Vue组件目录
-│   │   ├── ai-assistant/      # AI助手功能模块
-│   │   │   ├── AIAssistant.vue         # AI聊天主界面组件
-│   │   │   └── components/             # AI助手子组件
-│   │   │       ├── ChatHeader.vue      # 聊天头部组件
-│   │   │       ├── ChatInput.vue       # 消息输入组件
-│   │   │       ├── ChatMessages.vue    # 消息显示组件
-│   │   │       ├── ModelSelector.vue   # 模型选择器
-│   │   │       ├── StreamToggle.vue    # 流式开关组件
-│   │   │       └── index.ts            # 组件统一导出
-│   │   ├── terminal/                   # 网络终端模块
-│   │   │   └── NetworkTerminal.vue     # 网络设备连接终端
-│   │   ├── common/                     # 通用组件
-│   │   │   ├── ServerStatusIndicator.vue # 服务器状态指示器
-│   │   │   └── icons/                  # 图标组件集合
-│   │   │       ├── SunIcon.vue         # 太阳图标（浅色主题）
-│   │   │       ├── MoonIcon.vue        # 月亮图标（深色主题）
-│   │   │       ├── SendIcon.vue        # 发送图标
-│   │   │       ├── ClearIcon.vue       # 清除图标
-│   │   │       ├── ConnectIcon.vue     # 连接图标
-│   │   │       ├── DisconnectIcon.vue  # 断开图标
-│   │   │       └── index.ts            # 图标统一导出
-│   │   └── ui/                         # UI组件库
-│   │       ├── CardSpotlight.vue       # 聚光灯卡片组件
-│   │       ├── FloatingParticlesBackground.vue # 浮动粒子背景
-│   │       ├── RippleButton.vue        # 涟漪按钮组件
-│   │       └── ShimmerButton.vue       # 闪光按钮组件
-│   ├── layouts/                        # 布局组件
-│   │   └── MainLayout.vue             # 主布局组件
-│   ├── stores/                         # Pinia状态管理
-│   │   ├── ai-assistant/              # AI助手状态模块
-│   │   │   └── actions/
-│   │   │       └── storage.ts         # 存储相关操作
-│   │   ├── aiAssistant.ts             # AI助手状态管理
-│   │   ├── terminal.ts                # 终端会话状态管理
-│   │   └── app.ts                     # 应用全局状态管理
-│   ├── types/                         # TypeScript类型定义
-│   │   ├── index.ts                   # 主要类型定义
-│   │   └── chat.ts                    # 聊天相关类型
-│   ├── utils/                         # 工具函数
-│   │   ├── aiService.ts              # AI服务工具
-│   │   ├── terminalService.ts        # 终端服务工具
-│   │   ├── localStorageUtils.ts      # 本地存储工具
-│   │   └── helpers.ts                # 通用辅助函数
-│   ├── App.vue                        # 应用根组件
-│   ├── main.ts                        # 应用入口文件
-│   ├── style.css                      # 全局样式
-│   └── vite-env.d.ts                 # Vite环境类型声明
-├── index.html                          # HTML入口文件
-├── package.json                        # 项目依赖配置
-├── package-lock.json                   # 依赖锁定文件
-├── eslint.config.js                    # ESLint配置
-├── postcss.config.js                   # PostCSS配置
-├── tsconfig.json                       # TypeScript配置
-└── vite.config.ts                      # Vite构建配置
+├── .vscode/                          # VS Code 配置
+├── lib/                              # 第三方库和工具
+│   └── utils.ts                      # 通用工具函数
+├── public/                           # 公共静态资源
+├── src/
+│   ├── assets/
+│   │   ├── main.css                  # 入口（≤ 20 行），仅 @import 子模块
+│   │   └── styles/                   # P1 拆分的样式子模块
+│   │       ├── tokens.css            # OKLCH 色 / 间距 / 动效 / 字体 / Z 轴 token
+│   │       ├── base.css              # reset / focus-visible / reduced-motion
+│   │       ├── surfaces.css          # glass-effect / shadow-glow / btn-glow
+│   │       ├── terminal.css          # 终端命名空间样式
+│   │       └── ai.css                # AI 对话命名空间样式
+│   ├── components/
+│   │   ├── ai-assistant/
+│   │   │   ├── AIAssistant.vue       # 壳（~115 行），仅装配
+│   │   │   └── components/           # 5 个子组件
+│   │   │       ├── ChatHeader.vue
+│   │   │       ├── ChatInput.vue
+│   │   │       ├── ChatMessages.vue
+│   │   │       ├── ModelSelector.vue
+│   │   │       ├── StreamToggle.vue
+│   │   │       └── index.ts
+│   │   ├── terminal/
+│   │   │   ├── NetworkTerminal.vue   # 壳（~35 行），仅装配
+│   │   │   ├── components/           # 4 个子组件
+│   │   │   │   ├── TerminalConnectionForm.vue
+│   │   │   │   ├── TerminalOutput.vue
+│   │   │   │   ├── TerminalCommandInput.vue
+│   │   │   │   ├── TerminalStatusBar.vue
+│   │   │   │   └── index.ts
+│   │   │   └── composables/          # 2 个本地 composable
+│   │   │       ├── useTerminalLineStyle.ts
+│   │   │       └── useCommandHistory.ts
+│   │   ├── common/
+│   │   │   ├── ServerStatusIndicator.vue  # 使用 useIntervalFn，无 timer 泄漏
+│   │   │   └── icons/                # SunIcon / MoonIcon / Send / Clear / Connect / Disconnect
+│   │   └── ui/
+│   │       ├── CardSpotlight.vue
+│   │       ├── FloatingParticlesBackground.vue  # 纯 CSS 动画 + prefers-reduced-motion
+│   │       └── ShimmerButton.vue
+│   ├── composables/                  # 跨组件全局 composable
+│   │   ├── useAiKeyboard.ts          # Ctrl/Cmd+K 清空对话
+│   │   ├── useAutoResizeTextarea.ts
+│   │   └── useChatScroll.ts
+│   ├── layouts/MainLayout.vue
+│   ├── stores/
+│   │   ├── ai-assistant/             # AI 助手 store 拆分模块
+│   │   ├── terminal.ts
+│   │   └── app.ts
+│   ├── types/
+│   │   ├── index.ts
+│   │   └── chat.ts                   # ChatMessage / ChatSettings 等单一类型源头
+│   ├── utils/
+│   │   ├── aiService.ts
+│   │   ├── terminalService.ts
+│   │   ├── localStorageUtils.ts
+│   │   ├── helpers.ts
+│   │   └── logger.ts                 # 分级日志器（debug/info/warn/error + traceId）
+│   ├── App.vue
+│   ├── main.ts                       # 仅 import './assets/main.css'
+│   └── vite-env.d.ts
+├── .env.example                      # 环境变量样例
+├── index.html
+├── package.json
+├── package-lock.json
+├── eslint.config.js                  # ESLint 9 flat config
+├── postcss.config.js                 # 仅 @tailwindcss/postcss
+├── tsconfig.json
+└── vite.config.ts                    # alias / proxy / build manualChunks + sourcemap
 ```
 
 ### 后端结构 (FastAPI 0.115+ + Python 3.9+)
@@ -146,12 +154,17 @@ backend/
 
 ```
 scripts/
-├── dev.ps1                 # Windows开发环境统一启动脚本
-├── prod.ps1                # Windows生产环境统一启动脚本
-├── clean-python-cache.ps1  # Windows Python缓存清理脚本
-├── dev.sh                  # Linux/Mac开发环境统一启动脚本
-├── prod.sh                 # Linux/Mac生产环境统一启动脚本
-└── clean-python-cache.sh   # Linux/Mac Python缓存清理脚本
+├── dev.ps1                 # Windows 开发环境统一启动脚本
+├── prod.ps1                # Windows 生产环境统一启动脚本
+├── build.ps1               # Windows 前端生产构建 + dist 体积统计
+├── lint.ps1                # Windows typecheck + ESLint（--Fix 走 lint:fix）
+├── clean-python-cache.ps1  # Windows Python 缓存清理脚本
+├── dev.sh                  # Linux/Mac 开发环境统一启动脚本
+├── prod.sh                 # Linux/Mac 生产环境统一启动脚本
+├── build.sh                # Linux/Mac 前端生产构建 + dist 体积统计
+├── lint.sh                 # Linux/Mac typecheck + ESLint（--fix 走 lint:fix）
+├── clean-python-cache.sh   # Linux/Mac Python 缓存清理脚本
+└── p3_axe_audit.py         # P3 a11y 验证：Playwright + axe-core 自动审计
 ```
 
 ### 日志目录结构
@@ -202,7 +215,7 @@ logs/
 - **消息历史管理**：支持本地存储和聊天记录管理
 
 ### 响应式设计与主题系统
-- **现代化UI设计**：采用Inspira UI + TailwindCSS 4.0构建现代化界面
+- **现代化UI设计**：基于 Tailwind CSS v4 与 OKLCH 设计 token，差异化的"工程师终端审美"与"AI 对话 conversational 审美"
 - **响应式布局**：适配多种设备尺寸，支持桌面和移动端
 - **主题系统**：支持明暗主题切换，系统偏好自动适配
 - **高级动效**：聚光灯卡片、浮动粒子背景、波纹按钮等高级UI组件
@@ -218,24 +231,17 @@ logs/
 
 ### 前端技术栈
 
-- **核心框架**：Vue 3.5.13+ · TypeScript 5.8.3+
-- **状态管理**：Pinia 2.3.1+ (现代Vue状态管理库)
-- **构建工具**：Vite 6.0+ (下一代前端构建工具)
-- **HTTP客户端**：Axios 1.9.0+ (可靠的HTTP请求库)
-- **UI框架**：
-  - Inspira UI (现代化组件库)
-  - TailwindCSS 4.0+ (实用优先的CSS框架)
-  - @tailwindcss/postcss 4.1.13+ (最新PostCSS集成)
-- **动画与交互**：
-  - VueUse 11.0+ (高质量组合式工具集)
-  - @vueuse/motion 3.0.3+ (动画库)
-  - tailwindcss-animate 1.0.7+ (动画工具)
-  - canvas-confetti 1.9.3+ (粒子效果)
-- **工具库**：
-  - clsx 2.0+ (条件样式管理)
-  - tailwind-merge 2.6+ (样式合并工具)
-  - class-variance-authority 0.7+ (组件变体管理)
-  - marked 16.2.1+ (Markdown解析器)
+- **核心框架**：Vue 3.5.13+ · TypeScript 5.8.3+（strict）
+- **状态管理**：Pinia 2.3.1+
+- **构建工具**：Vite 6.0+（manualChunks: vue / markdown / vendor + esbuild + sourcemap）
+- **HTTP 客户端**：Axios 1.9.0+
+- **UI / 样式**：
+  - Tailwind CSS 4.0+（含内置 autoprefixer，不再单独依赖）
+  - @tailwindcss/postcss 4.1.13+（v4 唯一需要的 PostCSS 插件）
+  - tw-animate-css 1.3.8+
+- **组合式工具**：VueUse 11.0+（含 useIntervalFn 等）
+- **Markdown 安全**：marked 16.2.1+ · DOMPurify 3+（在 `ChatMessages.vue` 内净化 XSS）
+- **工具库**：clsx 2.0+ · tailwind-merge 2.6+
 
 ### 后端技术栈
 
@@ -266,15 +272,14 @@ logs/
 ### 开发工具与测试
 
 #### 前端开发工具
-- **代码质量**：ESLint 9.0+ · TypeScript 类型检查
+- **代码质量**：ESLint 9.0+ flat config · vue-tsc 2.0+ 类型检查
 - **自动化工具**：
   - @typescript-eslint/eslint-plugin 8.0+
   - @vue/eslint-config-typescript 14.0+
-  - eslint-plugin-vue 9.28.0+
-- **构建优化**：
-  - autoprefixer 10.4.16+ (浏览器前缀自动添加)
-  - postcss 8.4.31+ (CSS 后处理)
-  - vue-tsc 2.0+ (Vue TypeScript 编译器)
+  - eslint-plugin-vue 9.28+
+- **样式与构建**：
+  - postcss 8.4.31+（仅作为 @tailwindcss/postcss 的宿主，v4 已内置 autoprefixer 能力）
+  - Tailwind CSS v4（无 tailwind.config，配置走 `@theme inline` 与 CSS token）
 
 #### 后端开发工具
 - **代码质量**：
@@ -388,18 +393,38 @@ python run.py
 
 ### 前端
 
+推荐通过根目录脚本驱动，避免直接调用 npm 底层命令（对齐全局 Layer 4.1）：
+
+```powershell
+# Windows
+.\scripts\dev.ps1       # 后端 + 前端联动启动
+.\scripts\build.ps1     # 生产构建 + dist 体积统计
+.\scripts\lint.ps1      # typecheck + ESLint
+.\scripts\lint.ps1 -Fix # typecheck + ESLint --fix
+```
+
+```bash
+# Linux / Mac / Git Bash
+./scripts/dev.sh
+./scripts/build.sh
+./scripts/lint.sh
+./scripts/lint.sh --fix
+```
+
+需要直接调用底层命令时（不推荐）：
+
 ```bash
 cd frontend
-
-# 安装依赖
 npm install
-
-# 开发模式启动
-npm run dev
-
-# 构建生产版本
-npm run build
+npm run dev        # vite dev server
+npm run build      # vue-tsc && vite build
+npm run typecheck  # vue-tsc --noEmit
+npm run lint       # eslint .
 ```
+
+前端环境变量样例见 `frontend/.env.example`，复制为 `.env.local` 后填值（被
+`.gitignore` 排除，不会进入版本控制）。当前代码唯一消费的是 `VITE_INTERNAL_API_TOKEN`，
+需与后端 `INTERNAL_API_TOKEN` 一致。
 
 ## 环境变量配置
 

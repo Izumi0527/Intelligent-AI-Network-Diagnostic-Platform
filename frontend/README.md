@@ -1,125 +1,140 @@
 # AI智能网络故障分析平台 - 前端
 
-本项目是一个基于Vue 3和TypeScript的AI智能网络故障分析平台前端应用。结合现代UI设计和功能性，提供一个用于网络设备连接和AI辅助故障分析的界面。
+基于 **Vue 3.5 + TypeScript 5.8 + Vite 6 + Tailwind v4** 的网络故障分析平台前端。
+提供差异化的"工程师终端审美"与"AI 对话 conversational 审美"双区域体验。
 
-## 功能特点
-
-- **网络终端**：支持SSH/Telnet连接到网络设备
-- **AI助手**：集成Claude 3.7等AI模型，提供智能化故障分析
-- **现代UI**：响应式设计，支持明暗主题切换
-- **流式响应**：AI回答支持实时流式显示
-- **会话管理**：支持保存和清除对话历史
-- **状态监控**：实时显示与后端服务器和AI模型的连接状态
+> 完整的项目背景、API 契约、启停脚本细节见仓库根 [README.md](../README.md)。
+> 本文只聚焦前端层面的目录、组件、状态、构建与开发约定。
 
 ## 项目结构
 
 ```
 frontend/
-├── public/              # 静态资源
-├── src/                 # 源代码
-│   ├── assets/          # 资源文件(CSS, 图片等)
-│   ├── components/      # 组件
-│   │   ├── ai-assistant/   # AI助手相关组件
-│   │   ├── common/         # 通用组件
-│   │   └── terminal/       # 终端相关组件
-│   ├── layouts/         # 布局组件
-│   ├── stores/          # Pinia状态管理
-│   ├── App.vue          # 根组件
-│   └── main.ts          # 入口文件
-├── .gitignore          # Git忽略文件
-├── index.html          # HTML模板
-├── package.json        # 项目配置
-├── tsconfig.json       # TypeScript配置
-└── README.md           # 文档
+├── public/                          # 静态资源
+├── src/
+│   ├── assets/
+│   │   ├── main.css                 # 入口（≤ 20 行），仅 @import 子模块
+│   │   └── styles/                  # P1 拆分的样式子模块
+│   │       ├── tokens.css           # OKLCH 色 / 间距 / 动效 / 字体 / Z 轴 token
+│   │       ├── base.css             # reset / focus-visible / reduced-motion
+│   │       ├── surfaces.css         # glass-effect / shadow-glow / btn-glow
+│   │       ├── terminal.css         # 终端命名空间样式
+│   │       └── ai.css               # AI 对话命名空间样式
+│   ├── components/
+│   │   ├── ai-assistant/
+│   │   │   ├── AIAssistant.vue      # 壳（~115 行），仅装配
+│   │   │   └── components/          # 5 个子组件
+│   │   │       ├── ChatHeader.vue
+│   │   │       ├── ChatInput.vue
+│   │   │       ├── ChatMessages.vue
+│   │   │       ├── ModelSelector.vue
+│   │   │       └── StreamToggle.vue
+│   │   ├── terminal/
+│   │   │   ├── NetworkTerminal.vue  # 壳（~35 行），仅装配
+│   │   │   ├── components/          # 4 个子组件
+│   │   │   │   ├── TerminalConnectionForm.vue
+│   │   │   │   ├── TerminalOutput.vue
+│   │   │   │   ├── TerminalCommandInput.vue
+│   │   │   │   └── TerminalStatusBar.vue
+│   │   │   └── composables/         # 2 个本地 composable
+│   │   │       ├── useTerminalLineStyle.ts
+│   │   │       └── useCommandHistory.ts
+│   │   ├── common/
+│   │   │   ├── ServerStatusIndicator.vue
+│   │   │   └── icons/               # SunIcon / MoonIcon / Send / Clear / Connect / Disconnect
+│   │   └── ui/
+│   │       ├── CardSpotlight.vue
+│   │       ├── FloatingParticlesBackground.vue
+│   │       └── ShimmerButton.vue
+│   ├── composables/                 # 跨组件的全局 composable
+│   │   ├── useAiKeyboard.ts         # Ctrl/Cmd+K 清空对话
+│   │   ├── useAutoResizeTextarea.ts
+│   │   └── useChatScroll.ts
+│   ├── layouts/MainLayout.vue
+│   ├── stores/
+│   │   ├── app.ts                   # 应用级状态（主题 / 后端健康）
+│   │   ├── terminal.ts              # 终端会话
+│   │   └── ai-assistant/            # AI 助手 store 模块（拆分目录）
+│   ├── types/
+│   │   ├── index.ts
+│   │   └── chat.ts                  # ChatMessage / ChatSettings 等单一类型源头
+│   ├── utils/
+│   │   ├── aiService.ts
+│   │   ├── terminalService.ts
+│   │   ├── localStorageUtils.ts
+│   │   ├── helpers.ts
+│   │   └── logger.ts                # 分级日志器（debug/info/warn/error + traceId）
+│   ├── App.vue
+│   └── main.ts                      # 只 import './assets/main.css'
+├── .env.example                     # 环境变量样例
+├── eslint.config.js                 # ESLint 9 flat config
+├── postcss.config.js                # 仅 @tailwindcss/postcss
+├── package.json
+├── tsconfig.json
+└── vite.config.ts                   # alias / proxy / build manualChunks + sourcemap
 ```
 
-## 主要组件
+## 启动（推荐走根目录脚本）
 
-- **AIAssistant.vue**: AI助手界面，提供与AI模型交互的功能
-- **NetworkTerminal.vue**: 网络终端界面，提供SSH/Telnet远程连接功能
-- **MainLayout.vue**: 主布局组件，管理整体页面结构
+```powershell
+# Windows
+..\scripts\dev.ps1           # 后端 + 前端联动启动
+..\scripts\build.ps1         # 生产构建 + dist 体积统计
+..\scripts\lint.ps1          # typecheck + lint
+..\scripts\lint.ps1 -Fix     # typecheck + lint --fix
+```
+
+```bash
+# macOS / Linux / Git Bash
+../scripts/dev.sh
+../scripts/build.sh
+../scripts/lint.sh
+../scripts/lint.sh --fix
+```
+
+底层 `npm run dev / build / typecheck / lint / lint:fix` 仍可用，但日常请走 `scripts/`
+统一入口，方便对齐全局规则 Layer 4.1。
 
 ## 状态管理
 
-使用Pinia进行状态管理，主要包含以下store:
-- **app.ts**: 应用级状态，如主题切换、服务器连接等
-- **aiAssistant.ts**: AI助手相关状态
-- **terminal.ts**: 终端相关状态
+使用 Pinia 拆分：
+- `stores/app.ts` — 应用全局状态（主题切换、后端健康）
+- `stores/terminal.ts` — 终端会话状态
+- `stores/ai-assistant/` — AI 助手 store 模块（拆分为 actions / getters / types 等子文件）
 
-## 启动项目
+类型源头统一在 `src/types/chat.ts`，跨组件共享的 `ChatMessage` / `ChatSettings` 等不允许在
+组件内重复定义。
 
-```bash
-# 安装依赖
-npm install
+## 环境变量
 
-# 开发模式启动
-npm run dev
+复制 `.env.example` 为 `.env.local`（被 `.gitignore` 排除），按需填值。当前代码仅消费：
 
-# 构建生产版本
-npm run build
-```
+- `VITE_INTERNAL_API_TOKEN`（必填）— 与后端 `INTERNAL_API_TOKEN` 一致，前端通过
+  `X-Internal-Api-Token` 自证身份。消费点：`src/utils/terminalService.ts` /
+  `src/utils/aiService.ts`。
 
-## 依赖项
-
-- Vue 3
-- TypeScript
-- Vite
-- Pinia
-- Tailwind CSS
+`.env.example` 还以注释占位列出了 `VITE_API_BASE_URL` / `VITE_DEFAULT_THEME` /
+`VITE_DEFAULT_AI_MODEL`，作为未来扩展约定示例 —— 添加任何 `VITE_*` 时必须在 `src/`
+内有真实消费点，避免幽灵配置。
 
 ## 技术栈
 
-- **前端框架**：Vue 3 + TypeScript
-- **UI组件库**：Inspira UI
-- **状态管理**：Pinia
-- **样式方案**：TailwindCSS
-- **HTTP客户端**：Axios
-- **代码规范**：ESLint + Prettier
+- **框架**：Vue 3.5 + TypeScript 5.8（strict）
+- **构建**：Vite 6（manualChunks: vue / markdown / vendor）+ esbuild + sourcemap
+- **状态**：Pinia 2.3
+- **样式**：Tailwind CSS v4 + `@tailwindcss/postcss`（v4 内置 autoprefixer，不再单独依赖）
+- **Markdown 安全**：marked + DOMPurify（在 `ChatMessages.vue` 内净化）
+- **HTTP**：axios
+- **工具集**：@vueuse/core（含 useIntervalFn 等）、clsx + tailwind-merge
+- **代码规范**：ESLint 9 flat config + vue-tsc 2
 
-## 开发环境设置
+## 开发约定
 
-### 先决条件
-- Node.js (v18+)
-- npm 或 yarn
-
-### 安装依赖
-```bash
-npm install
-# 或
-yarn install
-```
-
-### 开发服务器
-```bash
-npm run dev
-# 或
-yarn dev
-```
-
-### 构建生产版本
-```bash
-npm run build
-# 或
-yarn build
-```
-
-## 配置
-
-平台支持通过环境变量进行配置：
-
-- `VITE_API_BASE_URL`：后端API基础URL
-- `VITE_INTERNAL_API_TOKEN`：内部 API Token，需与后端 `INTERNAL_API_TOKEN` 保持一致
-- `VITE_DEFAULT_THEME`：默认主题（light或dark）
-- `VITE_DEFAULT_AI_MODEL`：默认AI模型
-
-## API集成
-
-平台通过后端API与网络设备和AI模型进行通信，主要API端点包括：
-
-- 终端管理：`/api/terminal/*`
-- AI助手：`/api/ai/*`
-- 系统状态：`/api/status`
-
-## 许可证
-
-[MIT](LICENSE)
+- 任何超过 ~150 行的组件视为拆分候选；超过 300 行必须拆
+- 不引入 CommonJS、不引入 i18n / vue-router / shadcn-vue（plan 已明确不在范围）
+- AI 助手对话区使用 `text-foreground/80` / `text-muted-foreground` 等 token 化语义类，
+  禁止 `text-gray-*` 等 light-only 硬编码
+- 微交互过渡使用 `transition-[<具体属性>] duration-[var(--dur-base|slow)]
+  ease-[var(--ease-out)]`，禁止 `transition-all`
+- 装饰性 SVG 应在父按钮（已有 `aria-label`/`title`）内出现；如须强可达性，给父
+  按钮加 `aria-label`，依赖按钮的可达名称承载语义

@@ -1,12 +1,14 @@
 <template>
-  <div class="floating-particles-bg" aria-hidden="true">
-    <div
-      v-for="particle in particles"
-      :key="particle.id"
-      class="particle"
-      :style="particle.style"
-    ></div>
-    <div v-if="!disableOverlay" class="gradient-overlay"></div>
+  <div class="floating-particles-bg">
+    <div class="particles-layer" aria-hidden="true">
+      <div
+        v-for="particle in particles"
+        :key="particle.id"
+        class="particle"
+        :style="particle.style"
+      ></div>
+      <div v-if="!disableOverlay" class="gradient-overlay"></div>
+    </div>
     <slot></slot>
   </div>
 </template>
@@ -71,6 +73,13 @@ onMounted(createParticles);
   overflow: hidden;
 }
 
+.particles-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .particle {
   position: absolute;
   background: linear-gradient(45deg,
@@ -100,9 +109,9 @@ onMounted(createParticles);
   z-index: 1;
 }
 
-.floating-particles-bg > :not(.particle):not(.gradient-overlay) {
+.floating-particles-bg > :not(.particles-layer) {
   position: relative;
-  z-index: 2;
+  z-index: 1;
 }
 
 @keyframes float-around {

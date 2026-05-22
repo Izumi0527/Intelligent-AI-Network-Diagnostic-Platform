@@ -15,6 +15,8 @@
           class="p-2 rounded-xl glass-effect text-foreground hover:text-primary transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-slow)] ease-[var(--ease-out)] hover:scale-105 hover:shadow-glow-sm"
           @click="toggleTheme"
           :title="isDarkMode ? '切换到浅色模式' : '切换到深色模式'"
+          :aria-label="isDarkMode ? '切换到浅色模式' : '切换到深色模式'"
+          type="button"
         >
           <component :is="isDarkMode ? SunIcon : MoonIcon" class="w-5 h-5" />
         </button>

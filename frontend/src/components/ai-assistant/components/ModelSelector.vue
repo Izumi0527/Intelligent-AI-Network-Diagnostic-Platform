@@ -19,13 +19,16 @@
       </select>
     </div>
     
-    <div 
-      class="px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1.5"
-      :class="isConnected ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'"
+    <div
+      class="px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5"
+      :class="isConnected
+        ? 'bg-success/15 text-emerald-800 dark:text-emerald-200'
+        : 'bg-destructive/15 text-destructive dark:text-destructive-foreground'"
     >
-      <span 
+      <span
         class="block w-1.5 h-1.5 rounded-full"
         :class="isConnected ? 'bg-success animate-pulse' : 'bg-destructive'"
+        aria-hidden="true"
       ></span>
       <span>{{ isConnected ? '已连接' : '未连接' }}</span>
     </div>

@@ -1,0 +1,60 @@
+{
+  "app_url": "http://127.0.0.1:5173",
+  "axe": {
+    "violation_count": 0,
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 5
+      }
+    ],
+    "passes": 23,
+    "inapplicable": 38
+  },
+  "static_audit": {
+    "themeBgVarSample": "oklch(1 0 0)",
+    "iconCount": 3,
+    "iconHiddenCount": 0,
+    "iconAttrs": [
+      {
+        "classes": "w-5 h-5",
+        "ariaHidden": null,
+        "focusable": null,
+        "outer": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\" class"
+      },
+      {
+        "classes": "w-3.5 h-3.5",
+        "ariaHidden": null,
+        "focusable": null,
+        "outer": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\" class"
+      },
+      {
+        "classes": "w-4 h-4",
+        "ariaHidden": null,
+        "focusable": null,
+        "outer": "<svg data-v-22e1e8a2=\"\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\" strokeLinecap=\"round\" strokeLin"
+      }
+    ],
+    "logRoles": 1,
+    "statusRoles": 2,
+    "ariaLive": 3,
+    "particlesAriaHidden": true,
+    "terminalLogRegion": true
+  },
+  "interactive_regression": {
+    "form_values": {
+      "address": "192.168.99.99",
+      "port": "22",
+      "username": "auditor"
+    },
+    "chat_input_filled": "hello dompurify",
+    "chat_input_after_ctrl_k_value": "hello dompurify",
+    "ctrl_k_triggered_via_document_listener": true,
+    "theme_toggle": {
+      "before_dark": false,
+      "after_dark": true
+    }
+  }
+}

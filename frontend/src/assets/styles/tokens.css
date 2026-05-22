@@ -50,8 +50,8 @@
   --config-panel-bg: oklch(0.28 0.012 260);
   --config-input-bg: oklch(0.18 0.012 260);
   --config-input-border: oklch(0.32 0.012 260);
-  --config-button-bg: oklch(0.62 0.21 27);
-  --config-button-hover: oklch(0.52 0.2 27);
+  --config-button-bg: oklch(0.5 0.21 27);
+  --config-button-hover: oklch(0.42 0.2 27);
 
   /* ─── AI 对话 conversational 审美色 ─────────────────────── */
   --ai-panel-bg: oklch(1 0 0);

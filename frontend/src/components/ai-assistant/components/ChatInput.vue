@@ -21,14 +21,17 @@
         />
         
         <!-- 错误提示 -->
-        <div 
-          v-if="hasError" 
+        <div
+          v-if="hasError"
           class="absolute right-2 top-2 text-destructive"
           :title="errorMessage"
+          role="alert"
+          aria-live="polite"
         >
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
           </svg>
+          <span class="sr-only">{{ errorMessage }}</span>
         </div>
       </div>
       
@@ -47,12 +50,12 @@
     </div>
     
     <!-- 字符计数和提示 -->
-    <div class="flex justify-between items-center mt-2 text-xs text-muted-foreground/60">
+    <div class="flex justify-between items-center mt-2 text-xs text-muted-foreground">
       <div class="flex items-center gap-4">
         <span>{{ message.length }}/{{ maxLength }} 字符</span>
-        <span v-if="disabled" class="text-orange-500">{{ statusText }}</span>
+        <span v-if="disabled" class="text-orange-700 dark:text-orange-300">{{ statusText }}</span>
       </div>
-      <div class="text-[10px] opacity-60">Shift+Enter 换行 · Enter 发送</div>
+      <div class="text-[10px] text-foreground/70">Shift+Enter 换行 · Enter 发送</div>
     </div>
   </div>
 </template>

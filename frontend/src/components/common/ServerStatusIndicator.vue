@@ -1,8 +1,9 @@
 <template>
-  <div class="flex items-center gap-2">
-    <div 
-      class="w-2 h-2 rounded-full transition-colors" 
+  <div class="flex items-center gap-2" role="status" aria-live="polite">
+    <div
+      class="w-2 h-2 rounded-full transition-[background-color] duration-[var(--dur-base)] ease-[var(--ease-out)]"
       :class="appStore.isServerConnected ? 'bg-green-500' : 'bg-red-500'"
+      aria-hidden="true"
     ></div>
     <span class="text-sm">{{ statusText }}</span>
   </div>

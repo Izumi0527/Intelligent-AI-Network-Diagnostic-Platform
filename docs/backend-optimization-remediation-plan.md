@@ -88,55 +88,55 @@
   - 目标：为 `content`、`thinking`、`error`、`done` 定义稳定 SSE 输出格式。
   - 验收：流式接口不混合裸文本和 SSE；错误事件也保持一致事件结构。
 
-- [ ] 收口 legacy NetworkService
+- [x] 收口 legacy NetworkService
   - 涉及范围：`backend/app/services/network_service.py`、`backend/app/api/api_v1/endpoints/network.py`。
   - 目标：确认 `/network` 旧写接口已废弃后，将旧服务隔离到 legacy 包或删除运行时入口。
   - 验收：旧连接能力不会被健康检查或依赖层误初始化；`/network` 写接口继续返回 410。
 
 ## Phase 3：运行质量与测试治理
 
-- [ ] 迁移 Pydantic v2 写法
+- [x] 迁移 Pydantic v2 写法
   - 涉及范围：`backend/app/models/ai.py`、`backend/app/models/terminal.py`、相关测试。
   - 目标：`@validator` 改为 `@field_validator`，`class Config` 改为 `ConfigDict`。
   - 验收：相关 Pydantic 弃用警告消失，模型行为保持兼容或按新安全策略明确返回 422。
 
-- [ ] 收紧 Python 版本声明
+- [x] 收紧 Python 版本声明
   - 涉及范围：`backend/pyproject.toml`、依赖校验测试。
   - 目标：在替换 `telnetlib` 前，将 `requires-python` 收紧为 `>=3.9,<3.13`。
   - 验收：包元数据测试同步更新；依赖检查通过。
 
-- [ ] 明确依赖单一权威来源
+- [x] 明确依赖单一权威来源
   - 涉及范围：`backend/pyproject.toml`、`backend/requirements.txt`、依赖同步测试。
   - 目标：以 `pyproject.toml + uv.lock` 为权威；若保留 `requirements.txt`，标记为生成文件并增加同步校验。
   - 验收：运行依赖不会在两个文件中无声漂移。
 
-- [ ] 调整 pytest coverage 默认行为
+- [x] 调整 pytest coverage 默认行为
   - 涉及范围：`backend/pyproject.toml`、`pytest.ini`。
   - 目标：普通测试不默认生成 `htmlcov`；覆盖率通过显式命令运行。
   - 验收：`pytest -q --no-cov -p no:cacheprovider` 不生成 coverage 产物；覆盖率命令仍可单独执行。
 
-- [ ] 新增后端质量检查脚本
+- [x] 新增后端质量检查脚本
   - 涉及范围：`scripts/backend-check.ps1`、`scripts/backend-check.sh`、脚本验证测试。
   - 目标：串联 `uv pip check`、后端定向 `ruff`、pytest、现有 runtime/launch 校验。
   - 验收：脚本可在 Windows PowerShell 和类 Unix shell 下执行，失败时返回非零退出码。
 
-- [ ] 建立架构边界测试
+- [x] 建立架构边界测试
   - 涉及范围：`tests/` 下新增 AST 或 import 检查。
   - 目标：防止 `services/*` 导入 FastAPI、`models/*` 导入 logger、`core/*` 依赖 API 层。
   - 验收：违反边界时测试失败并指出具体文件。
 
-- [ ] 增加后端真实启动链路测试
+- [x] 增加后端真实启动链路测试
   - 涉及范围：`backend/run.py`、启动脚本测试。
   - 目标：覆盖参数解析、`.env` 加载、`uvicorn.run` 参数传递。
   - 验收：不真正占用端口即可验证启动参数。
 
 ## Phase 4：后续演进优化
 
-- [ ] 替换 `telnetlib`
+- [x] 替换 `telnetlib`
   - 目标：Python 3.13 前迁移到可维护 Telnet 实现或自有最小协议层。
   - 验收：移除 `telnetlib` 弃用警告，并放宽 Python 上限前完成兼容测试。
 
-- [ ] 引入可插拔限流后端
+- [x] 引入可插拔限流后端
   - 目标：内存限流先落地，后续可替换为 Redis 或网关限流。
   - 验收：AI 和终端接口都有清晰限流策略、响应头和 429 测试。
 
@@ -199,3 +199,12 @@ uv run --no-sync python -m ruff check app tests
 - 2026-05-22：完成 Phase 2 第三、第四项整改：核心终端和 Telnet 管理器构造阶段不再隐式创建后台任务，任务由应用 `lifespan` 显式启动并在 shutdown 清理；新增终端领域异常层，`TerminalService` 不再导入 FastAPI 或直接抛 `HTTPException`，终端路由统一将领域异常映射为 HTTP 响应。验证 `tests/test_terminal_connection_regressions.py tests/test_backend_security_and_connection_policy.py` 为 `54 passed`，完整 `tests` 为 `68 passed`，局部 `ruff check` 通过，`uv pip check` 通过，`verify-backend-runtime-dependencies.ps1` 与 `verify-launch-scripts.ps1` 通过。
 - 2026-05-22：完成 Phase 2 第五项整改：新增 `AIApplicationService` 承载模型状态脱敏、聊天请求摘要、响应补齐、流式输出适配与 DeepSeek 兼容生成编排，AI 路由收敛为依赖注入、HTTP 响应包装和异常映射；新增 fake 应用服务路由委托测试，验证 `tests/test_backend_security_and_connection_policy.py` 为 `48 passed`，完整 `tests` 为 `71 passed`，局部 `ruff check` 通过。
 - 2026-05-22：完成 Phase 2 第六项整改：新增统一 SSE 编码 helper，AI 聊天流和 DeepSeek 兼容流均输出 `event: content|thinking|error|done` 与 JSON `data`，移除裸文本和 data-only 混用；错误事件保持统一结构并脱敏。验证 SSE 契约测试通过，`tests/test_backend_security_and_connection_policy.py` 为 `51 passed`，完整 `tests` 为 `74 passed`，局部 `ruff check` 通过。
+- 2026-05-23：修复 development 启动链路：`run.py` 在本地开发环境缺少内部鉴权配置时生成仅当前进程有效的临时 Token，`dev.ps1` 与 `dev.sh` 为后端 `INTERNAL_API_TOKEN` 和前端 `VITE_INTERNAL_API_TOKEN` 注入同一个开发 Token，不放松 production 配置校验；完成 Phase 2 最后一项整改，将 legacy `NetworkService` 移入 `app.legacy`，运行时依赖层不再暴露旧连接服务初始化入口，`/network` 写接口继续返回 410。验证 `tests/test_run_startup_config.py tests/test_backend_security_and_connection_policy.py` 为 `53 passed`，`run.py --help` 可正常加载，局部 `ruff check` 与 `verify-launch-scripts.ps1` 通过。
+- 2026-05-23：完成 Phase 3 第一项整改：`backend/app/models/ai.py`、`backend/app/models/terminal.py` 迁移为 Pydantic v2 `field_validator` 与 `ConfigDict` 写法，并同步清理旧 network 模型 `class Config`；新增隔离子进程测试把 Pydantic v1 弃用警告提升为错误。验证 `tests/test_pydantic_v2_models.py tests/test_backend_security_and_connection_policy.py tests/test_terminal_connection_regressions.py` 为 `62 passed`，模型局部 `ruff check` 通过，Pydantic v1 弃用警告消失。
+- 2026-05-23：完成 Phase 3 第二项整改：将 `backend/pyproject.toml` 的 `requires-python` 收紧为 `>=3.9,<3.13`，并通过 `uv lock` 同步 `backend/uv.lock`，在替换 `telnetlib` 前显式排除 Python 3.13 及以上运行环境；新增包元数据回归测试校验 pyproject 与锁文件 Python 版本边界一致。验证 `tests/test_backend_package_metadata.py` 为 `2 passed`，`uv pip check` 通过，局部 `ruff check` 通过。
+- 2026-05-23：完成 Phase 3 第三项整改：明确 `backend/pyproject.toml + backend/uv.lock` 为后端依赖权威来源，`backend/requirements.txt` 仅保留为生成产物并添加禁止手工编辑说明；新增 Python 包元数据测试和 PowerShell runtime dependency 校验，要求 requirements 运行依赖与 `[project].dependencies` 完全同步。验证 `tests/test_backend_package_metadata.py` 为 `3 passed`，`verify-backend-runtime-dependencies.ps1` 通过，局部 `ruff check` 通过。
+- 2026-05-23：完成 Phase 3 第四项整改：移除后端 pytest 默认 `--cov`、`--cov-report` 和 `htmlcov` 生成参数，保留 `[tool.coverage.*]` 配置和显式覆盖率命令，普通测试默认不再生成覆盖率产物；新增配置回归测试防止默认 coverage 参数回流。验证 `tests/test_pytest_cache_config.py` 为 `2 passed`，从 `backend` 目录直接运行同一测试也为 `2 passed`，局部 `ruff check` 通过。
+- 2026-05-23：完成 Phase 3 第五、第六项整改：新增 `scripts/backend-check.ps1` 与 `scripts/backend-check.sh`，串联 `uv pip check`、后端依赖声明校验、当前已治理后端范围的定向 `ruff check`、后端定向 pytest 和启动脚本契约校验；新增 AST 架构边界测试，禁止 `services/*` 导入 FastAPI、`models/*` 导入 logger、`core/*` 依赖 API 层，并移除 `backend/app/models/ai.py` 对日志实现的直接依赖。验证 Windows PowerShell 版与 Git Bash 版 `backend-check` 均通过，默认后端检查为 `71 passed`，`tests/test_architecture_boundaries.py` 为 `3 passed`，`verify-launch-scripts.ps1` 通过。
+- 2026-05-23：完成 Phase 3 第七项整改：为 `run.py` 增加 `ENV_FILE` 覆盖能力，默认仍加载 `backend/.env`；新增真实启动链路测试，用临时 env 文件和假 `uvicorn` 模块在子进程中验证 `.env` 加载、参数解析和 `uvicorn.run` 的 `app`、`host`、`port`、`reload`、`log_level` 参数传递，不占用真实端口。验证 `tests/test_run_startup_config.py` 为 `2 passed`，Windows PowerShell 与 Git Bash 版 `backend-check` 均通过，默认后端检查为 `72 passed`。
+- 2026-05-23：完成 Phase 4 第一项整改：新增 `backend/app/core/network/telnet/client.py`，用最小 socket-based Telnet 客户端替代 Python 3.13 已移除的标准库实现，覆盖 `open`、`expect`、`read_until`、`read_very_eager`、`write`、`close` 和基础 IAC 协商处理；基础 Telnet 与华为 Telnet 连接不再导入 `telnetlib`，原有登录和分页判断测试继续通过。验证 `tests/test_telnet_login_policy.py tests/test_terminal_connection_regressions.py tests/test_backend_security_and_connection_policy.py` 为 `65 passed`，Windows PowerShell 与 Git Bash 版 `backend-check` 均通过，默认后端检查为 `76 passed`，未再出现 `telnetlib` 弃用警告；Python 上限本轮暂不放宽，等待单独的 3.13 运行矩阵验证。
+- 2026-05-23：完成 Phase 4 第二项整改：新增 `backend/app/core/rate_limit.py`，定义 `RateLimiterBackend` 协议、内存滑动窗口后端、路径级 `RateLimitRule` 和 `RateLimitMiddleware`，默认对 `/ai` 与 `/terminal` 接口按客户端维度限流，并支持通过 `app.state.rate_limiter` 替换为 Redis 或网关适配器；429 响应包含 `Retry-After`、`X-RateLimit-Limit`、`X-RateLimit-Remaining`、`X-RateLimit-Reset`，通过请求也返回剩余额度头。验证限流定向测试为 `2 passed`，`tests/test_backend_security_and_connection_policy.py tests/test_terminal_connection_regressions.py tests/test_telnet_login_policy.py` 为 `67 passed`，Windows PowerShell 与 Git Bash 版 `backend-check` 均通过，默认后端检查为 `78 passed`。

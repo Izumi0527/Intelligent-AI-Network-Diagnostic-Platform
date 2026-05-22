@@ -4,14 +4,14 @@ Telnet连接实现
 """
 
 import asyncio
-import telnetlib
-import socket
-import time
 import concurrent.futures
 import re
-from typing import Dict, Any, Optional, Tuple
+import socket
+import time
+from typing import Optional
 
-from app.core.network.base import NetworkConnection, DeviceType, ConnectionStatus
+from app.core.network.base import ConnectionStatus, NetworkConnection
+from app.core.network.telnet.client import TelnetClient
 from app.core.network.telnet.protocols import TelnetProtocol
 from app.utils.logger import get_logger
 
@@ -38,21 +38,21 @@ class TelnetConnection(NetworkConnection):
             re.compile(rb"(?:^|[\r\n])\s*[<\[]?[\w.\-()/@]+[>\]#$]\s*$"),
             re.compile(rb"[>\]#$]\s*$"),
         ]
-    
-    async def connect(self, timeout: int = 30) -> Tuple[bool, str]:
+
+    async def connect(self, timeout: int = 30) -> tuple[bool, str]:
         """建立Telnet连接"""
         try:
             self.status = ConnectionStatus.CONNECTING
             logger.info(f"正在连接到 {self.host}:{self.port}")
-            
+
             # 在线程池中执行连接操作
             loop = asyncio.get_event_loop()
             success, message = await loop.run_in_executor(
-                self.executor, 
-                self._connect_sync, 
-                timeout
+                self.executor,
+                self._connect_sync,
+                timeout,
             )
-            
+
             if success:
                 self.status = ConnectionStatus.CONNECTED
                 self.connection_time = time.time()
@@ -61,16 +61,16 @@ class TelnetConnection(NetworkConnection):
             else:
                 self.status = ConnectionStatus.ERROR
                 logger.error(f"连接失败: {message}")
-            
+
             return success, message
-            
+
         except Exception as e:
             self.status = ConnectionStatus.ERROR
             error_msg = f"连接异常: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
-    
-    def _connect_sync(self, timeout: int) -> Tuple[bool, str]:
+
+    def _connect_sync(self, timeout: int) -> tuple[bool, str]:
         """同步连接实现"""
         try:
             # 检查主机可达性
@@ -78,7 +78,7 @@ class TelnetConnection(NetworkConnection):
                 return False, f"主机 {self.host}:{self.port} 不可达"
 
             # 创建Telnet客户端
-            self.client = telnetlib.Telnet()
+            self.client = TelnetClient()
             self.client.open(self.host, self.port, timeout)
 
             success, message = self._perform_login(line_ending=b"\n")
@@ -94,7 +94,7 @@ class TelnetConnection(NetworkConnection):
         except Exception as e:
             return False, f"连接失败: {str(e)}"
 
-    def _perform_login(self, line_ending: bytes = b"\n") -> Tuple[bool, str]:
+    def _perform_login(self, line_ending: bytes = b"\n") -> tuple[bool, str]:
         """使用小型状态机完成 Telnet 登录。"""
         auth_output = b""
         sent_username = False
@@ -135,7 +135,7 @@ class TelnetConnection(NetworkConnection):
 
         return False, "登录失败，未检测到设备提示符"
 
-    def _expect_login_prompt(self) -> Tuple[str, bytes]:
+    def _expect_login_prompt(self) -> tuple[str, bytes]:
         """等待用户名、密码或登录后的设备提示符。"""
         patterns = (
             self.username_prompt_patterns
@@ -179,7 +179,7 @@ class TelnetConnection(NetworkConnection):
             "press space to continue",
         ]
         return any(marker in lowered for marker in pagination_markers)
-    
+
     def _check_host_reachable(self, timeout: float) -> bool:
         """检查主机是否可达"""
         try:
@@ -190,7 +190,7 @@ class TelnetConnection(NetworkConnection):
             return result == 0
         except Exception:
             return False
-    
+
     def _detect_prompt_pattern(self, response: bytes):
         """检测提示符模式"""
         try:
@@ -220,7 +220,7 @@ class TelnetConnection(NetworkConnection):
 
             # 如果都没找到，使用默认
             self.prompt_pattern = b'#'
-            logger.warning(f"未检测到明确提示符，使用默认 '#'")
+            logger.warning("未检测到明确提示符，使用默认 '#'")
 
         except Exception as e:
             logger.error(f"提示符检测失败: {str(e)}")
@@ -239,31 +239,31 @@ class TelnetConnection(NetworkConnection):
             logger.warning(f"设备信息检测失败: {str(e)}")
 
         return None
-    
-    async def execute_command(self, command: str) -> Tuple[bool, str]:
+
+    async def execute_command(self, command: str) -> tuple[bool, str]:
         """执行命令"""
         try:
             if self.status != ConnectionStatus.CONNECTED or not self.client:
                 return False, "连接未建立"
-            
+
             self.last_activity_time = time.time()
-            
+
             # 在线程池中执行命令
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
                 self.executor,
                 self._execute_command_sync,
-                command
+                command,
             )
-            
+
             return result
-            
+
         except Exception as e:
             error_msg = f"命令执行异常: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
-    
-    def _execute_command_sync(self, command: str) -> Tuple[bool, str]:
+
+    def _execute_command_sync(self, command: str) -> tuple[bool, str]:
         """同步执行命令 - 改进版本支持分页"""
         try:
             logger.debug(f"执行命令: {command}")
@@ -285,13 +285,10 @@ class TelnetConnection(NetworkConnection):
         except Exception as e:
             logger.error(f"命令执行异常: {str(e)}")
             return False, f"命令执行失败: {str(e)}"
-    
+
     def _read_command_response_with_pagination(self) -> bytes:
         """读取命令响应，支持分页处理 - 修复缓冲区同步问题"""
         try:
-            import time
-            import re
-
             full_response = b""
             start_time = time.time()
 
@@ -477,7 +474,7 @@ class TelnetConnection(NetworkConnection):
             logger.error(f"清理响应数据失败: {str(e)}")
             return response
 
-    async def disconnect(self) -> Tuple[bool, str]:
+    async def disconnect(self) -> tuple[bool, str]:
         """断开连接"""
         try:
             if self.client:
@@ -492,26 +489,26 @@ class TelnetConnection(NetworkConnection):
             error_msg = f"断开连接异常: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
-    
+
     def is_alive(self) -> bool:
         """检查连接是否活跃"""
         if not self.client or self.status != ConnectionStatus.CONNECTED:
             return False
-        
+
         try:
             # 检查连接是否断开
             self.client.sock.settimeout(0.1)
-            data = self.client.sock.recv(1, socket.MSG_PEEK)
+            self.client.sock.recv(1, socket.MSG_PEEK)
             return True
         except socket.timeout:
             return True  # 没有数据可读，连接正常
-        except:
+        except OSError:
             return False
-    
+
     def __del__(self):
         """析构函数"""
         try:
             if self.executor:
                 self.executor.shutdown(wait=False)
-        except:
+        except Exception:
             pass

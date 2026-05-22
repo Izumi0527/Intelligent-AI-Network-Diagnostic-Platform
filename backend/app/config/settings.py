@@ -66,6 +66,10 @@ class Settings(BaseSettings):
 
     # AI设置
     AI_ENABLED: bool = os.getenv("AI_ENABLED", "false").lower() == "true"
+    AI_RATE_LIMIT_PER_MINUTE: int = int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "60"))
+    TERMINAL_RATE_LIMIT_PER_MINUTE: int = int(
+        os.getenv("TERMINAL_RATE_LIMIT_PER_MINUTE", "120")
+    )
 
     # API密钥 - Anthropic (Claude)
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")

@@ -10,6 +10,7 @@ from starlette.requests import Request
 
 from app.api.api_v1.api import api_router
 from app.config.settings import settings
+from app.core.rate_limit import InMemoryRateLimiter, RateLimitMiddleware, RateLimitRule
 from app.services.ai.manager import AIServiceManager
 from app.services.deepseek_service import DeepseekService
 from app.services.terminal_service import TerminalService
@@ -50,6 +51,7 @@ def _initialize_application_services(application: FastAPI) -> None:
     application.state.terminal_service = TerminalService()
     application.state.ai_service_manager = AIServiceManager()
     application.state.deepseek_service = DeepseekService()
+    application.state.rate_limiter = InMemoryRateLimiter()
 
 
 async def _cleanup_service(service) -> None:
@@ -130,6 +132,23 @@ def create_app() -> FastAPI:
             allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
         )
 
+    application.add_middleware(
+        RateLimitMiddleware,
+        rules=[
+            RateLimitRule(
+                scope="ai",
+                path_prefix=f"{settings.API_V1_STR}/ai",
+                limit=settings.AI_RATE_LIMIT_PER_MINUTE,
+                window_seconds=60,
+            ),
+            RateLimitRule(
+                scope="terminal",
+                path_prefix=f"{settings.API_V1_STR}/terminal",
+                limit=settings.TERMINAL_RATE_LIMIT_PER_MINUTE,
+                window_seconds=60,
+            ),
+        ],
+    )
     application.add_middleware(LoggingMiddleware)
     application.include_router(api_router, prefix=settings.API_V1_STR)
 

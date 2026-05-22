@@ -26,10 +26,10 @@ from app.api import deps as deps_module
 from app.api.deps import (
     get_ai_application_service,
     get_ai_service_manager,
-    get_network_service,
     get_terminal_service,
 )
 from app.config.settings import Settings, settings
+from app.core.rate_limit import RateLimitResult
 from app.utils import logger as logger_utils
 from app.main import app, create_app
 from app.models.ai import (
@@ -71,14 +71,6 @@ class FakeTerminalConnectService:
             session_id="terminal-test",
             message=f"已连接 {credentials.device_address}",
         )
-
-
-class FailingNetworkService:
-    async def connect(self, _request):
-        raise AssertionError("废弃 /network/connect 不应调用 NetworkService")
-
-    async def get_connections(self):
-        raise AssertionError("健康检查不应依赖 NetworkService 连接统计")
 
 
 class BrokenTerminalManager:
@@ -209,6 +201,16 @@ class RejectingTerminalManager:
         )
 
 
+class StaticRateLimiter:
+    def __init__(self, result: RateLimitResult):
+        self.result = result
+        self.calls = []
+
+    async def hit(self, key, rule):
+        self.calls.append((key, rule))
+        return self.result
+
+
 def _enable_internal_auth(monkeypatch):
     monkeypatch.setattr(settings, "API_AUTH_ENABLED", True, raising=False)
     monkeypatch.setattr(settings, "INTERNAL_API_TOKEN", "test-token", raising=False)
@@ -216,6 +218,77 @@ def _enable_internal_auth(monkeypatch):
 
 def _auth_headers():
     return {"Authorization": "Bearer test-token"}
+
+
+def test_ai_routes_return_429_with_rate_limit_headers():
+    """AI 接口触发限流时应返回 429 和稳定响应头。"""
+    limited_app = create_app()
+    limiter = StaticRateLimiter(
+        RateLimitResult(
+            allowed=False,
+            limit=1,
+            remaining=0,
+            reset_after=17,
+        )
+    )
+
+    with TestClient(limited_app) as client:
+        limited_app.state.rate_limiter = limiter
+        response = client.post(
+            "/api/v1/ai/chat",
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": [{"role": "user", "content": "hello"}],
+            },
+        )
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "17"
+    assert response.headers["X-RateLimit-Limit"] == "1"
+    assert response.headers["X-RateLimit-Remaining"] == "0"
+    assert response.headers["X-RateLimit-Reset"] == "17"
+    assert response.json()["detail"] == "请求过于频繁，请稍后重试"
+    assert limiter.calls
+    assert limiter.calls[0][0].startswith("ai:")
+
+
+def test_terminal_routes_include_rate_limit_headers_when_allowed():
+    """终端接口通过限流时应带上剩余额度响应头。"""
+    limited_app = create_app()
+    limiter = StaticRateLimiter(
+        RateLimitResult(
+            allowed=True,
+            limit=5,
+            remaining=4,
+            reset_after=60,
+        )
+    )
+    fake_service = FakeTerminalConnectService()
+    limited_app.dependency_overrides[get_terminal_service] = lambda: fake_service
+
+    try:
+        with TestClient(limited_app) as client:
+            limited_app.state.rate_limiter = limiter
+            response = client.post(
+                "/api/v1/terminal/connect",
+                json={
+                    "connection_type": "ssh",
+                    "device_address": "192.0.2.10",
+                    "port": 22,
+                    "username": "admin",
+                    "password": "password",
+                },
+            )
+    finally:
+        limited_app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.headers["X-RateLimit-Limit"] == "5"
+    assert response.headers["X-RateLimit-Remaining"] == "4"
+    assert response.headers["X-RateLimit-Reset"] == "60"
+    assert fake_service.connect_calls == 1
+    assert limiter.calls
+    assert limiter.calls[0][0].startswith("terminal:")
 
 
 def _build_terminal_service(manager):
@@ -375,39 +448,40 @@ def test_ai_model_status_requires_internal_token(monkeypatch):
 def test_network_connect_is_gone_and_does_not_call_legacy_service(monkeypatch):
     """废弃的 /network 写接口应返回 410，并停止承载旧连接能力。"""
     _enable_internal_auth(monkeypatch)
-    app.dependency_overrides[get_network_service] = lambda: FailingNetworkService()
 
-    try:
-        response = TestClient(app, raise_server_exceptions=False).post(
-            "/api/v1/network/connect",
-            json={
-                "host": "192.0.2.10",
-                "port": 22,
-                "username": "admin",
-                "password": "password",
-                "connection_type": "SSH",
-                "device_type": "cisco_ios",
-            },
-            headers=_auth_headers(),
-        )
-    finally:
-        app.dependency_overrides.clear()
+    response = TestClient(app, raise_server_exceptions=False).post(
+        "/api/v1/network/connect",
+        json={
+            "host": "192.0.2.10",
+            "port": 22,
+            "username": "admin",
+            "password": "password",
+            "connection_type": "SSH",
+            "device_type": "cisco_ios",
+        },
+        headers=_auth_headers(),
+    )
 
     assert response.status_code == 410
     assert "/terminal" in response.text
 
 
-def test_health_does_not_depend_on_network_service(monkeypatch):
+def test_health_does_not_depend_on_network_service():
     """健康检查不应为了统计旧连接而初始化废弃 NetworkService。"""
-    app.dependency_overrides[get_network_service] = lambda: FailingNetworkService()
-
-    try:
-        response = TestClient(app, raise_server_exceptions=False).get("/api/v1/health")
-    finally:
-        app.dependency_overrides.clear()
+    response = TestClient(app, raise_server_exceptions=False).get("/api/v1/health")
 
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
+
+
+def test_runtime_dependencies_do_not_expose_legacy_network_service():
+    """运行时依赖层不能继续暴露 legacy NetworkService 初始化入口。"""
+    deps_source = (PROJECT_ROOT / "backend/app/api/deps.py").read_text(encoding="utf-8")
+
+    assert "NetworkService" not in deps_source
+    assert "get_network_service" not in deps_source
+    assert not (PROJECT_ROOT / "backend/app/services/network_service.py").exists()
+    assert (PROJECT_ROOT / "backend/app/legacy/network_service.py").exists()
 
 
 def test_cors_origins_remove_wildcard_and_empty_items(monkeypatch):
@@ -566,17 +640,14 @@ def test_dependencies_prefer_app_state_services():
     terminal_service = object()
     ai_manager = object()
     deepseek_service = object()
-    network_service = object()
 
     application.state.terminal_service = terminal_service
     application.state.ai_service_manager = ai_manager
     application.state.deepseek_service = deepseek_service
-    application.state.network_service = network_service
 
     assert deps_module.get_terminal_service(request) is terminal_service
     assert deps_module.get_ai_service_manager(request) is ai_manager
     assert deps_module.get_deepseek_service(request) is deepseek_service
-    assert deps_module.get_network_service(request) is network_service
 
 
 def test_ai_manager_module_does_not_create_global_singleton():

@@ -34,8 +34,10 @@ $ExpectedScripts = @(
     "prod.sh",
     "build.ps1",
     "lint.ps1",
+    "backend-check.ps1",
     "build.sh",
     "lint.sh",
+    "backend-check.sh",
     "p3_axe_audit.py",
     "clean-python-cache.ps1",
     "clean-python-cache.sh"
@@ -62,6 +64,12 @@ foreach ($scriptName in @("dev.ps1", "prod.ps1")) {
     Assert-Contains $content "Start-ManagedWindow[\s\S]+backend[\s\S]+Wait-BackendReady[\s\S]+Start-ManagedWindow[\s\S]+frontend" "$scriptName must start backend before frontend"
 }
 
+$DevPowerShell = Get-Content -Path (Join-Path $ScriptsDir "dev.ps1") -Raw
+Assert-Contains $DevPowerShell "Get-DevelopmentInternalApiToken" "dev.ps1 must prepare development internal API token"
+Assert-Contains $DevPowerShell "API_AUTH_ENABLED" "dev.ps1 must enable backend internal API auth"
+Assert-Contains $DevPowerShell "INTERNAL_API_TOKEN" "dev.ps1 must pass backend internal API token"
+Assert-Contains $DevPowerShell "VITE_INTERNAL_API_TOKEN" "dev.ps1 must pass matching frontend internal API token"
+
 foreach ($scriptName in @("dev.sh", "prod.sh")) {
     $path = Join-Path $ScriptsDir $scriptName
     $content = Get-Content -Path $path -Raw
@@ -74,6 +82,22 @@ foreach ($scriptName in @("dev.sh", "prod.sh")) {
     Assert-True (-not ($content -match "npm run (dev|preview) --")) "$scriptName must not forward Vite args through npm run"
     Assert-Contains $content "/api/v1/health" "$scriptName missing backend health check"
     Assert-Contains $content "start_managed_window[\s\S]+backend[\s\S]+wait_backend_ready[\s\S]+start_managed_window[\s\S]+frontend" "$scriptName must start backend before frontend"
+}
+
+$DevShell = Get-Content -Path (Join-Path $ScriptsDir "dev.sh") -Raw
+Assert-Contains $DevShell "development_internal_api_token" "dev.sh must prepare development internal API token"
+Assert-Contains $DevShell "API_AUTH_ENABLED" "dev.sh must enable backend internal API auth"
+Assert-Contains $DevShell "INTERNAL_API_TOKEN" "dev.sh must pass backend internal API token"
+Assert-Contains $DevShell "VITE_INTERNAL_API_TOKEN" "dev.sh must pass matching frontend internal API token"
+
+foreach ($scriptName in @("backend-check.ps1", "backend-check.sh")) {
+    $path = Join-Path $ScriptsDir $scriptName
+    $content = Get-Content -Path $path -Raw
+    Assert-Contains $content "uv pip check" "$scriptName must run uv pip check"
+    Assert-Contains $content "ruff check" "$scriptName must run backend ruff checks"
+    Assert-Contains $content "pytest" "$scriptName must run backend pytest"
+    Assert-Contains $content "verify-backend-runtime-dependencies.ps1" "$scriptName must run runtime dependency verification"
+    Assert-Contains $content "verify-launch-scripts.ps1" "$scriptName must run launch script verification"
 }
 
 $PowerShellCleaner = Get-Content -Path (Join-Path $ScriptsDir "clean-python-cache.ps1") -Raw

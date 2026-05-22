@@ -7,6 +7,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BACKEND_PATH="$PROJECT_ROOT/backend"
 FRONTEND_PATH="$PROJECT_ROOT/frontend"
 LOGS_PATH="$PROJECT_ROOT/logs"
+DEVELOPMENT_INTERNAL_API_TOKEN=""
 
 BACKEND_HOST="${BACKEND_HOST:-0.0.0.0}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
@@ -85,6 +86,62 @@ ensure_project_layout() {
     mkdir -p "$LOGS_PATH/app" "$LOGS_PATH/access" "$LOGS_PATH/error" "$LOGS_PATH/backend" "$LOGS_PATH/frontend"
 }
 
+read_env_value() {
+    local name="$1"
+    local line
+    while IFS= read -r line; do
+        case "$line" in
+            "$name="*)
+                line="${line#*=}"
+                line="${line%\"}"
+                line="${line#\"}"
+                line="${line%\'}"
+                line="${line#\'}"
+                printf "%s" "$line"
+                return 0
+                ;;
+        esac
+    done < "$BACKEND_PATH/.env"
+    return 1
+}
+
+invalid_internal_api_token() {
+    local token="${1:-}"
+    case "${token,,}" in
+        ""|"change-me"|"change-me-internal-api-token"|"your-token"|"test-token")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+new_urlsafe_token() {
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+    elif command -v python >/dev/null 2>&1; then
+        python -c 'import secrets; print(secrets.token_urlsafe(32))'
+    elif command -v openssl >/dev/null 2>&1; then
+        openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+    else
+        echo "缺少 python 或 openssl，无法生成开发内部 API Token。" >&2
+        exit 1
+    fi
+}
+
+development_internal_api_token() {
+    local configured_token
+    configured_token="$(read_env_value "INTERNAL_API_TOKEN" || true)"
+    if ! invalid_internal_api_token "$configured_token"; then
+        printf "%s" "$configured_token"
+        return 0
+    fi
+
+    echo "未检测到可用 INTERNAL_API_TOKEN，已生成仅本次开发会话使用的临时 Token。" >&2
+    new_urlsafe_token
+}
+
 escape_osascript() {
     printf "%s" "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
@@ -152,7 +209,8 @@ wait_backend_ready() {
 }
 
 new_backend_command() {
-    printf "export APP_ENV=development; export LOG_LEVEL=DEBUG; export PYTHONDONTWRITEBYTECODE=1; echo '后端开发服务启动中...'; uv run python run.py --host %s --port %s --reload" \
+    printf "export APP_ENV=development; export API_AUTH_ENABLED=true; export INTERNAL_API_TOKEN=%s; export LOG_LEVEL=DEBUG; export PYTHONDONTWRITEBYTECODE=1; echo '后端开发服务启动中...'; uv run python run.py --host %s --port %s --reload" \
+        "$(shell_quote "$DEVELOPMENT_INTERNAL_API_TOKEN")" \
         "$(shell_quote "$BACKEND_HOST")" \
         "$(shell_quote "$BACKEND_PORT")"
 }
@@ -165,7 +223,8 @@ new_frontend_command() {
         install_command="if [ ! -d node_modules ]; then echo '未检测到 node_modules，正在安装前端依赖...'; npm install; fi"
     fi
 
-    printf "export NODE_ENV=development; %s; vite_bin='./node_modules/.bin/vite'; if [ ! -x \"\$vite_bin\" ]; then echo '未找到本地 Vite 可执行文件，请确认前端依赖安装成功。' >&2; exit 1; fi; echo '前端开发服务启动中...'; \"\$vite_bin\" --host %s --port %s" \
+    printf "export NODE_ENV=development; export VITE_INTERNAL_API_TOKEN=%s; %s; vite_bin='./node_modules/.bin/vite'; if [ ! -x \"\$vite_bin\" ]; then echo '未找到本地 Vite 可执行文件，请确认前端依赖安装成功。' >&2; exit 1; fi; echo '前端开发服务启动中...'; \"\$vite_bin\" --host %s --port %s" \
+        "$(shell_quote "$DEVELOPMENT_INTERNAL_API_TOKEN")" \
         "$install_command" \
         "$(shell_quote "$FRONTEND_HOST")" \
         "$(shell_quote "$FRONTEND_PORT")"
@@ -178,6 +237,7 @@ ensure_project_layout
 ensure_command "uv" "请先安装 uv: https://github.com/astral-sh/uv"
 ensure_command "npm" "请先安装 Node.js 和 npm。"
 ensure_command "curl" "请先安装 curl。"
+DEVELOPMENT_INTERNAL_API_TOKEN="$(development_internal_api_token)"
 
 HEALTH_HOST="$(health_host "$BACKEND_HOST")"
 HEALTH_URL="http://${HEALTH_HOST}:${BACKEND_PORT}/api/v1/health"

@@ -1,11 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, validator
-
-from app.utils.logger import get_logger
-
-logger = get_logger(__name__)
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AI_MAX_MESSAGES = 50
 AI_MAX_MESSAGE_CONTENT_LENGTH = 8000
@@ -15,6 +11,7 @@ AI_MAX_TOKENS = 8192
 
 class AIModel(BaseModel):
     """AI模型信息"""
+
     value: str = Field(..., description="模型ID")
     label: str = Field(..., description="模型显示名称")
     description: Optional[str] = Field(None, description="模型描述")
@@ -23,36 +20,57 @@ class AIModel(BaseModel):
 
 class Message(BaseModel):
     """聊天消息"""
+
+    model_config = ConfigDict(extra="ignore")
+
     role: Literal["user", "assistant"] = Field(..., description="消息角色")
     content: str = Field(
         ...,
         description="消息内容",
         max_length=AI_MAX_MESSAGE_CONTENT_LENGTH,
     )
-    timestamp: Optional[datetime] = Field(default_factory=datetime.now, description="消息时间戳")
+    timestamp: Optional[datetime] = Field(
+        default_factory=datetime.now,
+        description="消息时间戳",
+    )
 
     # 添加验证器，确保content不为空
-    @validator('content')
-    def content_not_empty(cls, v):
-        if not v or not v.strip():
-            raise ValueError('消息内容不能为空')
-        return v.strip()
+    @field_validator("content")
+    @classmethod
+    def content_not_empty(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("消息内容不能为空")
+        return value.strip()
 
-    class Config:
-        # 允许额外字段，提高与不同API的兼容性
-        extra = "ignore"
 
 # 扩展消息类型，用于处理前端可能发送的简化消息格式
 class SimpleMessage(BaseModel):
     """简化的消息格式，用于与前端交互"""
+
+    model_config = ConfigDict(extra="ignore")
+
     role: str
     content: str
 
-    class Config:
-        extra = "ignore"
 
 class ChatRequest(BaseModel):
     """聊天请求模型"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model": "deepseek-v4-pro",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "如何解决交换机端口状态显示up但无法正常通信的问题？",
+                    }
+                ],
+                "stream": True,
+            }
+        }
+    )
+
     model: str = Field(..., description="模型名称", min_length=1, max_length=100)
     messages: list[Message] = Field(
         ...,
@@ -75,37 +93,38 @@ class ChatRequest(BaseModel):
     top_p: Optional[float] = Field(None, description="top p值", ge=0, le=1)
     stream: bool = Field(False, description="是否使用流式响应")
 
-    @validator('messages')
-    def messages_not_empty(cls, v):
+    @field_validator("messages", mode="before")
+    @classmethod
+    def messages_not_empty(cls, value: Any) -> Any:
         """确保消息列表不为空且所有消息内容有效"""
         # 基本验证：列表非空
-        if not v:
-            raise ValueError('消息列表不能为空')
+        if not value:
+            raise ValueError("消息列表不能为空")
 
         valid_messages = []
         conversion_errors = []
 
         # 尝试转换和验证每条消息
-        for i, message in enumerate(v):
+        for i, message in enumerate(value):
             try:
                 # 如果是字典（例如来自JSON的未验证数据），尝试转换为Message
                 if isinstance(message, dict):
+                    message = dict(message)
                     # 确保基本字段存在
-                    if not message.get('role'):
-                        logger.warning(f"消息{i}缺少role字段，默认设为'user'")
-                        message['role'] = 'user'
+                    if not message.get("role"):
+                        message["role"] = "user"
 
-                    if not message.get('content'):
-                        if 'content' in message and message['content'] == '':
-                            logger.warning(f"消息{i}内容为空，将被跳过")
+                    if not message.get("content"):
+                        if "content" in message and message["content"] == "":
                             continue
-                        elif 'content' not in message:
-                            logger.warning(f"消息{i}缺少content字段，将被跳过")
+                        elif "content" not in message:
                             continue
 
                     # 验证内容不全为空白字符
-                    if isinstance(message.get('content'), str) and message['content'].strip() == '':
-                        logger.warning(f"消息{i}内容全为空白字符，将被跳过")
+                    if (
+                        isinstance(message.get("content"), str)
+                        and message["content"].strip() == ""
+                    ):
                         continue
 
                     try:
@@ -113,17 +132,17 @@ class ChatRequest(BaseModel):
                         valid_msg = Message(**message)
                         valid_messages.append(valid_msg)
                     except Exception as e:
-                        logger.warning(f"消息{i}转换失败: {str(e)}，将被跳过")
                         conversion_errors.append((i, str(e)))
                         continue
                 else:
                     # 已经是Message对象，验证内容非空
-                    if not message.content or (isinstance(message.content, str) and message.content.strip() == ''):
-                        logger.warning(f"消息{i}内容为空，将被跳过")
+                    if not message.content or (
+                        isinstance(message.content, str)
+                        and message.content.strip() == ""
+                    ):
                         continue
                     valid_messages.append(message)
             except Exception as e:
-                logger.error(f"处理消息{i}时出错: {str(e)}")
                 conversion_errors.append((i, str(e)))
                 continue
 
@@ -140,38 +159,17 @@ class ChatRequest(BaseModel):
 
         return valid_messages
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "model": "deepseek-v4-pro",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": "如何解决交换机端口状态显示up但无法正常通信的问题？"
-                    }
-                ],
-                "stream": True
-            }
-        }
 
 class ChatResponse(BaseModel):
     """聊天响应"""
-    id: Optional[str] = Field(None, description="响应或请求追踪ID")
-    message: Message
-    model: str = Field(..., description="使用的AI模型")
-    finish_reason: Optional[str] = Field(None, description="结束原因")
-    usage: dict[str, Any] = Field(default_factory=dict, description="使用情况统计")
-    content: Optional[str] = Field(None, description="响应内容，方便前端直接获取")
 
-    class Config:
-        # 允许额外字段
-        extra = "ignore"
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        extra="ignore",
+        json_schema_extra={
             "example": {
                 "message": {
                     "role": "assistant",
-                    "content": "我是DeepSeek-V4-Pro大语言模型。"
+                    "content": "我是DeepSeek-V4-Pro大语言模型。",
                 },
                 "model": "deepseek-v4-pro",
                 "content": "我是DeepSeek-V4-Pro大语言模型。",
@@ -179,21 +177,35 @@ class ChatResponse(BaseModel):
                 "usage": {
                     "prompt_tokens": 10,
                     "completion_tokens": 12,
-                    "total_tokens": 22
-                }
+                    "total_tokens": 22,
+                },
             }
-        }
+        },
+    )
+
+    id: Optional[str] = Field(None, description="响应或请求追踪ID")
+    message: Message
+    model: str = Field(..., description="使用的AI模型")
+    finish_reason: Optional[str] = Field(None, description="结束原因")
+    usage: dict[str, Any] = Field(default_factory=dict, description="使用情况统计")
+    content: Optional[str] = Field(None, description="响应内容，方便前端直接获取")
+
 
 class ModelConnectionStatus(BaseModel):
     """模型连接状态"""
+
     connected: bool = Field(..., description="是否连接成功")
     message: str = Field(..., description="状态消息")
     last_check: str = Field(..., description="最后检查时间")
 
 class ModelsResponse(BaseModel):
     """可用模型列表响应"""
+
     models: list[AIModel] = Field(..., description="可用的模型列表")
-    status: dict[str, ModelConnectionStatus] = Field(default_factory=dict, description="各提供商连接状态")
+    status: dict[str, ModelConnectionStatus] = Field(
+        default_factory=dict,
+        description="各提供商连接状态",
+    )
 
 
 class DeepseekGenerateRequest(BaseModel):
@@ -216,8 +228,9 @@ class DeepseekGenerateRequest(BaseModel):
     )
     top_p: Optional[float] = Field(None, description="top p值", ge=0, le=1)
 
-    @validator("messages")
-    def message_total_length_within_limit(cls, value):
+    @field_validator("messages")
+    @classmethod
+    def message_total_length_within_limit(cls, value: list[Message]) -> list[Message]:
         total_content_length = sum(len(message.content) for message in value)
         if total_content_length > AI_MAX_TOTAL_MESSAGE_CONTENT_LENGTH:
             raise ValueError("消息总长度超出限制")
@@ -226,15 +239,29 @@ class DeepseekGenerateRequest(BaseModel):
 
 class StreamEvent(BaseModel):
     """流式响应事件"""
-    type: Literal["content", "error", "done", "finish", "thinking", "message_start", "content_block_start", "content_block_delta", "content_block_stop", "message_delta", "message_stop"]
-    data: dict[str, Any]
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "type": "content",
                 "data": {
-                    "content": "交换机端口状态显示up但无法正常通信"
-                }
+                    "content": "交换机端口状态显示up但无法正常通信",
+                },
             }
         }
+    )
+
+    type: Literal[
+        "content",
+        "error",
+        "done",
+        "finish",
+        "thinking",
+        "message_start",
+        "content_block_start",
+        "content_block_delta",
+        "content_block_stop",
+        "message_delta",
+        "message_stop",
+    ]
+    data: dict[str, Any]

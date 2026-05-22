@@ -1,3 +1,5 @@
+# Generated from backend/pyproject.toml and backend/uv.lock.
+# Do not edit by hand; keep [project].dependencies as the source of truth.
 fastapi==0.115.12
 uvicorn==0.34.2
 pydantic==2.11.4

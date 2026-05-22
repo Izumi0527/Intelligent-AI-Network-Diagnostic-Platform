@@ -7,7 +7,7 @@ name = "ai-network-platform"
 version = "1.0.0"
 description = "AI智能网络故障分析平台"
 readme = "../README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.13"
 authors = [
     {name = "AI Network Platform Team"},
 ]
@@ -95,7 +95,7 @@ strict_equality = true
 testpaths = ["../tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
-addopts = "-v --cov=app --cov-report=term-missing --cov-report=html"
+addopts = "-v"
 cache_dir = "../tests/.pytest_cache"
 asyncio_mode = "auto"
 

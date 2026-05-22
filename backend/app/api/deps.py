@@ -7,7 +7,6 @@ from app.config.settings import settings
 from app.services.ai.application_service import AIApplicationService
 from app.services.ai.manager import AIServiceManager
 from app.services.deepseek_service import DeepseekService
-from app.services.network_service import NetworkService
 from app.services.terminal_service import TerminalService
 from app.utils.logger import get_logger
 
@@ -51,15 +50,6 @@ def get_ai_application_service(
 ) -> AIApplicationService:
     """获取 AI 应用服务实例。"""
     return AIApplicationService(ai_manager)
-
-
-def get_network_service(request: Request) -> NetworkService:
-    """获取网络服务实例"""
-    return _get_or_create_state_service(
-        request,
-        "network_service",
-        NetworkService,
-    )
 
 
 def get_terminal_service(request: Request) -> TerminalService:

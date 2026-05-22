@@ -16,6 +16,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $BackendPath = Join-Path $ProjectRoot "backend"
 $FrontendPath = Join-Path $ProjectRoot "frontend"
 $LogsPath = Join-Path $ProjectRoot "logs"
+$DevelopmentInternalApiToken = $null
 
 function Write-Step {
     param([string]$Message)
@@ -67,6 +68,53 @@ function Ensure-ProjectLayout {
             New-Item -ItemType Directory -Path $path -Force | Out-Null
         }
     }
+}
+
+function Test-InvalidInternalApiToken {
+    param([AllowNull()][string]$Token)
+
+    $normalized = if ($null -eq $Token) { "" } else { $Token.Trim().ToLowerInvariant() }
+    return [string]::IsNullOrWhiteSpace($normalized) -or $normalized -in @(
+        "change-me",
+        "change-me-internal-api-token",
+        "your-token",
+        "test-token"
+    )
+}
+
+function New-UrlSafeToken {
+    $bytes = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+    } finally {
+        $rng.Dispose()
+    }
+
+    return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+}
+
+function Get-EnvFileValue {
+    param([string]$Name)
+
+    $envPath = Join-Path $BackendPath ".env"
+    foreach ($line in Get-Content -Path $envPath) {
+        if ($line -match "^\s*$([regex]::Escape($Name))\s*=\s*(.*)\s*$") {
+            return $Matches[1].Trim().Trim('"').Trim("'")
+        }
+    }
+
+    return $null
+}
+
+function Get-DevelopmentInternalApiToken {
+    $configuredToken = Get-EnvFileValue -Name "INTERNAL_API_TOKEN"
+    if (-not (Test-InvalidInternalApiToken -Token $configuredToken)) {
+        return $configuredToken
+    }
+
+    Write-Host "未检测到可用 INTERNAL_API_TOKEN，已生成仅本次开发会话使用的临时 Token。" -ForegroundColor Yellow
+    return New-UrlSafeToken
 }
 
 function Get-PowerShellExecutable {
@@ -134,8 +182,11 @@ function Wait-BackendReady {
 
 function New-BackendCommand {
     $hostLiteral = ConvertTo-PowerShellLiteral $BackendHost
+    $tokenLiteral = ConvertTo-PowerShellLiteral $DevelopmentInternalApiToken
     return @"
 `$env:APP_ENV = 'development'
+`$env:API_AUTH_ENABLED = 'true'
+`$env:INTERNAL_API_TOKEN = $tokenLiteral
 `$env:LOG_LEVEL = 'DEBUG'
 `$env:PYTHONDONTWRITEBYTECODE = '1'
 Write-Host '后端开发服务启动中...' -ForegroundColor Green
@@ -145,14 +196,16 @@ uv run python run.py --host $hostLiteral --port $BackendPort --reload
 
 function New-FrontendCommand {
     $hostLiteral = ConvertTo-PowerShellLiteral $FrontendHost
+    $tokenLiteral = ConvertTo-PowerShellLiteral $DevelopmentInternalApiToken
     $installCommand = "if (-not (Test-Path -LiteralPath 'node_modules')) { Write-Host '未检测到 node_modules，正在安装前端依赖...' -ForegroundColor Yellow; npm install }"
 
     if ($SkipFrontendInstall) {
         $installCommand = "Write-Host '已跳过前端依赖自动安装。' -ForegroundColor Yellow"
     }
 
-    return @"
+return @"
 `$env:NODE_ENV = 'development'
+`$env:VITE_INTERNAL_API_TOKEN = $tokenLiteral
 $installCommand
 `$vite = Join-Path (Get-Location) 'node_modules\.bin\vite.cmd'
 if (-not (Test-Path -LiteralPath `$vite)) { throw '未找到本地 Vite 可执行文件，请确认前端依赖安装成功。' }
@@ -168,6 +221,7 @@ try {
     Ensure-ProjectLayout
     Ensure-Command -Name "uv" -InstallHint "请先安装 uv: https://github.com/astral-sh/uv"
     Ensure-Command -Name "npm" -InstallHint "请先安装 Node.js 和 npm。"
+    $DevelopmentInternalApiToken = Get-DevelopmentInternalApiToken
 
     $healthHost = Get-HealthHost $BackendHost
     $healthUrl = "http://${healthHost}:$BackendPort/api/v1/health"

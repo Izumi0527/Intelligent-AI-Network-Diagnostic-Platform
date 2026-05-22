@@ -12,3 +12,15 @@ def test_pytest_cache_is_configured_under_tests_directory():
 
     assert "cache_dir = tests/.pytest_cache" in root_pytest_config
     assert 'cache_dir = "../tests/.pytest_cache"' in backend_pytest_config
+
+
+def test_pytest_default_options_do_not_generate_coverage_artifacts():
+    """普通 pytest 不应默认生成覆盖率和 htmlcov，覆盖率应由显式命令开启。"""
+    project_root = Path(__file__).resolve().parents[1]
+    backend_pytest_config = (project_root / "backend" / "pyproject.toml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "--cov" not in backend_pytest_config
+    assert "cov-report" not in backend_pytest_config
+    assert "[tool.coverage.run]" in backend_pytest_config

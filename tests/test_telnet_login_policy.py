@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("API_PREFIX", "/api")
@@ -20,6 +21,9 @@ from app.core.network.telnet import connection as telnet_connection_module
 from app.core.network.telnet.connection import TelnetConnection
 from app.core.network.telnet.devices import huawei as huawei_module
 from app.core.network.telnet.devices.huawei import HuaweiTelnetConnection
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class FakeSocket:
@@ -73,7 +77,7 @@ def test_telnet_login_accepts_login_prompt_and_utf8_credentials(monkeypatch):
         eager_responses=[b"Welcome", b"<Huawei>"],
         expect_responses=[b"Login:", b"Password:", b"<Huawei>"],
     )
-    monkeypatch.setattr(telnet_connection_module.telnetlib, "Telnet", lambda: fake_client)
+    monkeypatch.setattr(telnet_connection_module, "TelnetClient", lambda: fake_client)
     monkeypatch.setattr(telnet_connection_module.time, "sleep", lambda _seconds: None)
 
     connection = TelnetConnection("192.0.2.10", 23, "管理员", "复杂密码")
@@ -93,7 +97,7 @@ def test_huawei_telnet_does_not_enter_system_view_after_login(monkeypatch):
         expect_responses=[b"Username:", b"Password:", b"<Huawei>"],
     )
     monkeypatch.setattr(huawei_module.socket, "socket", lambda *_args: FakeSocket())
-    monkeypatch.setattr(huawei_module.telnetlib, "Telnet", lambda: fake_client)
+    monkeypatch.setattr(huawei_module, "TelnetClient", lambda sock=None: fake_client)
 
     connection = HuaweiTelnetConnection("192.0.2.10", 23, "admin", "password")
 
@@ -115,3 +119,14 @@ def test_telnet_completion_ignores_pagination_prompt_and_detects_device_prompt()
         b"",
         b"display version\nVersion info\n<Huawei>",
     ) is True
+
+
+def test_telnet_runtime_no_longer_imports_stdlib_telnetlib():
+    """运行时代码不应再导入 Python 3.13 移除的 telnetlib。"""
+    telnet_files = [
+        PROJECT_ROOT / "backend/app/core/network/telnet/connection.py",
+        PROJECT_ROOT / "backend/app/core/network/telnet/devices/huawei.py",
+    ]
+
+    for path in telnet_files:
+        assert "telnetlib" not in path.read_text(encoding="utf-8")

@@ -1,5 +1,5 @@
 import { aiService } from '@/utils/aiService';
-import type { AIAssistantState } from '@/types/chat';
+import type { AIAssistantState, AIModel } from '@/types/chat';
 import { logger } from '@/utils/logger';
 
 export const createConnectionActions = (state: AIAssistantState) => ({
@@ -43,11 +43,12 @@ export const createConnectionActions = (state: AIAssistantState) => ({
       const response = await aiService.getAvailableModels();
 
       if (response.data && Array.isArray(response.data.models)) {
-        state.availableModels = response.data.models.map((model: any) => ({
+        state.availableModels = response.data.models.map((model) => ({
           label: model.label,
           value: model.value,
           available: model.available !== false,
-          description: model.description
+          // exactOptionalPropertyTypes: 仅当 description 真实存在时才注入键
+          ...(model.description !== undefined && { description: model.description })
         }));
 
         try {
@@ -68,9 +69,10 @@ export const createConnectionActions = (state: AIAssistantState) => ({
       try {
         const cachedModels = localStorage.getItem(MODELS_CACHE_KEY);
         if (cachedModels) {
-          const parsedModels = JSON.parse(cachedModels);
+          const parsedModels: unknown = JSON.parse(cachedModels);
           if (Array.isArray(parsedModels) && parsedModels.length > 0) {
-            state.availableModels = parsedModels;
+            // 缓存格式由本模块自己写入（见上方 setItem），故信任结构，断言为 AIModel[]
+            state.availableModels = parsedModels as AIModel[];
             logger.debug('使用缓存的模型列表:', parsedModels.length, '个模型');
             return;
           }

@@ -1,6 +1,15 @@
 import axios, { AxiosHeaders, AxiosResponse } from 'axios';
 import type { ChatMessage, FormattedMessage, MessageHistoryItem } from '@/types';
 import type { ApiError } from '@/types/chat';
+import type {
+  ChatCompletionResponse,
+  ClaudeStreamChunk,
+  ModelStatusResponse,
+  ModelsListResponse,
+  OpenAIStreamChunk,
+  StreamErrorChunk,
+} from '@/types/api';
+import { isStreamEvent } from '@/types/api';
 import { extractErrorMessage, isApiError } from './helpers';
 import { logger } from './logger';
 
@@ -38,8 +47,9 @@ api.interceptors.response.use(
       // 特别处理422错误
       if (apiError.response && apiError.response.status === 422) {
         logger.error('请求参数验证失败:', apiError.response.data);
-        // 保留原始错误数据以便更详细的处理
-        apiError.validationErrors = (apiError.response.data as any)?.detail || [];
+        // response.data.detail 已由 ApiError schema 描述为 string | Array<{msg,type}>
+        const detail = apiError.response.data?.detail;
+        apiError.validationErrors = Array.isArray(detail) ? detail : [];
       }
     }
     return Promise.reject(error);
@@ -83,11 +93,11 @@ export function formatMessages(messages: ChatMessage[] | MessageHistoryItem[]): 
 
 export const aiService = {
   async checkModelConnection(model: string) {
-    return api.get(`/ai/models/${model}/status`);
+    return api.get<ModelStatusResponse>(`/ai/models/${model}/status`);
   },
 
   async getAvailableModels() {
-    return api.get('/ai/models');
+    return api.get<ModelsListResponse>('/ai/models');
   },
 
   async sendMessageStream(params: SendMessageParams) {
@@ -105,7 +115,7 @@ export const aiService = {
       });
 
       // 使用不同的方式处理流式响应
-      const response = await api.post('/ai/chat/stream', formattedParams, {
+      const response = await api.post<string>('/ai/chat/stream', formattedParams, {
         responseType: 'text', // 使用文本类型接收响应
         timeout: 120000 // 增加超时时间以处理长对话
       });
@@ -136,20 +146,20 @@ export const aiService = {
               try {
                 // 尝试解析为JSON
                 if (contentLine.startsWith('{') || contentLine.startsWith('[')) {
-                  const data = JSON.parse(contentLine);
+                  const parsed: unknown = JSON.parse(contentLine);
 
                   // 优先处理后端返回的 StreamEvent 格式
-                  if (data.type && data.data) {
-                    logger.debug(`[StreamEvent] 接收到事件类型: ${data.type}`, data.data);
+                  if (isStreamEvent(parsed)) {
+                    logger.debug(`[StreamEvent] 接收到事件类型: ${parsed.type}`, parsed.data);
 
-                    if (data.type === 'thinking' && data.data.thinking) {
+                    if (parsed.type === 'thinking' && parsed.data.thinking) {
                       // 处理思考内容
-                      const thinkingChunk = `🤔思考: ${data.data.thinking}`;
+                      const thinkingChunk = `🤔思考: ${parsed.data.thinking}`;
                       controller.enqueue(encoder.encode(thinkingChunk));
                       return;
-                    } else if (data.type === 'content' && data.data.content) {
+                    } else if (parsed.type === 'content' && parsed.data.content) {
                       // 处理正常内容
-                      const content = data.data.content;
+                      const content = parsed.data.content;
                       if (content.length > 20) {
                         const chunkSize = Math.min(20, Math.ceil(content.length / 3));
                         for (let i = 0; i < content.length; i += chunkSize) {
@@ -160,12 +170,12 @@ export const aiService = {
                         controller.enqueue(encoder.encode(content));
                       }
                       return;
-                    } else if (data.type === 'error' && data.data.error) {
+                    } else if (parsed.type === 'error' && parsed.data.error) {
                       // 处理错误
-                      const errorContent = `错误: ${data.data.error}`;
+                      const errorContent = `错误: ${parsed.data.error}`;
                       controller.enqueue(encoder.encode(errorContent));
                       return;
-                    } else if (data.type === 'done' || data.type === 'finish') {
+                    } else if (parsed.type === 'done' || parsed.type === 'finish') {
                       // 处理完成事件
                       logger.debug('流式响应完成');
                       return;
@@ -177,22 +187,33 @@ export const aiService = {
                   let thinking = '';
 
                   // 处理Claude/Anthropic事件格式
-                  if (data.event === 'content_block_delta' && data.data?.delta?.text) {
-                    content = data.data.delta.text;
+                  const claude = parsed as ClaudeStreamChunk;
+                  if (claude.event === 'content_block_delta' && claude.data?.delta?.text) {
+                    content = claude.data.delta.text;
                   }
                   // 处理DeepSeek/OpenAI格式
-                  else if (data.choices && data.choices.length > 0) {
-                    if (data.choices[0].delta?.content) {
-                      content = data.choices[0].delta.content;
+                  else {
+                    const oai = parsed as OpenAIStreamChunk;
+                    if (oai.choices && oai.choices.length > 0) {
+                      const delta = oai.choices[0]?.delta;
+                      if (delta?.content) {
+                        content = delta.content;
+                      }
+                      // 处理DeepSeek思考内容 - 使用正确的字段名
+                      if (delta?.reasoning_content) {
+                        thinking = delta.reasoning_content;
+                      }
                     }
-                    // 处理DeepSeek思考内容 - 使用正确的字段名
-                    if (data.choices[0].delta?.reasoning_content) {
-                      thinking = data.choices[0].delta.reasoning_content;
+                    // 处理错误信息
+                    else {
+                      const err = parsed as StreamErrorChunk;
+                      if (err.error) {
+                        const errText = typeof err.error === 'string'
+                          ? err.error
+                          : JSON.stringify(err.error);
+                        content = `错误: ${errText}`;
+                      }
                     }
-                  }
-                  // 处理错误信息
-                  else if (data.error) {
-                    content = `错误: ${typeof data.error === 'string' ? data.error : JSON.stringify(data.error)}`;
                   }
 
                   // 处理思考内容
@@ -309,7 +330,7 @@ export const aiService = {
     };
 
     try {
-      return api.post('/ai/chat', formattedParams);
+      return api.post<ChatCompletionResponse>('/ai/chat', formattedParams);
     } catch (error: unknown) {
       logger.error('消息发送错误:', error);
       throw error;
@@ -319,7 +340,7 @@ export const aiService = {
   /**
      * 发送消息，带重试机制
      */
-  async sendMessageWithRetry(params: SendMessageParams, maxRetries = 3): Promise<AxiosResponse> {
+  async sendMessageWithRetry(params: SendMessageParams, maxRetries = 3): Promise<AxiosResponse<ChatCompletionResponse>> {
     // 参数验证
     if (!params.model) {
       const error = new Error('未指定模型参数');
@@ -359,7 +380,7 @@ export const aiService = {
           messageCount: formattedParams.messages.length
         });
 
-        const response = await api.post('/ai/chat', formattedParams);
+        const response = await api.post<ChatCompletionResponse>('/ai/chat', formattedParams);
 
         // 验证响应结构
         if (response.data) {
@@ -382,7 +403,7 @@ export const aiService = {
         // 记录详细错误信息
         if (axios.isAxiosError(error) && error.response) {
           const statusCode = error.response.status;
-          const data = error.response.data;
+          const data: unknown = error.response.data;
 
           // 特别处理422错误，详细记录错误信息
           if (statusCode === 422) {

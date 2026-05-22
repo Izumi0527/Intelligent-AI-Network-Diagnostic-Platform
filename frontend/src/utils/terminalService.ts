@@ -1,4 +1,5 @@
 import axios, { AxiosHeaders } from 'axios';
+import type { TerminalConnectResponse, TerminalExecuteResponse } from '@/types/api';
 
 const api = axios.create({
   baseURL: '/api',
@@ -28,10 +29,10 @@ export interface TerminalConnectParams {
 
 export const terminalService = {
   async connect(params: TerminalConnectParams) {
-    return api.post('/terminal/connect', {
+    return api.post<TerminalConnectResponse>('/terminal/connect', {
       connection_type: params.type,
       device_address: params.address,
-      port: parseInt(params.port) || (params.type === 'ssh' ? 22 : 23),
+      port: parseInt(params.port, 10) || (params.type === 'ssh' ? 22 : 23),
       username: params.username,
       password: params.password
     }, {
@@ -40,7 +41,7 @@ export const terminalService = {
   },
 
   async execute(sessionId: string, command: string) {
-    return api.post('/terminal/execute', {
+    return api.post<TerminalExecuteResponse>('/terminal/execute', {
       session_id: sessionId,
       command: command
     });

@@ -89,7 +89,7 @@ export const useTerminalStore = defineStore('terminal', {
 
         const data = response.data;
         if (data.success) {
-          this.sessionId = data.session_id;
+          this.sessionId = data.session_id ?? null;
           this.connectionStatus = 'connected';
           const connTime = Math.floor((Date.now() - this.connectionStartTime) / 1000);
           this.terminalOutput.push(`成功连接到 ${this.deviceAddress}（用时: ${connTime}秒）`);

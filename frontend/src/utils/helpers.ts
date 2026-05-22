@@ -41,14 +41,11 @@ export function extractErrorMessage(error: unknown): string {
  * ChatMessage类型守卫
  */
 export function isChatMessage(obj: unknown): obj is ChatMessage {
+  if (obj === null || typeof obj !== 'object') { return false; }
+  const m = obj as { id?: unknown; role?: unknown; content?: unknown };
   return (
-    obj !== null &&
-    typeof obj === 'object' &&
-    'id' in obj &&
-    'role' in obj &&
-    'content' in obj &&
-    typeof (obj as any).id === 'string' &&
-    ['user', 'assistant', 'system'].includes((obj as any).role) &&
-    typeof (obj as any).content === 'string'
+    typeof m.id === 'string' &&
+    typeof m.content === 'string' &&
+    (m.role === 'user' || m.role === 'assistant' || m.role === 'system')
   );
 }

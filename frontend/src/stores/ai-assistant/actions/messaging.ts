@@ -135,7 +135,7 @@ export const createMessagingActions = (
             await nextTick();
             logger.debug(`[流式状态] nextTick后状态 - isAIResponding: ${state.isAIResponding}, isStreamingContent: ${state.isStreamingContent}`);
 
-            await actions._handleStreamResponse(response.data, assistantMessage, sessionId);
+            await actions._handleStreamResponse(response.data as ReadableStream<Uint8Array>, assistantMessage, sessionId);
           } else {
             logger.error(`[流式错误] 响应不是ReadableStream，会话ID: ${sessionId}`);
             logger.error(`[流式错误] 实际类型: ${typeof response.data}`);
@@ -172,7 +172,7 @@ export const createMessagingActions = (
       }
     },
 
-    async _handleStreamResponse(stream: ReadableStream, assistantMessage: ChatMessage, sessionId: string) {
+    async _handleStreamResponse(stream: ReadableStream<Uint8Array>, assistantMessage: ChatMessage, sessionId: string) {
       const reader = stream.getReader();
       const decoder = new TextDecoder('utf-8');
 

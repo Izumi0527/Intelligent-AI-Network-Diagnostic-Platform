@@ -9,6 +9,8 @@
     stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
+    aria-hidden="true"
+    focusable="false"
   >
     <circle cx="12" cy="12" r="4"></circle>
     <path d="M12 2v2"></path>

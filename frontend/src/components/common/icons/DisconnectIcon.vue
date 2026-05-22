@@ -9,6 +9,8 @@
     stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
+    aria-hidden="true"
+    focusable="false"
   >
     <path d="m18 6-12 12"></path>
     <path d="m6 6 12 12"></path>

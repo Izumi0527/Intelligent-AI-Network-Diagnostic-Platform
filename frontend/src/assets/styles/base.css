@@ -14,10 +14,11 @@
       color var(--dur-slow) var(--ease-out);
   }
 
-  /* 键盘焦点可见环 — WCAG AA */
+  /* 键盘焦点可见环 — WCAG AA（用 primary 取色保证 light/dark 双模对比） */
   :focus-visible {
-    outline: 2px solid oklch(var(--ring));
+    outline: 2px solid oklch(var(--primary));
     outline-offset: 2px;
+    border-radius: 2px;
   }
 
   /* 用户偏好减少动效时禁用过渡 */

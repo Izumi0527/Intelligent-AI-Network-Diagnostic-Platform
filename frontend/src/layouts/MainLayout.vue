@@ -12,7 +12,7 @@
 
         <!-- 主题切换开关 -->
         <button
-          class="p-2 rounded-xl glass-effect text-foreground hover:text-primary transition-all duration-300 hover:scale-105 hover:shadow-glow-sm"
+          class="p-2 rounded-xl glass-effect text-foreground hover:text-primary transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-slow)] ease-[var(--ease-out)] hover:scale-105 hover:shadow-glow-sm"
           @click="toggleTheme"
           :title="isDarkMode ? '切换到浅色模式' : '切换到深色模式'"
         >
@@ -23,7 +23,7 @@
 
     <!-- 主内容区域：左侧终端(2/3) + 右侧AI助手(1/3) -->
     <main class="flex flex-1 overflow-hidden min-h-0 responsive-layout">
-      <section class="w-2/3 h-full overflow-hidden transition-all duration-300 p-3 terminal-section">
+      <section class="w-2/3 h-full overflow-hidden transition-[width,opacity] duration-[var(--dur-slow)] ease-[var(--ease-out)] p-3 terminal-section">
         <CardSpotlight
           :gradient-size="400"
           gradient-color="oklch(var(--primary) / 0.3)"

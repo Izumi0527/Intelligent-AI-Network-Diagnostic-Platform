@@ -20,7 +20,7 @@
         :key="message.id ?? index"
         :class="[
           message.role === 'user' ? 'message-user flex flex-col items-end' : 'message-assistant',
-          'group transition-all'
+          'group transition-[transform,opacity,background-color] duration-[var(--dur-base)] ease-[var(--ease-out)]'
         ]"
       >
         <div
@@ -85,7 +85,7 @@
       role="log"
       aria-live="polite"
       aria-busy="true"
-      class="message-assistant group transition-all fade-in"
+      class="message-assistant group transition-[transform,opacity,background-color] duration-[var(--dur-base)] ease-[var(--ease-out)] fade-in"
     >
       <div class="font-medium text-xs mb-1.5 opacity-70 flex items-center gap-2 text-muted-foreground">
         <span class="inline-block w-5 h-5 rounded-full overflow-hidden flex items-center justify-center" aria-hidden="true">
@@ -111,7 +111,7 @@
       role="status"
       aria-live="polite"
       aria-busy="true"
-      class="message-assistant group transition-all fade-in"
+      class="message-assistant group transition-[transform,opacity,background-color] duration-[var(--dur-base)] ease-[var(--ease-out)] fade-in"
     >
       <div class="font-medium text-xs mb-1.5 opacity-70 flex items-center gap-2 text-muted-foreground">
         <span class="inline-block w-5 h-5 rounded-full overflow-hidden flex items-center justify-center" aria-hidden="true">
@@ -134,7 +134,7 @@
       role="status"
       aria-live="polite"
       aria-busy="true"
-      class="message-assistant group transition-all fade-in"
+      class="message-assistant group transition-[transform,opacity,background-color] duration-[var(--dur-base)] ease-[var(--ease-out)] fade-in"
     >
       <div class="font-medium text-xs mb-1.5 opacity-70 flex items-center gap-2 text-muted-foreground">
         <span class="inline-block w-5 h-5 rounded-full overflow-hidden flex items-center justify-center" aria-hidden="true">

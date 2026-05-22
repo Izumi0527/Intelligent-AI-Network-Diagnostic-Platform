@@ -7,7 +7,7 @@
         id="terminal-command"
         name="command"
         v-model="command"
-        class="flex-1 rounded-lg border border-border bg-terminal/70 terminal-text px-3 py-2 text-sm font-mono input-glow focus:border-primary backdrop-blur-sm transition-all duration-200"
+        class="flex-1 rounded-lg border border-border bg-terminal/70 terminal-text px-3 py-2 text-sm font-mono input-glow focus:border-primary backdrop-blur-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)]"
         placeholder="输入命令..."
         type="text"
         autocomplete="off"
@@ -18,7 +18,7 @@
       />
       <button
         :disabled="store.connectionStatus !== 'connected'"
-        class="terminal-send-button px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="terminal-send-button px-4 py-2 rounded-lg font-medium text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed"
         @click="handleExecute"
       >
         发送

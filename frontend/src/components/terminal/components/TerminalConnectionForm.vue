@@ -7,7 +7,7 @@
         id="terminal-connection-type"
         name="connectionType"
         v-model="store.connectionType"
-        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50"
+        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50"
       >
         <option value="telnet">Telnet</option>
         <option value="ssh">SSH</option>
@@ -21,7 +21,7 @@
         id="terminal-device-address"
         name="deviceAddress"
         v-model="store.deviceAddress"
-        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50 focus:border-primary"
+        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
         placeholder="192.168.20.1"
         type="text"
         autocomplete="off"
@@ -35,7 +35,7 @@
         id="terminal-port"
         name="port"
         v-model="store.port"
-        class="w-20 rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50 focus:border-primary"
+        class="w-20 rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
         :placeholder="store.connectionType === 'ssh' ? '22' : '23'"
         type="number"
         inputmode="numeric"
@@ -50,7 +50,7 @@
         id="terminal-username"
         name="username"
         v-model="store.username"
-        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50 focus:border-primary"
+        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
         placeholder="admin"
         type="text"
         autocomplete="username"
@@ -64,7 +64,7 @@
         id="terminal-password"
         name="password"
         v-model="store.password"
-        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-all duration-200 hover:border-primary/50 focus:border-primary"
+        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
         type="password"
         placeholder="••••••••"
         autocomplete="current-password"
@@ -96,7 +96,7 @@
         <button
           v-if="store.canCancelConnection && store.connectionStatus === 'connecting'"
           type="button"
-          class="h-10 px-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm transition-all duration-200"
+          class="h-10 px-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)]"
           @click="handleCancelConnect"
         >
           取消连接

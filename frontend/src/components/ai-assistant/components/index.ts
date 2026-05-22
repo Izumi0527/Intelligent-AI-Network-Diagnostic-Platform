@@ -11,11 +11,17 @@ import ModelSelector from './ModelSelector.vue';
 import StreamToggle from './StreamToggle.vue';
 import ChatMessages from './ChatMessages.vue';
 import ChatInput from './ChatInput.vue';
+import MessageActions from './MessageActions.vue';
+import StopGenerationButton from './StopGenerationButton.vue';
+import ConfirmDialog from './ConfirmDialog.vue';
 
 export {
   ChatHeader,
   ModelSelector,
   StreamToggle,
   ChatMessages,
-  ChatInput
+  ChatInput,
+  MessageActions,
+  StopGenerationButton,
+  ConfirmDialog
 };

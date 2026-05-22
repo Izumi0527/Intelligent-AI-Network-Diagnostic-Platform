@@ -58,7 +58,7 @@ export const createStorageActions = (state: AIAssistantState): StorageActions =>
             model: state.selectedModel
           }
         };
-      } else if (savedData.messages && Array.isArray(savedData.messages)) {
+      } else if (Array.isArray(savedData.messages)) {
         // 如果是 ChatData 格式
         return savedData;
       }
@@ -73,7 +73,7 @@ export const createStorageActions = (state: AIAssistantState): StorageActions =>
     if (savedData) {
       if (Array.isArray(savedData)) {
         state.chatMessages = savedData;
-      } else if (savedData.messages && Array.isArray(savedData.messages)) {
+      } else if (Array.isArray(savedData.messages)) {
         state.chatMessages = savedData.messages;
       } else {
         state.chatMessages = [];

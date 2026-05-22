@@ -15,7 +15,7 @@ export const createConnectionActions = (state: AIAssistantState): ConnectionActi
 
       logger.debug('模型连接检查响应:', response.data);
 
-      if (response.data && typeof response.data === 'object') {
+      if (typeof response.data === 'object' && response.data !== null) {
         if ('connected' in response.data) {
           state.isModelConnected = Boolean(response.data.connected);
           logger.debug('设置连接状态:', state.isModelConnected);
@@ -47,7 +47,7 @@ export const createConnectionActions = (state: AIAssistantState): ConnectionActi
       logger.debug('开始从后端加载模型列表...');
       const response = await aiService.getAvailableModels();
 
-      if (response.data && Array.isArray(response.data.models)) {
+      if (Array.isArray(response.data.models)) {
         state.availableModels = response.data.models.map((model) => ({
           label: model.label,
           value: model.value,
@@ -73,7 +73,7 @@ export const createConnectionActions = (state: AIAssistantState): ConnectionActi
 
       try {
         const cachedModels = localStorage.getItem(MODELS_CACHE_KEY);
-        if (cachedModels) {
+        if (cachedModels !== null && cachedModels !== '') {
           const parsedModels: unknown = JSON.parse(cachedModels);
           if (Array.isArray(parsedModels) && parsedModels.length > 0) {
             // 缓存格式由本模块自己写入（见上方 setItem），故信任结构，断言为 AIModel[]

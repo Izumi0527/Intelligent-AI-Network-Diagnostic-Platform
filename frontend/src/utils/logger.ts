@@ -22,7 +22,7 @@ const PROD_TRUNCATE_LIMIT = 1000;
 
 function resolveLevel(): LogLevel {
   const raw = (import.meta.env.VITE_LOG_LEVEL as string | undefined)?.toLowerCase();
-  if (raw && raw in LEVEL_RANK) {
+  if (raw !== undefined && raw in LEVEL_RANK) {
     return raw as LogLevel;
   }
   return DEFAULT_LEVEL;

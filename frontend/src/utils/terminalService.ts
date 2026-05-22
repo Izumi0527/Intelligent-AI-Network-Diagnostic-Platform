@@ -9,7 +9,7 @@ const api = axios.create({
 const internalApiToken = import.meta.env.VITE_INTERNAL_API_TOKEN as string | undefined;
 
 api.interceptors.request.use((config) => {
-  if (!internalApiToken) {
+  if (internalApiToken === undefined || internalApiToken === '') {
     return config;
   }
 

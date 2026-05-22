@@ -93,12 +93,12 @@ export const useTerminalStore = defineStore('terminal', {
           this.connectionStatus = 'connected';
           const connTime = Math.floor((Date.now() - this.connectionStartTime) / 1000);
           this.terminalOutput.push(`成功连接到 ${this.deviceAddress}（用时: ${connTime}秒）`);
-          if (data.device_info) {
+          if (data.device_info !== undefined && data.device_info !== '') {
             this.terminalOutput.push(data.device_info);
           }
         } else {
           this.connectionStatus = 'error';
-          this.terminalOutput.push(`连接失败: ${data.message || '未知错误'}`);
+          this.terminalOutput.push(`连接失败: ${data.message ?? '未知错误'}`);
         }
       } catch (error: unknown) {
         clearInterval(connectionTimer);
@@ -137,7 +137,7 @@ export const useTerminalStore = defineStore('terminal', {
     },
 
     async disconnect() {
-      if (this.connectionStatus !== 'connected' || !this.sessionId) {
+      if (this.connectionStatus !== 'connected' || this.sessionId === null) {
         return;
       }
 
@@ -154,7 +154,7 @@ export const useTerminalStore = defineStore('terminal', {
     },
 
     async executeCommand(cmd: string) {
-      if (!this.sessionId || this.connectionStatus !== 'connected') {
+      if (this.sessionId === null || this.connectionStatus !== 'connected') {
         return;
       }
 

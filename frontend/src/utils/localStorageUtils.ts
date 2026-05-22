@@ -15,7 +15,7 @@ export const localStorageUtils = {
   loadChat(key: string): ChatData | ChatMessage[] | null {
     try {
       const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) as (ChatData | ChatMessage[]) : null;
+      return data !== null && data !== '' ? JSON.parse(data) as (ChatData | ChatMessage[]) : null;
     } catch (error) {
       logger.error('加载聊天记录失败:', error);
       return null;
@@ -48,7 +48,7 @@ export const localStorageUtils = {
       const keys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('chat_history_')) {
+        if (key !== null && key.startsWith('chat_history_')) {
           keys.push(key);
         }
       }
@@ -67,7 +67,7 @@ export const localStorageUtils = {
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('chat_history_')) {
+        if (key !== null && key.startsWith('chat_history_')) {
           const chatData = this.loadChat(key);
           if (chatData) {
             chats[key] = chatData;

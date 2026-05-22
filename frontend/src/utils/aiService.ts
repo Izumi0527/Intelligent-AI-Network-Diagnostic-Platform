@@ -28,7 +28,7 @@ const api = axios.create({
 const internalApiToken = import.meta.env.VITE_INTERNAL_API_TOKEN as string | undefined;
 
 api.interceptors.request.use((config) => {
-  if (!internalApiToken) {
+  if (internalApiToken === undefined || internalApiToken === '') {
     return config;
   }
 
@@ -49,7 +49,7 @@ api.interceptors.response.use(
   response => response,
   (error: unknown) => {
     // 使用类型守卫检查ApiError
-    if (error && typeof error === 'object' && 'response' in error) {
+    if (error !== null && typeof error === 'object' && 'response' in error) {
       const apiError = error as ApiError;
       // 特别处理422错误
       if (apiError.response && apiError.response.status === 422) {
@@ -68,14 +68,14 @@ api.interceptors.response.use(
  */
 export function formatMessages(messages: ChatMessage[] | MessageHistoryItem[]): FormattedMessage[] {
   // 安全检查：确保messages是非空数组
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+  if (!Array.isArray(messages) || messages.length === 0) {
     logger.warn('formatMessages接收到空消息列表，这可能导致请求失败');
     return [];
   }
 
   return messages.map(msg => {
     // 确保每条消息都有role和content字段
-    if (!msg || typeof msg !== 'object') {
+    if (msg === null || typeof msg !== 'object') {
       logger.warn('消息格式无效，跳过:', msg);
       return { role: 'user' as const, content: '无效消息' };
     }
@@ -95,7 +95,7 @@ export function formatMessages(messages: ChatMessage[] | MessageHistoryItem[]): 
       role,
       content
     };
-  }).filter(msg => msg && msg.content); // 过滤掉无效消息
+  }).filter(msg => msg.content !== ''); // 过滤掉无效消息
 }
 
 export const aiService = {
@@ -159,12 +159,12 @@ export const aiService = {
                   if (isStreamEvent(parsed)) {
                     logger.debug(`[StreamEvent] 接收到事件类型: ${parsed.type}`, parsed.data);
 
-                    if (parsed.type === 'thinking' && parsed.data.thinking) {
+                    if (parsed.type === 'thinking' && parsed.data.thinking !== undefined && parsed.data.thinking !== '') {
                       // 处理思考内容
                       const thinkingChunk = `🤔思考: ${parsed.data.thinking}`;
                       controller.enqueue(encoder.encode(thinkingChunk));
                       return;
-                    } else if (parsed.type === 'content' && parsed.data.content) {
+                    } else if (parsed.type === 'content' && parsed.data.content !== undefined && parsed.data.content !== '') {
                       // 处理正常内容
                       const content = parsed.data.content;
                       if (content.length > 20) {
@@ -177,7 +177,7 @@ export const aiService = {
                         controller.enqueue(encoder.encode(content));
                       }
                       return;
-                    } else if (parsed.type === 'error' && parsed.data.error) {
+                    } else if (parsed.type === 'error' && parsed.data.error !== undefined && parsed.data.error !== '') {
                       // 处理错误
                       const errorContent = `错误: ${parsed.data.error}`;
                       controller.enqueue(encoder.encode(errorContent));
@@ -195,7 +195,7 @@ export const aiService = {
 
                   // 处理Claude/Anthropic事件格式
                   const claude = parsed as ClaudeStreamChunk;
-                  if (claude.event === 'content_block_delta' && claude.data?.delta?.text) {
+                  if (claude.event === 'content_block_delta' && claude.data?.delta?.text !== undefined && claude.data.delta.text !== '') {
                     content = claude.data.delta.text;
                   }
                   // 处理DeepSeek/OpenAI格式
@@ -203,18 +203,18 @@ export const aiService = {
                     const oai = parsed as OpenAIStreamChunk;
                     if (oai.choices && oai.choices.length > 0) {
                       const delta = oai.choices[0]?.delta;
-                      if (delta?.content) {
+                      if (delta?.content !== undefined && delta.content !== '') {
                         content = delta.content;
                       }
                       // 处理DeepSeek思考内容 - 使用正确的字段名
-                      if (delta?.reasoning_content) {
+                      if (delta?.reasoning_content !== undefined && delta.reasoning_content !== '') {
                         thinking = delta.reasoning_content;
                       }
                     }
                     // 处理错误信息
                     else {
                       const err = parsed as StreamErrorChunk;
-                      if (err.error) {
+                      if (err.error !== undefined) {
                         const errText = typeof err.error === 'string'
                           ? err.error
                           : JSON.stringify(err.error);
@@ -323,7 +323,7 @@ export const aiService = {
 
       return {
         data: errorStream,
-        status: (isApiError(error) && error.response?.status) || 500,
+        status: isApiError(error) && error.response?.status !== undefined ? error.response.status : 500,
         headers: {}
       };
     }
@@ -356,7 +356,7 @@ export const aiService = {
     }
 
     // 确保消息列表不为空
-    if (!params.messages || !Array.isArray(params.messages) || params.messages.length === 0) {
+    if (!Array.isArray(params.messages) || params.messages.length === 0) {
       const error = new Error('消息列表不能为空');
       logger.error('发送消息失败:', error);
       throw error;
@@ -389,18 +389,18 @@ export const aiService = {
 
         const response = await api.post<ChatCompletionResponse>('/ai/chat', formattedParams);
 
-        // 验证响应结构
-        if (response.data) {
-          // 优先使用content字段，其次使用message.content结构
-          if (!response.data.content && response.data.message?.content) {
-            response.data.content = response.data.message.content;
-          }
+        // 验证响应结构：ChatCompletionResponse schema 已保证 response.data 是对象
+        // 优先使用content字段，其次使用message.content结构
+        if ((response.data.content === undefined || response.data.content === '')
+            && response.data.message?.content !== undefined
+            && response.data.message.content !== '') {
+          response.data.content = response.data.message.content;
+        }
 
-          // 如果仍然没有content，记录响应并标记为错误
-          if (!response.data.content) {
-            logger.error('响应中缺少content字段', response.data);
-            throw new Error('响应格式异常：缺少内容');
-          }
+        // 如果仍然没有content，记录响应并标记为错误
+        if (response.data.content === undefined || response.data.content === '') {
+          logger.error('响应中缺少content字段', response.data);
+          throw new Error('响应格式异常：缺少内容');
         }
 
         return response;

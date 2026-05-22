@@ -129,10 +129,8 @@ export const createMessagingActions = (
           logger.debug('[流式诊断] 是否为 ReadableStream:', response.data instanceof ReadableStream);
           logger.debug('[流式诊断] 构造函数名称:', response.data?.constructor?.name);
 
-          if (!response?.data) {
-            throw new Error('流式响应无效');
-          }
-
+          // StreamSendResult 类型已保证 response.data 是 ReadableStream<Uint8Array>，
+          // 兜底防线只需保留 instanceof 检查（处理上游契约破坏的极端情况）。
           if (response.data instanceof ReadableStream) {
             // 立即切换到流式接收状态 - 添加详细日志
             logger.debug(`[流式状态] 开始接收流式内容，会话ID: ${sessionId}`);
@@ -204,70 +202,69 @@ export const createMessagingActions = (
             break;
           }
 
-          if (value) {
-            const chunk = decoder.decode(value, { stream: true });
+          // ReadableStream<Uint8Array> 的契约：done=false 时 value 一定是 Uint8Array
+          const chunk = decoder.decode(value, { stream: true });
 
-            if (chunk) {
-              if (isFirstChunk) {
-                logger.debug(`[流式处理] 接收到首个数据块 (${chunk.length}字符)，会话ID: ${sessionId}`);
-                isFirstChunk = false;
-              }
+          if (chunk) {
+            if (isFirstChunk) {
+              logger.debug(`[流式处理] 接收到首个数据块 (${chunk.length}字符)，会话ID: ${sessionId}`);
+              isFirstChunk = false;
+            }
 
-              if (chunk.includes('[DONE]')) {
-                logger.debug('[流式处理] 收到流结束标记');
-                continue;
-              }
+            if (chunk.includes('[DONE]')) {
+              logger.debug('[流式处理] 收到流结束标记');
+              continue;
+            }
 
-              if (chunk.startsWith('错误:')) {
-                logger.error(`[流式处理] 收到错误消息: ${chunk}`);
-                assistantMessage.content += `\n${chunk}`;
-                contentReceived = true;
-
-                // 强制触发响应式更新
-                const messageIndex = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
-                if (messageIndex !== -1) {
-                  state.chatMessages[messageIndex] = { ...assistantMessage };
-                  state.chatMessages = [...state.chatMessages];
-                }
-                continue;
-              }
-
-              // 处理思考内容
-              if (chunk.startsWith('🤔思考: ')) {
-                const thinkingText = chunk.substring(6); // 去掉 "🤔思考: " 前缀
-                thinkingContent += thinkingText;
-
-                // 更新当前思考内容状态
-                state.isThinking = true;
-                state.currentThinkingContent = thinkingContent;
-
-                // 更新消息中的思考内容
-                if (!assistantMessage.thinking) {
-                  assistantMessage.thinking = {
-                    content: thinkingContent,
-                    isComplete: false,
-                    timestamp: Date.now()
-                  };
-                } else {
-                  assistantMessage.thinking.content = thinkingContent;
-                }
-
-                // 强制触发响应式更新
-                const messageIndex = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
-                if (messageIndex !== -1) {
-                  state.chatMessages[messageIndex] = { ...assistantMessage };
-                  state.chatMessages = [...state.chatMessages];
-                }
-                continue;
-              }
-
-              // 逐字符添加内容来实现打字机效果
-              await actions._addContentCharByChar(assistantMessage, chunk);
+            if (chunk.startsWith('错误:')) {
+              logger.error(`[流式处理] 收到错误消息: ${chunk}`);
+              assistantMessage.content += `\n${chunk}`;
               contentReceived = true;
 
-              if (chunk.length > 50) {
-                logger.debug(`[流式处理] 接收到较大数据块: ${chunk.length}字符`);
+              // 强制触发响应式更新
+              const messageIndex = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
+              if (messageIndex !== -1) {
+                state.chatMessages[messageIndex] = { ...assistantMessage };
+                state.chatMessages = [...state.chatMessages];
               }
+              continue;
+            }
+
+            // 处理思考内容
+            if (chunk.startsWith('🤔思考: ')) {
+              const thinkingText = chunk.substring(6); // 去掉 "🤔思考: " 前缀
+              thinkingContent += thinkingText;
+
+              // 更新当前思考内容状态
+              state.isThinking = true;
+              state.currentThinkingContent = thinkingContent;
+
+              // 更新消息中的思考内容
+              if (!assistantMessage.thinking) {
+                assistantMessage.thinking = {
+                  content: thinkingContent,
+                  isComplete: false,
+                  timestamp: Date.now()
+                };
+              } else {
+                assistantMessage.thinking.content = thinkingContent;
+              }
+
+              // 强制触发响应式更新
+              const messageIndex = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
+              if (messageIndex !== -1) {
+                state.chatMessages[messageIndex] = { ...assistantMessage };
+                state.chatMessages = [...state.chatMessages];
+              }
+              continue;
+            }
+
+            // 逐字符添加内容来实现打字机效果
+            await actions._addContentCharByChar(assistantMessage, chunk);
+            contentReceived = true;
+
+            if (chunk.length > 50) {
+              logger.debug(`[流式处理] 接收到较大数据块: ${chunk.length}字符`);
             }
           }
         }
@@ -378,8 +375,8 @@ export const createMessagingActions = (
           messages: messagesToSend
         }, 3);
 
-        const assistantContent = response.data?.content || response.data?.message?.content;
-        if (assistantContent) {
+        const assistantContent = response.data?.content ?? response.data?.message?.content;
+        if (assistantContent !== undefined && assistantContent !== '') {
           state.chatMessages.push({
             id: generateId(),
             role: 'assistant',

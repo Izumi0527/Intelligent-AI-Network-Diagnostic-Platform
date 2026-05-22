@@ -21,12 +21,12 @@ export function useCommandHistory(): UseCommandHistoryReturn {
 
   const showPrevious = (): void => {
     const prev = store.getPreviousCommand();
-    if (prev) { command.value = prev; }
+    if (prev !== undefined && prev !== '') { command.value = prev; }
   };
 
   const showNext = (): void => {
     const next = store.getNextCommand();
-    command.value = next || '';
+    command.value = next ?? '';
   };
 
   const reset = (): void => {

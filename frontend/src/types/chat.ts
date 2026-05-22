@@ -9,6 +9,29 @@ export interface ThinkingContent {
   timestamp: number
 }
 
+// 错误分类：messaging.ts 与 utils.ts 共用
+export type ErrorType =
+  | 'network'
+  | 'timeout'
+  | 'rate-limit'
+  | 'validation'
+  | 'server'
+  | 'aborted'
+  | 'unknown'
+
+export interface MessageError {
+  type: ErrorType
+  message: string
+  retryable: boolean
+}
+
+export type MessageStatus =
+  | 'sending'
+  | 'streaming'
+  | 'done'
+  | 'error'
+  | 'aborted'
+
 // 标准聊天消息接口 - 用于 stores 和主要逻辑
 export interface ChatMessage {
   id: string
@@ -16,6 +39,9 @@ export interface ChatMessage {
   content: string
   timestamp?: number
   thinking?: ThinkingContent // 思考内容（仅限 assistant 角色）
+  error?: MessageError // 错误分类（用于 UI 决定是否显示 retry 按钮）
+  aborted?: boolean // 用户主动中断
+  status?: MessageStatus // 消息生命周期状态
 }
 
 // 组件兼容的消息接口 - 用于 ChatMessages 组件
@@ -101,6 +127,10 @@ export interface AIAssistantState {
   conversationId: string
   modelConnections: Record<string, boolean>
   connectionStatus: string
+  // AbortController 用于中断进行中的流式请求；null 时表示无在途请求
+  abortController: AbortController | null
+  // 用户视口是否处于消息列表底部（< 80px 距底视为 true）
+  isAtBottom: boolean
 }
 
 // ───────────────────────────────── 持久化与 Store ─────────────────────────────────

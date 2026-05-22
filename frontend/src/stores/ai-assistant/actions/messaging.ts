@@ -7,6 +7,8 @@ import { nextTick } from 'vue';
 interface MessagingActions {
   sendMessage(content: string): Promise<void>;
   sendMessageStream(content: string): Promise<void>;
+  stopGeneration(): void;
+  retryLastMessage(): Promise<void>;
   _handleStreamResponse(
     stream: ReadableStream<Uint8Array>,
     assistantMessage: ChatMessage,
@@ -39,7 +41,8 @@ export const createMessagingActions = (
         id: generateId(),
         role: 'user',
         content,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        status: 'done'
       });
 
       storageActions.saveToStorage({
@@ -57,6 +60,11 @@ export const createMessagingActions = (
         }
       });
 
+      // 为本次会话创建 AbortController；同时保留本地引用，避免 ESLint 路径分析
+      // 与 await 期间 state.abortController 被异步置空时的类型推断冲突。
+      const abortController = new AbortController();
+      state.abortController = abortController;
+
       // 设置为思考状态
       state.isAIResponding = true;
       state.isStreamingContent = false;
@@ -71,11 +79,17 @@ export const createMessagingActions = (
           await actions.sendMessageRegular(content);
         }
       } catch (error: unknown) {
-        logger.error('消息发送错误:', error);
-        utilActions.handleMessageError(error as ApiError | Error, content);
+        // 用户主动中断不视为错误：用本地 abortController 引用，避开异步置空的歧义
+        if (abortController.signal.aborted) {
+          logger.debug('[消息发送] 用户已主动停止生成');
+        } else {
+          logger.error('消息发送错误:', error);
+          utilActions.handleMessageError(error as ApiError | Error, content);
+        }
       } finally {
         state.isAIResponding = false;
-        state.isStreamingContent = false;  // 确保流式状态也被重置
+        state.isStreamingContent = false;
+        state.abortController = null;
         logger.debug('[消息发送] 重置所有状态 - isAIResponding: false, isStreamingContent: false');
         storageActions.saveToStorage({
           id: state.conversationId,
@@ -103,7 +117,8 @@ export const createMessagingActions = (
           id: generateId(),
           role: 'assistant',
           content: '',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          status: 'streaming'
         };
 
         state.chatMessages.push(assistantMessage);
@@ -118,11 +133,17 @@ export const createMessagingActions = (
         logger.debug(`发送流式请求，消息数: ${messageHistory.length}，会话ID: ${sessionId}`);
 
         try {
-          const response = await aiService.sendMessageStream({
-            model: state.selectedModel,
-            messages: messageHistory,
-            stream: true
-          });
+          // 把 AbortController 的 signal 传给 aiService，使 axios 请求阶段可中断。
+          // 仅在 signal 存在时构造 options，避免 exactOptionalPropertyTypes 报错。
+          const signal = state.abortController?.signal;
+          const response = await aiService.sendMessageStream(
+            {
+              model: state.selectedModel,
+              messages: messageHistory,
+              stream: true
+            },
+            signal !== undefined ? { signal } : {}
+          );
 
           logger.debug('[流式诊断] 响应对象:', response);
           logger.debug('[流式诊断] response.data 类型:', typeof response.data);
@@ -185,6 +206,7 @@ export const createMessagingActions = (
     async _handleStreamResponse(stream: ReadableStream<Uint8Array>, assistantMessage: ChatMessage, sessionId: string): Promise<void> {
       const reader = stream.getReader();
       const decoder = new TextDecoder('utf-8');
+      const signal = state.abortController?.signal;
 
       logger.debug(`[流式处理] 开始读取流，会话ID: ${sessionId}`);
 
@@ -194,6 +216,25 @@ export const createMessagingActions = (
 
       try {
         for (;;) {
+          // 用户主动中断：立即取消 reader 并退出循环
+          if (signal?.aborted === true) {
+            logger.debug(`[流式处理] 检测到 abort，停止读取，会话ID: ${sessionId}`);
+            await reader.cancel();
+            assistantMessage.aborted = true;
+            assistantMessage.status = 'aborted';
+            if (assistantMessage.content.trim() === '') {
+              assistantMessage.content = '（已停止生成）';
+            } else {
+              assistantMessage.content += '\n\n（已停止生成）';
+            }
+            const idx = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
+            if (idx !== -1) {
+              state.chatMessages[idx] = { ...assistantMessage };
+              state.chatMessages = [...state.chatMessages];
+            }
+            break;
+          }
+
           const { value, done } = await reader.read();
 
           if (done) {
@@ -290,6 +331,13 @@ export const createMessagingActions = (
           actions._handleStreamError(assistantMessage, '未接收到有效内容');
         } else {
           logger.debug(`[流式处理] 成功接收内容，总长度: ${assistantMessage.content.length}字符，会话ID: ${sessionId}`);
+          // 成功完成：标记 status = 'done' 让 UI 据此停止流式态显示
+          assistantMessage.status = 'done';
+          const idx = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
+          if (idx !== -1) {
+            state.chatMessages[idx] = { ...assistantMessage };
+            state.chatMessages = [...state.chatMessages];
+          }
         }
 
         // 流式内容接收完成，重置状态
@@ -313,8 +361,14 @@ export const createMessagingActions = (
     // 逐字符添加内容的方法
     async _addContentCharByChar(assistantMessage: ChatMessage, chunk: string): Promise<void> {
       const chars = chunk.split('');
+      const signal = state.abortController?.signal;
 
       for (let i = 0; i < chars.length; i++) {
+        // 用户中断时立即停止打字机循环，避免继续填充已废弃的消息
+        if (signal?.aborted === true) {
+          logger.debug('[打字机] 检测到 abort，停止逐字添加');
+          return;
+        }
         assistantMessage.content += chars[i];
 
         // 每添加一个字符，更新一次UI
@@ -330,23 +384,29 @@ export const createMessagingActions = (
     },
 
     _handleStreamError(assistantMessage: ChatMessage, errorMsg: string): void {
-      const index = state.chatMessages.indexOf(assistantMessage);
-      if (index !== -1) {
-        state.chatMessages.splice(index, 1);
+      // 不再 splice + push 新错误消息；直接给原 assistant 消息打 error 标记
+      // 以便 UI 在该消息位置渲染 MessageActions 的 retry 按钮（P2 接入）
+      const idx = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
+      if (idx !== -1) {
+        const original = state.chatMessages[idx];
+        if (original !== undefined) {
+          const prefix = original.content.trim() !== '' ? `${original.content}\n\n` : '';
+          state.chatMessages[idx] = {
+            ...original,
+            content: `${prefix}⚠️ ${errorMsg}`,
+            error: { type: 'server', message: errorMsg, retryable: true },
+            status: 'error'
+          };
+          state.chatMessages = [...state.chatMessages];
+        }
       }
-
-      state.chatMessages.push({
-        id: generateId(),
-        role: 'assistant',
-        content: `发生错误: ${errorMsg}`,
-        timestamp: Date.now()
-      });
 
       // 重置所有状态
       state.isAIResponding = false;
       state.isStreamingContent = false;
       state.isThinking = false;
       state.currentThinkingContent = '';
+      state.abortController = null;
     },
 
     async sendMessageRegular(content: string): Promise<void> {
@@ -381,7 +441,8 @@ export const createMessagingActions = (
             id: generateId(),
             role: 'assistant',
             content: assistantContent,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            status: 'done'
           });
         } else {
           logger.error('响应格式异常，无法获取内容:', response.data);
@@ -392,6 +453,68 @@ export const createMessagingActions = (
       } catch (error) {
         utilActions.handleMessageError(error as ApiError | Error, content);
       }
+    },
+
+    // 用户主动停止生成：abort 进行中的 axios 请求，标记最后一条助手消息为 aborted。
+    // 流式 reader 与打字机循环会在下一次 check 时看到 signal.aborted 并跳出。
+    stopGeneration(): void {
+      const controller = state.abortController;
+      if (controller !== null && !controller.signal.aborted) {
+        logger.debug('[停止生成] 触发 AbortController.abort()');
+        controller.abort();
+      }
+
+      // 立即给最后一条 assistant 消息打 aborted 标记（在 _handleStreamResponse 的 abort 分支里
+      // 也会做相同处理，但若 axios 还未返回时 abort，那里不会执行，所以此处兜底）
+      const lastIdx = state.chatMessages.length - 1;
+      const lastMsg = lastIdx >= 0 ? state.chatMessages[lastIdx] : undefined;
+      if (lastMsg !== undefined && lastMsg.role === 'assistant' && lastMsg.status !== 'aborted') {
+        const prefix = lastMsg.content.trim() !== '' ? `${lastMsg.content}\n\n` : '';
+        state.chatMessages[lastIdx] = {
+          ...lastMsg,
+          content: `${prefix}（已停止生成）`,
+          aborted: true,
+          status: 'aborted'
+        };
+        state.chatMessages = [...state.chatMessages];
+      }
+
+      state.isAIResponding = false;
+      state.isStreamingContent = false;
+      state.isThinking = false;
+      state.currentThinkingContent = '';
+      // abortController 在 sendMessage 的 finally 中清理；此处不立即置 null 避免竞态
+    },
+
+    // 重试最后一次失败/中断的发送：定位末尾最近的 user 消息内容，删除该 user 及其后所有消息，
+    // 然后重新走 sendMessage 流程（自动重新 push user + 发起请求）。
+    async retryLastMessage(): Promise<void> {
+      if (state.isAIResponding || state.isStreamingContent) {
+        logger.debug('[重试] AI 正在响应中，跳过重试');
+        return;
+      }
+
+      let userIdx = -1;
+      for (let i = state.chatMessages.length - 1; i >= 0; i--) {
+        if (state.chatMessages[i]?.role === 'user') {
+          userIdx = i;
+          break;
+        }
+      }
+      if (userIdx < 0) {
+        logger.debug('[重试] 没有可重试的 user 消息');
+        return;
+      }
+      const userContent = state.chatMessages[userIdx]?.content ?? '';
+      if (userContent.trim() === '') {
+        logger.warn('[重试] user 消息内容为空，跳过重试');
+        return;
+      }
+      // 删除该 user 及其后所有消息（含失败/中断的 assistant）
+      state.chatMessages.splice(userIdx);
+      state.chatMessages = [...state.chatMessages];
+      logger.debug(`[重试] 重新发送 user 消息: "${userContent.substring(0, 30)}..."`);
+      await actions.sendMessage(userContent);
     }
   };
 

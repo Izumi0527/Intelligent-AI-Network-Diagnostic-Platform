@@ -44,6 +44,11 @@ interface SendMessageParams {
     stream?: boolean;
 }
 
+// 控制选项，与业务参数分离
+interface SendMessageOptions {
+    signal?: AbortSignal;
+}
+
 // 添加新的错误处理拦截器
 api.interceptors.response.use(
   response => response,
@@ -103,7 +108,7 @@ export const aiService = {
     return api.get<ModelsListResponse>('/ai/models');
   },
 
-  async sendMessageStream(params: SendMessageParams): Promise<StreamSendResult> {
+  async sendMessageStream(params: SendMessageParams, options: SendMessageOptions = {}): Promise<StreamSendResult> {
     // 确保消息格式正确
     const formattedParams = {
       ...params,
@@ -117,11 +122,16 @@ export const aiService = {
         messageCount: formattedParams.messages.length
       });
 
-      // 使用不同的方式处理流式响应
-      const response = await api.post<string>('/ai/chat/stream', formattedParams, {
-        responseType: 'text', // 使用文本类型接收响应
-        timeout: 120000 // 增加超时时间以处理长对话
-      });
+      // 使用不同的方式处理流式响应；signal 为 undefined 时不放进 config 以满足
+      // axios GenericAbortSignal 的非可空契约（exactOptionalPropertyTypes 严格）。
+      const axiosConfig: Parameters<typeof api.post>[2] = {
+        responseType: 'text',
+        timeout: 120000
+      };
+      if (options.signal !== undefined) {
+        axiosConfig.signal = options.signal;
+      }
+      const response = await api.post<string>('/ai/chat/stream', formattedParams, axiosConfig);
 
       // 创建一个可读流，用于处理SSE格式的数据
       const stream = new ReadableStream<Uint8Array>({
@@ -261,7 +271,7 @@ export const aiService = {
               }
             };
 
-            // 处理文本响应，将其转换为流
+            // 处理文本响应，将其转换为流。api.post<string> 的泛型已保证 data 为 string。
             const textData = response.data;
             logger.debug('收到文本响应，长度：', textData.length);
 

@@ -15,5 +15,7 @@ export const initialState = (): AIAssistantState => ({
   error: null,
   conversationId: generateId(),
   modelConnections: {},
-  connectionStatus: 'disconnected'
+  connectionStatus: 'disconnected',
+  abortController: null,
+  isAtBottom: true
 });

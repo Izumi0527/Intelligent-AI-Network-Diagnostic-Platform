@@ -72,31 +72,19 @@ api.interceptors.response.use(
  * 格式化消息历史，确保API兼容
  */
 export function formatMessages(messages: ChatMessage[] | MessageHistoryItem[]): FormattedMessage[] {
-  // 安全检查：确保messages是非空数组
   if (!Array.isArray(messages) || messages.length === 0) {
     logger.warn('formatMessages接收到空消息列表，这可能导致请求失败');
     return [];
   }
 
-  return messages.map(msg => {
-    // 类型保证 msg 是对象，role 是 'user' | 'assistant' | 'system'，content 是 string；
-    // 此处只做空内容兜底，不做运行时 null/类型检查（dead code）。
-    const role = msg.role;
-    // 确保content不为空或仅包含空白字符
-    const content = msg.content && typeof msg.content === 'string'
-      ? msg.content.trim()
-      : '内容为空';
-
-    // 只对用户消息警告空内容，助手消息在流式对话时可能初始为空
-    if ((!msg.content || msg.content.trim() === '') && role === 'user') {
-      logger.warn(`发现空内容用户消息，role=${role}`);
-    }
-
-    return {
-      role,
-      content
-    };
-  }).filter(msg => msg.content !== ''); // 过滤掉无效消息
+  // 空 content / 非字符串 content 直接过滤，**绝不**用 "内容为空" 字面 fallback——
+  // 否则会把前端 placeholder assistant 污染到上游 provider 上下文。
+  return messages
+    .filter(msg => typeof msg.content === 'string' && msg.content.trim() !== '')
+    .map(msg => ({
+      role: msg.role,
+      content: msg.content.trim()
+    }));
 }
 
 export const aiService = {
@@ -139,153 +127,161 @@ export const aiService = {
           const encoder = new TextEncoder();
 
           try {
-            // 处理单行SSE数据
-            const processLine = (line: string): void => {
-              if (line === 'data: [DONE]' || line === '[DONE]') {
+            // 长内容分块输出，让流式 UI 更流畅
+            const enqueueChunked = (text: string): void => {
+              if (text.length > 20) {
+                const chunkSize = Math.min(20, Math.ceil(text.length / 3));
+                for (let i = 0; i < text.length; i += chunkSize) {
+                  controller.enqueue(encoder.encode(text.substring(i, i + chunkSize)));
+                }
+              } else {
+                controller.enqueue(encoder.encode(text));
+              }
+            };
+
+            // SSE 行驱动状态机：currentEvent 在 event: 行更新，dataBuffer 在 data: 行累积，
+            // 空行触发 flushEvent 按 currentEvent 派发。修复 P2.6 b8b88f1 统一 SSE 契约后
+            // 前端误把 raw `event: thinking` 当 content 输出的回归。
+            let currentEvent: string | null = null;
+            let dataBuffer: string[] = [];
+
+            const flushEvent = (): void => {
+              if (dataBuffer.length === 0) {
+                currentEvent = null;
+                return;
+              }
+              const dataText = dataBuffer.join('\n');
+              const eventType = currentEvent;
+              dataBuffer = [];
+              currentEvent = null;
+
+              if (dataText === '[DONE]') {
                 logger.debug('接收到流结束标记');
                 return;
               }
 
-              // 处理可能存在的多层嵌套data:前缀问题
-              let contentLine = line;
-              // 持续清除所有的data:前缀
-              while (contentLine.startsWith('data:')) {
-                contentLine = contentLine.substring(5).trim();
-              }
-
-              // 检查是否为空
-              if (!contentLine) { return; }
-
               try {
-                // 尝试解析为JSON
-                if (contentLine.startsWith('{') || contentLine.startsWith('[')) {
-                  const parsed: unknown = JSON.parse(contentLine);
-
-                  // 优先处理后端返回的 StreamEvent 格式
-                  if (isStreamEvent(parsed)) {
-                    logger.debug(`[StreamEvent] 接收到事件类型: ${parsed.type}`, parsed.data);
-
-                    if (parsed.type === 'thinking' && parsed.data.thinking !== undefined && parsed.data.thinking !== '') {
-                      // 处理思考内容
-                      const thinkingChunk = `🤔思考: ${parsed.data.thinking}`;
-                      controller.enqueue(encoder.encode(thinkingChunk));
-                      return;
-                    } else if (parsed.type === 'content' && parsed.data.content !== undefined && parsed.data.content !== '') {
-                      // 处理正常内容
-                      const content = parsed.data.content;
-                      if (content.length > 20) {
-                        const chunkSize = Math.min(20, Math.ceil(content.length / 3));
-                        for (let i = 0; i < content.length; i += chunkSize) {
-                          const chunk = content.substring(i, i + chunkSize);
-                          controller.enqueue(encoder.encode(chunk));
-                        }
-                      } else {
-                        controller.enqueue(encoder.encode(content));
-                      }
-                      return;
-                    } else if (parsed.type === 'error' && parsed.data.error !== undefined && parsed.data.error !== '') {
-                      // 处理错误
-                      const errorContent = `错误: ${parsed.data.error}`;
-                      controller.enqueue(encoder.encode(errorContent));
-                      return;
-                    } else if (parsed.type === 'done' || parsed.type === 'finish') {
-                      // 处理完成事件
-                      logger.debug('流式响应完成');
-                      return;
-                    }
+                if (!dataText.startsWith('{') && !dataText.startsWith('[')) {
+                  if (!dataText.includes('[DONE]')) {
+                    controller.enqueue(encoder.encode(dataText));
                   }
+                  return;
+                }
 
-                  // 处理不同AI服务的原始输出格式（保持向后兼容）
-                  let content = '';
-                  let thinking = '';
+                const parsed: unknown = JSON.parse(dataText);
 
-                  // 处理Claude/Anthropic事件格式
-                  const claude = parsed as ClaudeStreamChunk;
-                  if (claude.event === 'content_block_delta' && claude.data?.delta?.text !== undefined && claude.data.delta.text !== '') {
-                    content = claude.data.delta.text;
-                  } else {
-                    // 处理DeepSeek/OpenAI格式
-                    const oai = parsed as OpenAIStreamChunk;
-                    if (oai.choices && oai.choices.length > 0) {
-                      const delta = oai.choices[0]?.delta;
-                      if (delta?.content !== undefined && delta.content !== '') {
-                        content = delta.content;
-                      }
-                      // 处理DeepSeek思考内容 - 使用正确的字段名
-                      if (delta?.reasoning_content !== undefined && delta.reasoning_content !== '') {
-                        thinking = delta.reasoning_content;
-                      }
-                    } else {
-                      // 处理错误信息
-                      const err = parsed as StreamErrorChunk;
-                      if (err.error !== undefined) {
-                        const errText = typeof err.error === 'string'
-                          ? err.error
-                          : JSON.stringify(err.error);
-                        content = `错误: ${errText}`;
-                      }
-                    }
+                if (eventType === 'thinking') {
+                  const thinking = (parsed as { thinking?: string }).thinking;
+                  if (thinking !== undefined && thinking !== '') {
+                    controller.enqueue(encoder.encode(`🤔思考: ${thinking}`));
                   }
-
-                  // 处理思考内容
-                  if (thinking) {
-                    // 为思考内容添加特殊标记
-                    const thinkingChunk = `🤔思考: ${thinking}`;
-                    controller.enqueue(encoder.encode(thinkingChunk));
+                  return;
+                }
+                if (eventType === 'content') {
+                  const content = (parsed as { content?: string }).content;
+                  if (content !== undefined && content !== '') {
+                    enqueueChunked(content);
                   }
-
-                  // 只有当提取到实际内容时才传递，按字符或小块分割以提高流畅性
-                  if (content) {
-                    // 对长内容进行细粒度处理，使显示更流畅
-                    if (content.length > 20) {
-                      const chunkSize = Math.min(20, Math.ceil(content.length / 3));
-                      for (let i = 0; i < content.length; i += chunkSize) {
-                        const chunk = content.substring(i, i + chunkSize);
-                        controller.enqueue(encoder.encode(chunk));
-                      }
-                    } else {
-                      controller.enqueue(encoder.encode(content));
-                    }
+                  return;
+                }
+                if (eventType === 'error') {
+                  const errVal = (parsed as { error?: unknown }).error;
+                  if (errVal !== undefined) {
+                    const errText = typeof errVal === 'string' ? errVal : JSON.stringify(errVal);
+                    controller.enqueue(encoder.encode(`错误: ${errText}`));
                   }
+                  return;
+                }
+                if (eventType === 'done' || eventType === 'finish') {
+                  logger.debug('流式响应完成');
+                  return;
+                }
+
+                // 兼容：currentEvent === null 时按 isStreamEvent 形态识别
+                if (isStreamEvent(parsed)) {
+                  if (parsed.type === 'thinking' && parsed.data.thinking !== undefined && parsed.data.thinking !== '') {
+                    controller.enqueue(encoder.encode(`🤔思考: ${parsed.data.thinking}`));
+                    return;
+                  }
+                  if (parsed.type === 'content' && parsed.data.content !== undefined && parsed.data.content !== '') {
+                    enqueueChunked(parsed.data.content);
+                    return;
+                  }
+                  if (parsed.type === 'error' && parsed.data.error !== undefined && parsed.data.error !== '') {
+                    controller.enqueue(encoder.encode(`错误: ${parsed.data.error}`));
+                    return;
+                  }
+                  if (parsed.type === 'done' || parsed.type === 'finish') {
+                    return;
+                  }
+                }
+
+                // 兜底：OpenAI / Claude / Deepseek 原始 chunk（未走统一封装的极端场景）
+                let content = '';
+                let thinking = '';
+
+                const claude = parsed as ClaudeStreamChunk;
+                if (claude.event === 'content_block_delta' && claude.data?.delta?.text !== undefined && claude.data.delta.text !== '') {
+                  content = claude.data.delta.text;
                 } else {
-                  // 如果不是JSON但仍有内容，则直接传递
-                  if (contentLine && !contentLine.includes('[DONE]')) {
-                    // 纯文本也进行分块处理
-                    if (contentLine.length > 30) {
-                      const chunkSize = Math.min(30, Math.ceil(contentLine.length / 4));
-                      for (let i = 0; i < contentLine.length; i += chunkSize) {
-                        const chunk = contentLine.substring(i, i + chunkSize);
-                        controller.enqueue(encoder.encode(chunk));
-                      }
-                    } else {
-                      controller.enqueue(encoder.encode(contentLine));
+                  const oai = parsed as OpenAIStreamChunk;
+                  if (oai.choices && oai.choices.length > 0) {
+                    const delta = oai.choices[0]?.delta;
+                    if (delta?.content !== undefined && delta.content !== '') {
+                      content = delta.content;
+                    }
+                    if (delta?.reasoning_content !== undefined && delta.reasoning_content !== '') {
+                      thinking = delta.reasoning_content;
+                    }
+                  } else {
+                    const err = parsed as StreamErrorChunk;
+                    if (err.error !== undefined) {
+                      const errText = typeof err.error === 'string' ? err.error : JSON.stringify(err.error);
+                      content = `错误: ${errText}`;
                     }
                   }
                 }
+
+                if (thinking) {
+                  controller.enqueue(encoder.encode(`🤔思考: ${thinking}`));
+                }
+                if (content) {
+                  enqueueChunked(content);
+                }
               } catch (e) {
-                // 解析失败时，记录原因并直接传递原始内容
-                logger.debug('SSE 行解析失败，按原文透传:', e);
-                if (contentLine && !contentLine.includes('[DONE]')) {
-                  controller.enqueue(encoder.encode(contentLine));
+                logger.debug('SSE data 解析失败，按原文透传:', e);
+                if (dataText && !dataText.includes('[DONE]')) {
+                  controller.enqueue(encoder.encode(dataText));
                 }
               }
             };
 
-            // 处理文本响应，将其转换为流。api.post<string> 的泛型已保证 data 为 string。
+            // 处理文本响应。api.post<string> 的泛型已保证 data 为 string。
             const textData = response.data;
             logger.debug('收到文本响应，长度：', textData.length);
 
-            // 将文本按行分割
-            if (typeof textData === 'string') {
-              const lines = textData.split('\n');
-              for (const line of lines) {
-                if (line.trim()) {
-                  processLine(line.trim());
-                }
-              }
-            } else {
+            if (typeof textData !== 'string') {
               throw new Error(`响应数据类型意外：${typeof textData}`);
             }
+
+            for (const rawLine of textData.split('\n')) {
+              const line = rawLine.replace(/\r$/, '');
+              if (line === '') {
+                flushEvent();
+                continue;
+              }
+              if (line.startsWith(':')) { continue; }
+              if (line.startsWith('event:')) {
+                currentEvent = line.slice(6).trim();
+                continue;
+              }
+              if (line.startsWith('data:')) {
+                dataBuffer.push(line.slice(5).replace(/^ /, ''));
+                continue;
+              }
+            }
+            // 部分上游不发尾随空行，兜底 flush
+            flushEvent();
 
             // 处理完成后关闭控制器
             controller.close();

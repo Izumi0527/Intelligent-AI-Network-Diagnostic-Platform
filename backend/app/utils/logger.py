@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from app.config.settings import settings
+from app.utils.request_context import get_request_id
 
 STANDARD_LOG_FORMAT = (
     "%(asctime)s - %(name)s - %(levelname)s - "
-    "%(funcName)s:%(lineno)d - %(message)s"
+    "%(funcName)s:%(lineno)d - request_id=%(request_id)s - %(message)s"
 )
 STANDARD_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 RESET_COLOR = "\033[0m"
@@ -155,6 +156,7 @@ class LoggerManager:
             )
             file_handler.setFormatter(formatter)
             file_handler.setLevel(getattr(logging, level.upper()))
+            file_handler.addFilter(RequestIdFilter())
             logger.addHandler(file_handler)
 
         # 控制台日志处理器
@@ -162,6 +164,7 @@ class LoggerManager:
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setFormatter(console_formatter)
             console_handler.setLevel(getattr(logging, level.upper()))
+            console_handler.addFilter(RequestIdFilter())
             logger.addHandler(console_handler)
 
         # 错误日志单独处理器（ERROR级别及以上写入error目录）
@@ -175,6 +178,7 @@ class LoggerManager:
             )
             error_handler.setFormatter(formatter)
             error_handler.setLevel(logging.ERROR)
+            error_handler.addFilter(RequestIdFilter())
             logger.addHandler(error_handler)
 
         self.loggers[name] = logger
@@ -262,6 +266,7 @@ class JsonFormatter(logging.Formatter):
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
+            "request_id": getattr(record, "request_id", None) or "-",
         }
 
         # 添加异常信息（如果有）
@@ -295,6 +300,8 @@ class SensitiveFormatter(logging.Formatter):
         try:
             record.msg = redact_sensitive_text(_get_redacted_message(record))
             record.args = ()
+            if not hasattr(record, "request_id"):
+                record.request_id = get_request_id() or "-"
             return super().format(record)
         finally:
             record.msg = original_msg
@@ -324,6 +331,14 @@ class ColoredConsoleFormatter(SensitiveFormatter):
             return super().format(record)
         finally:
             record.levelname = original_levelname
+
+
+class RequestIdFilter(logging.Filter):
+    """把当前请求上下文中的 request_id 注入日志记录。"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = get_request_id() or "-"
+        return True
 
 
 # 全局日志管理器实例

@@ -23,8 +23,15 @@ RUFF_TARGETS=(
     "backend/app/services/terminal_exceptions.py"
     "backend/app/services/ai/base.py"
     "backend/app/services/ai/application_service.py"
+    "backend/app/utils/api_errors.py"
     "backend/app/utils/logger.py"
+    "backend/app/utils/request_context.py"
     "backend/app/utils/terminal_policy.py"
+    "tests/protocol_fakes.py"
+    "tests/test_protocol_fake_services.py"
+    "tests/test_api_error_contract.py"
+    "tests/test_request_id_tracing.py"
+    "tests/test_health_readiness.py"
     "tests/test_backend_package_metadata.py"
     "tests/test_architecture_boundaries.py"
     "tests/test_pytest_cache_config.py"
@@ -42,6 +49,10 @@ PYTEST_TARGETS=(
     "tests/test_backend_security_and_connection_policy.py"
     "tests/test_terminal_connection_regressions.py"
     "tests/test_telnet_login_policy.py"
+    "tests/test_protocol_fake_services.py"
+    "tests/test_api_error_contract.py"
+    "tests/test_request_id_tracing.py"
+    "tests/test_health_readiness.py"
 )
 
 write_step() {

@@ -374,6 +374,9 @@ class TelnetConnection(NetworkConnection):
             logger.info(f"命令响应读取完成，总长度: {len(full_response)} 字节")
             return full_response
 
+        except (ConnectionResetError, BrokenPipeError, OSError) as e:
+            logger.error(f"读取分页响应失败: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"读取分页响应失败: {str(e)}")
             return full_response if 'full_response' in locals() else b""

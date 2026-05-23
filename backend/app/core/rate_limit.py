@@ -7,10 +7,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
+from app.utils.api_errors import api_error_response
 
 
 @dataclass(frozen=True)
@@ -108,9 +109,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         headers = self._headers(result)
 
         if not result.allowed:
-            return JSONResponse(
+            return api_error_response(
                 status_code=429,
-                content={"detail": "请求过于频繁，请稍后重试"},
+                code="rate_limit_exceeded",
+                message="请求过于频繁，请稍后重试",
+                request=request,
                 headers={**headers, "Retry-After": str(result.reset_after)},
             )
 

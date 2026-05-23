@@ -30,7 +30,6 @@ from app.api.deps import (
 )
 from app.config.settings import Settings, settings
 from app.core.rate_limit import RateLimitResult
-from app.utils import logger as logger_utils
 from app.main import app, create_app
 from app.models.ai import (
     ChatRequest,
@@ -39,13 +38,13 @@ from app.models.ai import (
     Message,
     ModelsResponse,
 )
-from app.services.ai.application_service import AIApplicationService, AIStreamingResult
 from app.models.terminal import (
     CommandRequest,
     CommandResponse,
     ConnectionResponse,
     TerminalCredentials,
 )
+from app.services.ai.application_service import AIApplicationService, AIStreamingResult
 from app.services.ai.base import ProviderType
 from app.services.ai.providers.claude_provider import ClaudeProvider
 from app.services.ai.providers.deepseek_provider import DeepseekProvider
@@ -56,6 +55,7 @@ from app.services.terminal_exceptions import (
     TerminalPolicyViolation,
 )
 from app.services.terminal_service import TerminalService
+from app.utils import logger as logger_utils
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -247,7 +247,8 @@ def test_ai_routes_return_429_with_rate_limit_headers():
     assert response.headers["X-RateLimit-Limit"] == "1"
     assert response.headers["X-RateLimit-Remaining"] == "0"
     assert response.headers["X-RateLimit-Reset"] == "17"
-    assert response.json()["detail"] == "请求过于频繁，请稍后重试"
+    assert response.json()["error"]["code"] == "rate_limit_exceeded"
+    assert response.json()["error"]["message"] == "请求过于频繁，请稍后重试"
     assert limiter.calls
     assert limiter.calls[0][0].startswith("ai:")
 
@@ -806,7 +807,8 @@ def test_terminal_route_maps_policy_violation_to_http_response(monkeypatch):
         app.dependency_overrides.clear()
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "终端连接必须配置允许主机或允许网段"
+    assert response.json()["error"]["code"] == "forbidden"
+    assert response.json()["error"]["message"] == "终端连接必须配置允许主机或允许网段"
 
 
 def test_terminal_route_maps_missing_session_to_404(monkeypatch):
@@ -825,7 +827,8 @@ def test_terminal_route_maps_missing_session_to_404(monkeypatch):
         app.dependency_overrides.clear()
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "会话不存在: missing-session"
+    assert response.json()["error"]["code"] == "not_found"
+    assert response.json()["error"]["message"] == "会话不存在: missing-session"
 
 
 def test_deepseek_generate_requires_internal_token(monkeypatch):

@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import (
     get_ai_application_service,
@@ -30,9 +30,24 @@ router = APIRouter()
 def _ai_error_response(error: AIApplicationError):
     """将 AI 应用服务异常转换为 HTTP 响应。"""
     if isinstance(error, AIValidationError):
-        return JSONResponse(status_code=error.status_code, content={"detail": error.detail})
+        raise HTTPException(
+            status_code=error.status_code,
+            detail={
+                "code": "validation_error",
+                "message": "请求参数验证失败",
+                "details": error.detail,
+            },
+        ) from error
 
-    raise HTTPException(status_code=error.status_code, detail=error.client_message) from error
+    raise HTTPException(
+        status_code=error.status_code,
+        detail={
+            "code": "upstream_error"
+            if error.status_code in {500, 502, 503}
+            else "ai_service_error",
+            "message": error.client_message,
+        },
+    ) from error
 
 
 @router.get("/models", response_model=ModelsResponse)

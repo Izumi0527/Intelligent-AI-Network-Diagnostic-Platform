@@ -4,7 +4,9 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -14,7 +16,9 @@ from app.core.rate_limit import InMemoryRateLimiter, RateLimitMiddleware, RateLi
 from app.services.ai.manager import AIServiceManager
 from app.services.deepseek_service import DeepseekService
 from app.services.terminal_service import TerminalService
+from app.utils.api_errors import api_error_response, normalize_http_detail
 from app.utils.logger import get_logger
+from app.utils.request_context import new_request_id, reset_request_id, set_request_id
 
 # 使用统一的日志管理器获取logger
 logger = get_logger(__name__)
@@ -31,6 +35,56 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             f"{request.method} {request.url.path} - {response.status_code} ({process_time:.2f}s)"
         )
         return response
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """为每个请求生成或透传 X-Request-ID。"""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or new_request_id()
+        request.state.request_id = request_id
+        token = set_request_id(request_id)
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            reset_request_id(token)
+
+
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """把 HTTP 异常统一包装为稳定错误结构。"""
+    code, message, details = normalize_http_detail(exc.detail, exc.status_code)
+    return api_error_response(
+        status_code=exc.status_code,
+        code=code,
+        message=message,
+        details=details,
+        request=request,
+        headers=exc.headers,
+    )
+
+
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """把请求校验错误统一包装为稳定错误结构。"""
+    return api_error_response(
+        status_code=422,
+        code="validation_error",
+        message="请求参数验证失败",
+        details=exc.errors(),
+        request=request,
+    )
+
+
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """兜底处理未预期异常，避免向客户端暴露内部细节。"""
+    logger.error(f"未处理异常: {str(exc)}", exc_info=True)
+    return api_error_response(
+        status_code=500,
+        code="internal_error",
+        message="内部服务器错误",
+        request=request,
+    )
 
 
 async def cleanup_idle_sessions(terminal_service):
@@ -121,6 +175,18 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         **_api_documentation_urls(),
     )
+    application.add_exception_handler(
+        StarletteHTTPException,
+        http_exception_handler,
+    )
+    application.add_exception_handler(
+        RequestValidationError,
+        validation_exception_handler,
+    )
+    application.add_exception_handler(
+        Exception,
+        unhandled_exception_handler,
+    )
 
     cors_origins = [origin for origin in settings.BACKEND_CORS_ORIGINS if origin != "*"]
     if cors_origins:
@@ -150,6 +216,7 @@ def create_app() -> FastAPI:
         ],
     )
     application.add_middleware(LoggingMiddleware)
+    application.add_middleware(RequestIdMiddleware)
     application.include_router(api_router, prefix=settings.API_V1_STR)
 
     @application.get("/")

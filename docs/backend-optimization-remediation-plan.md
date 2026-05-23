@@ -140,19 +140,19 @@
   - 目标：内存限流先落地，后续可替换为 Redis 或网关限流。
   - 验收：AI 和终端接口都有清晰限流策略、响应头和 429 测试。
 
-- [ ] 增加协议级假服务测试
+- [x] 增加协议级假服务测试
   - 目标：用 fake SSH/Telnet/AI provider 覆盖超时、断连、分页、流式错误。
   - 验收：核心连接和 provider 解析逻辑不依赖真实外部服务即可回归。
 
-- [ ] 标准化 API 错误响应
+- [x] 标准化 API 错误响应
   - 目标：统一错误结构为 `{ "error": { "code": "...", "message": "...", "request_id": "...", "details": [] } }`。
   - 验收：FastAPI validation、鉴权、业务异常、上游异常都使用统一结构。
 
-- [ ] 增加请求追踪 ID
+- [x] 增加请求追踪 ID
   - 目标：支持 `X-Request-ID` 透传，无请求头时自动生成。
   - 验收：响应头、应用日志、AI 上游调用日志、终端操作日志都包含同一 request_id。
 
-- [ ] 扩展健康检查分级
+- [x] 扩展健康检查分级
   - 目标：保留轻量 `/health`，新增或扩展 readiness 检查配置和资源状态。
   - 验收：健康检查不会触发昂贵外部 AI 调用；ready 检查能发现关键配置缺失。
 
@@ -208,3 +208,4 @@ uv run --no-sync python -m ruff check app tests
 - 2026-05-23：完成 Phase 3 第七项整改：为 `run.py` 增加 `ENV_FILE` 覆盖能力，默认仍加载 `backend/.env`；新增真实启动链路测试，用临时 env 文件和假 `uvicorn` 模块在子进程中验证 `.env` 加载、参数解析和 `uvicorn.run` 的 `app`、`host`、`port`、`reload`、`log_level` 参数传递，不占用真实端口。验证 `tests/test_run_startup_config.py` 为 `2 passed`，Windows PowerShell 与 Git Bash 版 `backend-check` 均通过，默认后端检查为 `72 passed`。
 - 2026-05-23：完成 Phase 4 第一项整改：新增 `backend/app/core/network/telnet/client.py`，用最小 socket-based Telnet 客户端替代 Python 3.13 已移除的标准库实现，覆盖 `open`、`expect`、`read_until`、`read_very_eager`、`write`、`close` 和基础 IAC 协商处理；基础 Telnet 与华为 Telnet 连接不再导入 `telnetlib`，原有登录和分页判断测试继续通过。验证 `tests/test_telnet_login_policy.py tests/test_terminal_connection_regressions.py tests/test_backend_security_and_connection_policy.py` 为 `65 passed`，Windows PowerShell 与 Git Bash 版 `backend-check` 均通过，默认后端检查为 `76 passed`，未再出现 `telnetlib` 弃用警告；Python 上限本轮暂不放宽，等待单独的 3.13 运行矩阵验证。
 - 2026-05-23：完成 Phase 4 第二项整改：新增 `backend/app/core/rate_limit.py`，定义 `RateLimiterBackend` 协议、内存滑动窗口后端、路径级 `RateLimitRule` 和 `RateLimitMiddleware`，默认对 `/ai` 与 `/terminal` 接口按客户端维度限流，并支持通过 `app.state.rate_limiter` 替换为 Redis 或网关适配器；429 响应包含 `Retry-After`、`X-RateLimit-Limit`、`X-RateLimit-Remaining`、`X-RateLimit-Reset`，通过请求也返回剩余额度头。验证限流定向测试为 `2 passed`，`tests/test_backend_security_and_connection_policy.py tests/test_terminal_connection_regressions.py tests/test_telnet_login_policy.py` 为 `67 passed`，Windows PowerShell 与 Git Bash 版 `backend-check` 均通过，默认后端检查为 `78 passed`。
+- 2026-05-23：完成 Phase 4 剩余四项整改：新增协议级 fake SSH/Telnet/AI 测试，覆盖分页、断连和流式错误；新增统一 API 错误响应工具和全局异常处理，validation、鉴权、业务异常、上游异常与限流错误统一输出 `{ "error": { "code": "...", "message": "...", "request_id": "...", "details": [] } }`；新增 `X-Request-ID` 透传/生成中间件和日志上下文注入；将 `/health` 改为轻量存活检查，并新增 `/health/ready` 检查本地配置和应用资源状态；同步 Windows PowerShell 与 Git Bash 版 `backend-check` 默认目标，纳入本轮新增测试和工具模块。验证新增定向测试 `tests/test_protocol_fake_services.py tests/test_api_error_contract.py tests/test_request_id_tracing.py tests/test_health_readiness.py` 为 `15 passed`；关联回归 `tests/test_backend_security_and_connection_policy.py tests/test_terminal_connection_regressions.py tests/test_telnet_login_policy.py` 为 `67 passed`；合并关联验证为 `82 passed`；本轮触达文件 `ruff check` 通过；Windows PowerShell 与 Git Bash 版 `scripts/backend-check` 均通过，默认后端检查为 `93 passed`。

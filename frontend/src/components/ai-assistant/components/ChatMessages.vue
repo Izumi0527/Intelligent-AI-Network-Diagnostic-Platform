@@ -7,14 +7,25 @@
     class="chat-messages relative flex-1 overflow-y-auto p-4 space-y-6 bg-transparent"
     style="min-height: 400px;"
   >
-    <!-- 空状态 -->
-    <div v-if="messages.length === 0" class="flex h-full items-center justify-center">
-      <div class="text-center max-w-sm p-8">
-        <div class="text-4xl mb-4 opacity-30" aria-hidden="true">💬</div>
-        <p class="mb-2 text-foreground/80 font-medium">与AI助手开始对话获取网络问题的帮助</p>
-        <p class="text-sm text-muted-foreground">可以询问网络设备配置、故障排查方法或最佳实践</p>
-      </div>
+    <!-- 模型切换骨架占位：避免 conversation 列表瞬间替换导致的闪烁，最小 200ms -->
+    <div
+      v-if="isModelLoading"
+      role="status"
+      aria-busy="true"
+      aria-label="正在切换模型"
+      class="space-y-3 px-1"
+    >
+      <div class="skeleton-bar h-3 w-1/3"></div>
+      <div class="skeleton-bar h-12 w-3/4"></div>
+      <div class="skeleton-bar h-3 w-1/4 ml-auto"></div>
+      <div class="skeleton-bar h-16 w-2/3 ml-auto"></div>
     </div>
+
+    <!-- 空状态：示例 prompt 引导卡 -->
+    <empty-state
+      v-else-if="messages.length === 0"
+      @select="onSelectPrompt"
+    />
 
     <!-- 消息列表：MessageBubble 取代旧 80 行内联模板，ThinkingBlock 由 MessageBubble 内部聚合 -->
     <template v-else>
@@ -88,11 +99,14 @@
 
     <!-- 悬浮"停止生成"按钮：覆盖在消息列表底部居中，仅在流式接收中或思考中显示 -->
     <stop-generation-button :visible="canStop" @stop="onStop" />
+
+    <!-- 悬浮"回到最新"按钮：用户向上翻看历史时显示 -->
+    <scroll-to-bottom-button :visible="showScrollToBottom" @scroll="onScrollToBottom" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useChatScroll } from '@/composables';
 import type { ChatMessage, ThinkingContent } from '@/types/chat';
 import { useAiAssistantStore } from '@/stores/ai-assistant';
@@ -100,6 +114,8 @@ import { logger } from '@/utils/logger';
 import MessageBubble from './MessageBubble.vue';
 import ThinkingBlock from './ThinkingBlock.vue';
 import StopGenerationButton from './StopGenerationButton.vue';
+import EmptyState from './EmptyState.vue';
+import ScrollToBottomButton from './ScrollToBottomButton.vue';
 
 export interface StreamState {
   isTyping: boolean
@@ -114,12 +130,29 @@ const props = defineProps<{
   streamState: StreamState
 }>();
 
+const emit = defineEmits<{
+  'select-prompt': [prompt: string]
+}>();
+
 const store = useAiAssistantStore();
 
-const { containerRef, scrollToBottom } = useChatScroll({
+const { containerRef, scrollToBottom, isAtBottom } = useChatScroll({
   messageCount: () => props.messages.length,
   isTyping: () => props.streamState.isTyping,
   isStreamingContent: () => props.streamState.isStreamingContent
+});
+
+// 模型切换骨架占位：watch selectedModel，最小 200ms 显示骨架避免列表瞬间替换闪烁
+const isModelLoading = ref<boolean>(false);
+let modelLoadingTimer: ReturnType<typeof setTimeout> | null = null;
+watch(() => store.selectedModel, (next, prev) => {
+  if (next === prev || prev === undefined) { return; }
+  isModelLoading.value = true;
+  if (modelLoadingTimer !== null) { clearTimeout(modelLoadingTimer); }
+  modelLoadingTimer = setTimeout(() => {
+    isModelLoading.value = false;
+    modelLoadingTimer = null;
+  }, 200);
 });
 
 // 是否紧凑 meta：上一条同 role 且时间差 < 60s 时折叠头像/角色名，仅显时间
@@ -155,6 +188,11 @@ const canStop = computed<boolean>(() =>
   || props.streamState.isTyping
 );
 
+// "回到最新"按钮可见性：仅在用户向上翻看（非底部）且有消息时显示
+const showScrollToBottom = computed<boolean>(() =>
+  props.messages.length > 0 && !isAtBottom.value
+);
+
 const onStop = (): void => {
   logger.debug('[ChatMessages] 用户点击停止生成');
   store.stopGeneration();
@@ -170,6 +208,14 @@ const onCopy = (id: string): void => {
   store.copyMessage(id);
 };
 
+const onScrollToBottom = (): void => {
+  void scrollToBottom();
+};
+
+const onSelectPrompt = (prompt: string): void => {
+  emit('select-prompt', prompt);
+};
+
 defineExpose({ scrollToBottom });
 </script>
 
@@ -180,6 +226,28 @@ defineExpose({ scrollToBottom });
 
 .bubble-assistant-bg {
   background: var(--bubble-assistant-bg);
+}
+
+/* 模型切换骨架占位 */
+.skeleton-bar {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, oklch(var(--muted)) 60%, transparent),
+    color-mix(in oklch, oklch(var(--muted)) 80%, transparent),
+    color-mix(in oklch, oklch(var(--muted)) 60%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s var(--ease-out) infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-bar { animation: none !important; }
 }
 
 .chat-messages::-webkit-scrollbar {

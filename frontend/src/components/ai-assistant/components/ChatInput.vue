@@ -123,10 +123,15 @@ const handleInput = (): void => {
 
 const focus = (): void => { messageInput.value?.focus(); };
 const clear = (): void => { message.value = ''; adjustTextareaHeight(); };
+const fillText = (text: string): void => {
+  message.value = text;
+  adjustTextareaHeight();
+  focus();
+};
 
 watch(() => props.disabled, (disabled) => { if (!disabled) { focus(); } });
 
-defineExpose({ focus, clear });
+defineExpose({ focus, clear, fillText });
 </script>
 
 <style scoped>

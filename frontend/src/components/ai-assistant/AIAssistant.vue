@@ -17,9 +17,11 @@
       :messages="messagesForDisplay"
       :stream-state="streamState"
       class="ai-chat-gradient"
+      @select-prompt="handleSelectPrompt"
     />
 
     <chat-input
+      ref="chatInputRef"
       :disabled="store.isLoading || store.isAIResponding"
       :status-text="store.isAIResponding ? 'AI 正在响应...' : ''"
       @send="handleSendMessage"
@@ -37,6 +39,7 @@ import { logger } from '@/utils/logger';
 
 const store = useAiAssistantStore();
 const chatMessagesRef = ref<InstanceType<typeof ChatMessages> | null>(null);
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 
 const modelsForSelector = computed(() =>
   store.availableModels.map((model) => ({
@@ -83,6 +86,11 @@ const handleSendMessage = async (content: string): Promise<void> => {
   } catch (error) {
     logger.error('发送消息失败:', error);
   }
+};
+
+// EmptyState 示例 prompt 点击 → 注入到 ChatInput textarea，让用户可改后再发送
+const handleSelectPrompt = (prompt: string): void => {
+  chatInputRef.value?.fillText(prompt);
 };
 
 useAiKeyboard({ onClear: handleClear });

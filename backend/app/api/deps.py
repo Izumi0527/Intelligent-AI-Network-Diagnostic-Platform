@@ -46,13 +46,6 @@ def get_ai_service_manager(request: Request) -> AIServiceManager:
     )
 
 
-def get_ai_application_service(
-    ai_manager: AIServiceManager = Depends(get_ai_service_manager),
-) -> AIApplicationService:
-    """获取 AI 应用服务实例。"""
-    return AIApplicationService(ai_manager)
-
-
 def get_brave_search_client(request: Request) -> BraveSearchClient:
     """获取 Brave Search 单例 client（按应用实例缓存到 app.state）。"""
     return _get_or_create_state_service(
@@ -60,6 +53,14 @@ def get_brave_search_client(request: Request) -> BraveSearchClient:
         "brave_search_client",
         BraveSearchClient,
     )
+
+
+def get_ai_application_service(
+    ai_manager: AIServiceManager = Depends(get_ai_service_manager),
+    brave_client: BraveSearchClient = Depends(get_brave_search_client),
+) -> AIApplicationService:
+    """获取 AI 应用服务实例。"""
+    return AIApplicationService(ai_manager, brave_client=brave_client)
 
 
 def get_terminal_service(request: Request) -> TerminalService:

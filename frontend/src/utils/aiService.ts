@@ -195,6 +195,16 @@ export const aiService = {
                   logger.debug('流式响应完成');
                   return;
                 }
+                if (eventType === 'search_results') {
+                  // T2.2：识别并 log；T2.4 接入 UI 卡片
+                  const sources = (parsed as { sources?: unknown }).sources;
+                  const searchFailed = (parsed as { search_failed?: unknown }).search_failed;
+                  logger.info('收到联网搜索结果事件', {
+                    count: Array.isArray(sources) ? sources.length : 0,
+                    searchFailed,
+                  });
+                  return;
+                }
 
                 // 兼容：currentEvent === null 时按 isStreamEvent 形态识别
                 if (isStreamEvent(parsed)) {

@@ -3,7 +3,7 @@ import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import ValidationError
 
@@ -14,9 +14,11 @@ from app.models.ai import (
     Message,
     ModelConnectionStatus,
     ModelsResponse,
+    SearchSource,
 )
 from app.services.ai.base import safe_ai_client_message
 from app.services.ai.manager import AIServiceManager
+from app.services.search.brave_search import BraveSearchClient, SearchResult
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -49,8 +51,13 @@ class AIStreamingResult:
 class AIApplicationService:
     """AI 应用服务，承载路由之外的对话编排和响应组装。"""
 
-    def __init__(self, ai_manager: AIServiceManager):
+    def __init__(
+        self,
+        ai_manager: AIServiceManager,
+        brave_client: Optional[BraveSearchClient] = None,
+    ):
         self.ai_manager = ai_manager
+        self.brave_client = brave_client
 
     async def get_models_response(self) -> ModelsResponse:
         """获取可用模型响应。"""
@@ -72,9 +79,13 @@ class AIApplicationService:
             self._log_chat_request("接收聊天请求", request)
             self._normalize_message_timestamps(request)
 
+            sources, search_failed = await self._maybe_inject_search(request)
+
             response = await self.ai_manager.chat(request)
             if not getattr(response, "content", None):
                 response.content = response.message.content
+            response.sources = sources
+            response.search_failed = search_failed
             return response
         except ValidationError as e:
             raise self._validation_error_from_pydantic(e) from e
@@ -94,6 +105,15 @@ class AIApplicationService:
 
         async def generate_text_stream() -> AsyncIterator[str]:
             try:
+                sources, search_failed = await self._maybe_inject_search(request)
+                if request.enable_search:
+                    yield encode_sse_event(
+                        "search_results",
+                        {
+                            "sources": [s.model_dump() for s in sources],
+                            "search_failed": search_failed,
+                        },
+                    )
                 async for event in self.ai_manager.chat_stream(request):
                     if event.type == "content":
                         content = event.data.get("content", "")
@@ -260,6 +280,76 @@ class AIApplicationService:
             )
 
         return AIValidationError(detail)
+
+    async def _maybe_inject_search(
+        self,
+        request: ChatRequest,
+    ) -> tuple[list[SearchSource], bool]:
+        """根据 enable_search 调 Brave，并把结果作为 system message 注入到 messages[0]。
+
+        Returns:
+            (sources, search_failed)：
+              - sources：成功时为非空列表；其他场景为 []
+              - search_failed：启用但未取到结果时为 True；未启用 / 成功时为 False
+        """
+        if not request.enable_search:
+            return ([], False)
+        if self.brave_client is None or not self.brave_client.is_enabled():
+            logger.warning("enable_search=true 但 Brave 未启用，跳过注入")
+            return ([], True)
+
+        query = self._extract_query(request.messages)
+        if not query:
+            return ([], True)
+
+        try:
+            raw_results = await self.brave_client.search(query)
+        except Exception as exc:  # 防御性兜底；client 已吞异常，这里再加一层
+            logger.warning("Brave 搜索调用异常：%s", type(exc).__name__)
+            return ([], True)
+
+        if not raw_results:
+            return ([], True)
+
+        sources = [
+            SearchSource(title=r.title, url=r.url, description=r.description)
+            for r in raw_results
+        ]
+        system_block = self._format_search_block(raw_results, query)
+        request.messages.insert(0, Message(role="system", content=system_block))
+        return (sources, False)
+
+    @staticmethod
+    def _extract_query(messages: list[Message]) -> str:
+        """取最后一条 user message 作为搜索 query。"""
+        for message in reversed(messages):
+            if message.role == "user" and message.content.strip():
+                return message.content.strip()
+        return ""
+
+    @staticmethod
+    def _format_search_block(results: list[SearchResult], query: str) -> str:
+        """把 Brave 搜索结果格式化为可注入的 system message 文本。
+
+        二次截断：单条 description 最长 240 字，整体不超过约 4KB。
+        """
+        lines: list[str] = [
+            "以下是来自网络的实时检索结果，请优先据此回答用户问题，并在回答末尾用 [n] 引用对应来源：",
+            "",
+        ]
+        budget = 4000  # 字符预算
+        for idx, item in enumerate(results, start=1):
+            desc = (item.description or "").strip()
+            if len(desc) > 240:
+                desc = desc[:240] + "…"
+            chunk = f"[{idx}] {item.title}\n    URL: {item.url}\n    摘要: {desc}\n"
+            if budget - len(chunk) < 0:
+                break
+            lines.append(chunk)
+            budget -= len(chunk)
+        lines.append("")
+        lines.append(f"用户问题: {query}")
+        return "\n".join(lines)
 
 
 def encode_sse_event(event_type: str, data: dict[str, Any]) -> str:

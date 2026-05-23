@@ -39,12 +39,23 @@ export interface ModelsListResponse {
 
 // ───────────────────────────────── 对话 ─────────────────────────────────
 
+/** 单条联网搜索来源（与后端 SearchSource 模型对齐） */
+export interface SearchSource {
+  title: string;
+  url: string;
+  description?: string;
+}
+
 /** 非流式 /ai/chat 与 /ai/chat (retry) 的返回 schema */
 export interface ChatCompletionResponse {
   content?: string;
   message?: {
     content?: string;
   };
+  /** 联网搜索引用的来源（enable_search 启用时） */
+  sources?: SearchSource[];
+  /** 联网搜索是否失败（启用但未取到结果或异常时为 true） */
+  search_failed?: boolean;
 }
 
 // ───────────────────────────────── 终端 ─────────────────────────────────
@@ -68,11 +79,15 @@ export interface TerminalExecuteResponse {
  * 同一 SSE 连接也可能透传上游厂商原始格式，由调用方做 fallback 兼容。
  */
 export interface StreamEvent {
-  type: 'thinking' | 'content' | 'error' | 'done' | 'finish';
+  type: 'thinking' | 'content' | 'error' | 'done' | 'finish' | 'search_results';
   data: {
     thinking?: string;
     content?: string;
     error?: string;
+    /** type=search_results 时携带 */
+    sources?: SearchSource[];
+    /** type=search_results 时携带 */
+    search_failed?: boolean;
   };
 }
 

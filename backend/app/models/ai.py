@@ -23,7 +23,7 @@ class Message(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    role: Literal["user", "assistant"] = Field(..., description="消息角色")
+    role: Literal["user", "assistant", "system"] = Field(..., description="消息角色")
     content: str = Field(
         ...,
         description="消息内容",
@@ -92,6 +92,10 @@ class ChatRequest(BaseModel):
     )
     top_p: Optional[float] = Field(None, description="top p值", ge=0, le=1)
     stream: bool = Field(False, description="是否使用流式响应")
+    enable_search: bool = Field(
+        False,
+        description="是否启用联网搜索（Brave Search）",
+    )
 
     @field_validator("messages", mode="before")
     @classmethod
@@ -160,6 +164,16 @@ class ChatRequest(BaseModel):
         return valid_messages
 
 
+class SearchSource(BaseModel):
+    """单条联网搜索结果来源，用于回传给前端渲染卡片。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = Field(..., description="结果标题")
+    url: str = Field(..., description="结果 URL")
+    description: Optional[str] = Field(default="", description="结果摘要")
+
+
 class ChatResponse(BaseModel):
     """聊天响应"""
 
@@ -189,6 +203,14 @@ class ChatResponse(BaseModel):
     finish_reason: Optional[str] = Field(None, description="结束原因")
     usage: dict[str, Any] = Field(default_factory=dict, description="使用情况统计")
     content: Optional[str] = Field(None, description="响应内容，方便前端直接获取")
+    sources: list[SearchSource] = Field(
+        default_factory=list,
+        description="联网搜索引用的来源列表（enable_search 启用时）",
+    )
+    search_failed: bool = Field(
+        False,
+        description="联网搜索是否失败（启用但未取到结果或异常时为 true）",
+    )
 
 
 class ModelConnectionStatus(BaseModel):
@@ -257,6 +279,7 @@ class StreamEvent(BaseModel):
         "done",
         "finish",
         "thinking",
+        "search_results",
         "message_start",
         "content_block_start",
         "content_block_delta",

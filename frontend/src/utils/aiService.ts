@@ -7,6 +7,7 @@ import type {
   ModelStatusResponse,
   ModelsListResponse,
   OpenAIStreamChunk,
+  ParsedStreamEvent,
   StreamErrorChunk,
 } from '@/types/api';
 import { isStreamEvent } from '@/types/api';
@@ -127,16 +128,13 @@ export const aiService = {
           const encoder = new TextEncoder();
 
           try {
-            // 长内容分块输出，让流式 UI 更流畅
-            const enqueueChunked = (text: string): void => {
-              if (text.length > 20) {
-                const chunkSize = Math.min(20, Math.ceil(text.length / 3));
-                for (let i = 0; i < text.length; i += chunkSize) {
-                  controller.enqueue(encoder.encode(text.substring(i, i + chunkSize)));
-                }
-              } else {
-                controller.enqueue(encoder.encode(text));
-              }
+            // 一行一条 JSON 事件输出，messaging.ts 用 buffer+split('\n') 解析。
+            // 取代历史上的"层间 magic string"做法（前缀 🤔思考: / 错误:），
+            // 让事件类型回到结构化字段，避免 in-band signaling 与内容前缀冲突。
+            const enqueueEvent = (type: ParsedStreamEvent['type'], text: string): void => {
+              if (text === '') { return; }
+              const payload: ParsedStreamEvent = { type, text };
+              controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
             };
 
             // SSE 行驱动状态机：currentEvent 在 event: 行更新，dataBuffer 在 data: 行累积，
@@ -162,8 +160,9 @@ export const aiService = {
 
               try {
                 if (!dataText.startsWith('{') && !dataText.startsWith('[')) {
+                  // 非 JSON 兜底文本：按 content 包装下行
                   if (!dataText.includes('[DONE]')) {
-                    controller.enqueue(encoder.encode(dataText));
+                    enqueueEvent('content', dataText);
                   }
                   return;
                 }
@@ -173,14 +172,14 @@ export const aiService = {
                 if (eventType === 'thinking') {
                   const thinking = (parsed as { thinking?: string }).thinking;
                   if (thinking !== undefined && thinking !== '') {
-                    controller.enqueue(encoder.encode(`🤔思考: ${thinking}`));
+                    enqueueEvent('thinking', thinking);
                   }
                   return;
                 }
                 if (eventType === 'content') {
                   const content = (parsed as { content?: string }).content;
                   if (content !== undefined && content !== '') {
-                    enqueueChunked(content);
+                    enqueueEvent('content', content);
                   }
                   return;
                 }
@@ -188,7 +187,7 @@ export const aiService = {
                   const errVal = (parsed as { error?: unknown }).error;
                   if (errVal !== undefined) {
                     const errText = typeof errVal === 'string' ? errVal : JSON.stringify(errVal);
-                    controller.enqueue(encoder.encode(`错误: ${errText}`));
+                    enqueueEvent('error', errText);
                   }
                   return;
                 }
@@ -200,15 +199,15 @@ export const aiService = {
                 // 兼容：currentEvent === null 时按 isStreamEvent 形态识别
                 if (isStreamEvent(parsed)) {
                   if (parsed.type === 'thinking' && parsed.data.thinking !== undefined && parsed.data.thinking !== '') {
-                    controller.enqueue(encoder.encode(`🤔思考: ${parsed.data.thinking}`));
+                    enqueueEvent('thinking', parsed.data.thinking);
                     return;
                   }
                   if (parsed.type === 'content' && parsed.data.content !== undefined && parsed.data.content !== '') {
-                    enqueueChunked(parsed.data.content);
+                    enqueueEvent('content', parsed.data.content);
                     return;
                   }
                   if (parsed.type === 'error' && parsed.data.error !== undefined && parsed.data.error !== '') {
-                    controller.enqueue(encoder.encode(`错误: ${parsed.data.error}`));
+                    enqueueEvent('error', parsed.data.error);
                     return;
                   }
                   if (parsed.type === 'done' || parsed.type === 'finish') {
@@ -237,21 +236,22 @@ export const aiService = {
                     const err = parsed as StreamErrorChunk;
                     if (err.error !== undefined) {
                       const errText = typeof err.error === 'string' ? err.error : JSON.stringify(err.error);
-                      content = `错误: ${errText}`;
+                      enqueueEvent('error', errText);
+                      return;
                     }
                   }
                 }
 
-                if (thinking) {
-                  controller.enqueue(encoder.encode(`🤔思考: ${thinking}`));
+                if (thinking !== '') {
+                  enqueueEvent('thinking', thinking);
                 }
-                if (content) {
-                  enqueueChunked(content);
+                if (content !== '') {
+                  enqueueEvent('content', content);
                 }
               } catch (e) {
-                logger.debug('SSE data 解析失败，按原文透传:', e);
+                logger.debug('SSE data 解析失败，按 content 兜底:', e);
                 if (dataText && !dataText.includes('[DONE]')) {
-                  controller.enqueue(encoder.encode(dataText));
+                  enqueueEvent('content', dataText);
                 }
               }
             };
@@ -305,20 +305,22 @@ export const aiService = {
       const errorStream = new ReadableStream<Uint8Array>({
         start(controller): void {
           const encoder = new TextEncoder();
-          let errorMessage = '错误: 无法连接到服务器';
+          let errorText = '无法连接到服务器';
 
           // 使用类型安全的错误处理
           if (isApiError(error)) {
-            errorMessage = `错误: 服务器返回${error.response.status}错误`;
+            errorText = `服务器返回${error.response.status}错误`;
             if (error.response.data) {
               // data 是结构化对象（含 detail 等字段），用 JSON.stringify 避免 [object Object]
-              errorMessage += ` - ${JSON.stringify(error.response.data)}`;
+              errorText += ` - ${JSON.stringify(error.response.data)}`;
             }
           } else {
-            errorMessage = `错误: ${extractErrorMessage(error)}`;
+            errorText = extractErrorMessage(error);
           }
 
-          controller.enqueue(encoder.encode(errorMessage));
+          // 统一 JSON 事件格式（与主流 enqueueEvent 对齐），由 messaging.ts 解析后渲染
+          const payload: ParsedStreamEvent = { type: 'error', text: errorText };
+          controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
           controller.close();
         }
       });

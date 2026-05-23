@@ -1,5 +1,7 @@
 import { aiService } from '@/utils/aiService';
 import type { AIAssistantState, ChatMessage, StoreActions, ApiError } from '@/types/chat';
+import type { ParsedStreamEvent } from '@/types/api';
+import { isParsedStreamEvent } from '@/types/api';
 import { generateId } from '../../../utils/helpers';
 import { logger } from '../../../utils/logger';
 import { nextTick } from 'vue';
@@ -214,6 +216,46 @@ export const createMessagingActions = (
       let contentReceived = false;
       let isFirstChunk = true;
       let thinkingContent = '';
+      // buffer 暂存跨 chunk 的不完整 JSON 行——aiService.ts 发的每条事件以 \n 结尾，
+      // 但 TextDecoder.decode 可能在任意字节切片，必须自己重组行边界。
+      let buffer = '';
+
+      // 强制触发响应式更新（chatMessages 数组引用替换）
+      const refreshMessage = (): void => {
+        const idx = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
+        if (idx !== -1) {
+          state.chatMessages[idx] = { ...assistantMessage };
+          state.chatMessages = [...state.chatMessages];
+        }
+      };
+
+      const dispatchEvent = async (event: ParsedStreamEvent): Promise<void> => {
+        if (event.type === 'error') {
+          logger.error(`[流式处理] 收到错误事件: ${event.text}`);
+          assistantMessage.content += `\n${event.text}`;
+          contentReceived = true;
+          refreshMessage();
+          return;
+        }
+        if (event.type === 'thinking') {
+          thinkingContent += event.text;
+          state.isThinking = true;
+          state.currentThinkingContent = thinkingContent;
+          // 重建整个 thinking 对象（而非 mutate .content）：refreshMessage 做 { ...assistantMessage }
+          // 浅拷贝后 chatMessages[idx].thinking 仍指向同一子对象，Vue lazy proxify 嵌套对象时
+          // 通过原对象 mutate 属性绕过 proxy set trap，触发不了渲染——必须替换整个 thinking 引用。
+          assistantMessage.thinking = {
+            content: thinkingContent,
+            isComplete: false,
+            timestamp: assistantMessage.thinking?.timestamp ?? Date.now()
+          };
+          refreshMessage();
+          return;
+        }
+        // 类型已 narrow 到 'content'：error/thinking 上面均 return
+        await actions._addContentCharByChar(assistantMessage, event.text);
+        contentReceived = true;
+      };
 
       try {
         for (;;) {
@@ -228,11 +270,7 @@ export const createMessagingActions = (
             } else {
               assistantMessage.content += '\n\n（已停止生成）';
             }
-            const idx = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
-            if (idx !== -1) {
-              state.chatMessages[idx] = { ...assistantMessage };
-              state.chatMessages = [...state.chatMessages];
-            }
+            refreshMessage();
             break;
           }
 
@@ -240,105 +278,92 @@ export const createMessagingActions = (
 
           if (done) {
             logger.debug(`[流式处理] 流读取完成，会话ID: ${sessionId}`);
+            // 末尾 buffer 若残留完整 JSON 行也要解析
+            const tail = buffer.trim();
+            if (tail !== '' && !tail.includes('[DONE]')) {
+              try {
+                const parsed: unknown = JSON.parse(tail);
+                if (isParsedStreamEvent(parsed)) {
+                  await dispatchEvent(parsed);
+                }
+              } catch (e) {
+                logger.warn(`[流式处理] 末尾残行解析失败: ${tail.substring(0, 80)}`, e);
+              }
+            }
+            buffer = '';
             break;
           }
 
           // ReadableStream<Uint8Array> 的契约：done=false 时 value 一定是 Uint8Array
           const chunk = decoder.decode(value, { stream: true });
 
-          if (chunk) {
-            if (isFirstChunk) {
-              logger.debug(`[流式处理] 接收到首个数据块 (${chunk.length}字符)，会话ID: ${sessionId}`);
-              isFirstChunk = false;
-            }
+          if (chunk === '') { continue; }
 
-            if (chunk.includes('[DONE]')) {
-              logger.debug('[流式处理] 收到流结束标记');
-              continue;
-            }
+          if (isFirstChunk) {
+            logger.debug(`[流式处理] 接收到首个数据块 (${chunk.length}字符)，会话ID: ${sessionId}`);
+            isFirstChunk = false;
+          }
 
-            if (chunk.startsWith('错误:')) {
-              logger.error(`[流式处理] 收到错误消息: ${chunk}`);
-              assistantMessage.content += `\n${chunk}`;
-              contentReceived = true;
+          // 按 \n 切行；最后一段（可能不完整）留到下次 read 拼回
+          buffer += chunk;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
 
-              // 强制触发响应式更新
-              const messageIndex = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
-              if (messageIndex !== -1) {
-                state.chatMessages[messageIndex] = { ...assistantMessage };
-                state.chatMessages = [...state.chatMessages];
-              }
-              continue;
-            }
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed === '' || trimmed.includes('[DONE]')) { continue; }
 
-            // 处理思考内容
-            if (chunk.startsWith('🤔思考: ')) {
-              const thinkingText = chunk.substring(6); // 去掉 "🤔思考: " 前缀
-              thinkingContent += thinkingText;
-
-              // 更新当前思考内容状态
-              state.isThinking = true;
-              state.currentThinkingContent = thinkingContent;
-
-              // 更新消息中的思考内容
-              if (!assistantMessage.thinking) {
-                assistantMessage.thinking = {
-                  content: thinkingContent,
-                  isComplete: false,
-                  timestamp: Date.now()
-                };
+            try {
+              const parsed: unknown = JSON.parse(trimmed);
+              if (isParsedStreamEvent(parsed)) {
+                await dispatchEvent(parsed);
               } else {
-                assistantMessage.thinking.content = thinkingContent;
+                logger.warn(`[流式处理] 非 ParsedStreamEvent 形态，丢弃: ${trimmed.substring(0, 80)}`);
               }
-
-              // 强制触发响应式更新
-              const messageIndex = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
-              if (messageIndex !== -1) {
-                state.chatMessages[messageIndex] = { ...assistantMessage };
-                state.chatMessages = [...state.chatMessages];
-              }
-              continue;
-            }
-
-            // 逐字符添加内容来实现打字机效果
-            await actions._addContentCharByChar(assistantMessage, chunk);
-            contentReceived = true;
-
-            if (chunk.length > 50) {
-              logger.debug(`[流式处理] 接收到较大数据块: ${chunk.length}字符`);
+            } catch (e) {
+              logger.warn(`[流式处理] JSON 解析失败: ${trimmed.substring(0, 80)}`, e);
             }
           }
         }
 
+        // flush decoder 最终状态（可能含跨字节字符的尾部）
         const finalChunk = decoder.decode();
-        if (finalChunk.trim() !== '') {
-          logger.debug(`[流式处理] 处理最终数据块 (${finalChunk.length}字符)，会话ID: ${sessionId}`);
-
-          if (!finalChunk.includes('[DONE]') && !finalChunk.startsWith('错误:') && !finalChunk.startsWith('🤔思考: ')) {
-            await actions._addContentCharByChar(assistantMessage, finalChunk);
-            contentReceived = true;
+        if (finalChunk.trim() !== '' && !finalChunk.includes('[DONE]')) {
+          buffer += finalChunk;
+          const tail = buffer.trim();
+          if (tail !== '') {
+            try {
+              const parsed: unknown = JSON.parse(tail);
+              if (isParsedStreamEvent(parsed)) {
+                await dispatchEvent(parsed);
+              }
+            } catch (e) {
+              logger.warn(`[流式处理] finalChunk 解析失败: ${tail.substring(0, 80)}`, e);
+            }
           }
         }
 
-        // 完成思考内容
-        if (thinkingContent && assistantMessage.thinking) {
-          assistantMessage.thinking.isComplete = true;
+        // 完成思考内容（重建对象，避免嵌套 mutate 触发不了响应式——见上方 dispatchEvent 注释）
+        if (thinkingContent !== '' && assistantMessage.thinking !== undefined) {
+          assistantMessage.thinking = {
+            content: assistantMessage.thinking.content,
+            isComplete: true,
+            timestamp: assistantMessage.thinking.timestamp
+          };
+          refreshMessage();
           state.isThinking = false;
           state.currentThinkingContent = '';
         }
 
-        if (!contentReceived || !assistantMessage.content.trim()) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- contentReceived 在 dispatchEvent 闭包内被改，ESLint 无法追踪
+        if (!contentReceived || assistantMessage.content.trim() === '') {
           logger.warn(`[流式处理] 未接收到有效内容，会话ID: ${sessionId}`);
           actions._handleStreamError(assistantMessage, '未接收到有效内容');
         } else {
           logger.debug(`[流式处理] 成功接收内容，总长度: ${assistantMessage.content.length}字符，会话ID: ${sessionId}`);
           // 成功完成：标记 status = 'done' 让 UI 据此停止流式态显示
           assistantMessage.status = 'done';
-          const idx = state.chatMessages.findIndex(msg => msg.id === assistantMessage.id);
-          if (idx !== -1) {
-            state.chatMessages[idx] = { ...assistantMessage };
-            state.chatMessages = [...state.chatMessages];
-          }
+          refreshMessage();
         }
 
         // 流式内容接收完成，重置状态

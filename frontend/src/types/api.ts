@@ -107,3 +107,27 @@ export interface OpenAIStreamChunk {
 export interface StreamErrorChunk {
   error?: string | { message?: string };
 }
+
+// ───────────────────────────────── 前端解析后的统一事件 ─────────────────────────────────
+
+/**
+ * aiService.ts SSE 状态机解析后通过 ReadableStream 输出的统一事件格式。
+ * 每条事件序列化为一行 JSON（用 `\n` 分隔），由 messaging.ts 的 buffer+split 解析。
+ *
+ * 取代历史上的"层间 magic string"做法（`"🤔思考: ..."` / `"错误: ..."` 前缀），
+ * 让事件类型回到结构化字段，避免 in-band signaling 与文本前缀冲突。
+ */
+export interface ParsedStreamEvent {
+  type: 'thinking' | 'content' | 'error';
+  text: string;
+}
+
+/** 类型守卫：能否当作 ParsedStreamEvent 解释 */
+export function isParsedStreamEvent(x: unknown): x is ParsedStreamEvent {
+  if (x === null || typeof x !== 'object') { return false; }
+  const obj = x as { type?: unknown; text?: unknown };
+  return (
+    (obj.type === 'thinking' || obj.type === 'content' || obj.type === 'error') &&
+    typeof obj.text === 'string'
+  );
+}

@@ -7,6 +7,7 @@ from app.config.settings import settings
 from app.services.ai.application_service import AIApplicationService
 from app.services.ai.manager import AIServiceManager
 from app.services.deepseek_service import DeepseekService
+from app.services.search.brave_search import BraveSearchClient
 from app.services.terminal_service import TerminalService
 from app.utils.logger import get_logger
 
@@ -50,6 +51,15 @@ def get_ai_application_service(
 ) -> AIApplicationService:
     """获取 AI 应用服务实例。"""
     return AIApplicationService(ai_manager)
+
+
+def get_brave_search_client(request: Request) -> BraveSearchClient:
+    """获取 Brave Search 单例 client（按应用实例缓存到 app.state）。"""
+    return _get_or_create_state_service(
+        request,
+        "brave_search_client",
+        BraveSearchClient,
+    )
 
 
 def get_terminal_service(request: Request) -> TerminalService:

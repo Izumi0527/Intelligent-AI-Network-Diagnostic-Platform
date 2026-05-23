@@ -105,6 +105,15 @@ class Settings(BaseSettings):
     DEEPSEEK_MODEL_DESCRIPTIONS: Optional[str] = os.getenv("DEEPSEEK_MODEL_DESCRIPTIONS")
     DEEPSEEK_MODEL_MAX_TOKENS: Optional[str] = os.getenv("DEEPSEEK_MODEL_MAX_TOKENS")
 
+    # 联网搜索配置 (Brave Search)
+    BRAVE_SEARCH_ENABLED: bool = os.getenv("BRAVE_SEARCH_ENABLED", "false").lower() == "true"
+    BRAVE_SEARCH_API_KEY: Optional[str] = os.getenv("BRAVE_SEARCH_API_KEY")
+    BRAVE_SEARCH_BASE_URL: Optional[str] = os.getenv(
+        "BRAVE_SEARCH_BASE_URL", "https://api.search.brave.com/res/v1"
+    )
+    BRAVE_SEARCH_DEFAULT_COUNT: int = int(os.getenv("BRAVE_SEARCH_DEFAULT_COUNT", "5"))
+    BRAVE_SEARCH_TIMEOUT: int = int(os.getenv("BRAVE_SEARCH_TIMEOUT", "5"))
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,
@@ -334,6 +343,39 @@ class Settings(BaseSettings):
                 "AI配置验证失败:\n" + "\n".join(error_messages) +
                 "\n请检查.env文件并确保所有必需的AI配置项都已正确设置。"
             )
+
+        # 联网搜索（Brave）可选告警：enabled=true 但 key 空 → 自动 disable，仅 warn 不抛
+        self._validate_brave_search_config()
+
+    def _validate_brave_search_config(self) -> None:
+        """Brave Search 是可选能力：开关 true 但 key 缺失只告警 + 自动关，避免阻塞启动。"""
+        if not self.BRAVE_SEARCH_ENABLED:
+            return
+
+        api_key = (self.BRAVE_SEARCH_API_KEY or "").strip()
+        if not api_key or api_key.lower() in {"your-brave-key", "change-me", "your-key"}:
+            import logging
+            logging.getLogger(__name__).warning(
+                "BRAVE_SEARCH_ENABLED=true 但 BRAVE_SEARCH_API_KEY 未配置或为占位值，自动禁用联网搜索"
+            )
+            self.BRAVE_SEARCH_ENABLED = False
+            return
+
+        if self.BRAVE_SEARCH_DEFAULT_COUNT <= 0 or self.BRAVE_SEARCH_DEFAULT_COUNT > 20:
+            import logging
+            logging.getLogger(__name__).warning(
+                "BRAVE_SEARCH_DEFAULT_COUNT=%d 不在 [1, 20]，回退默认 5",
+                self.BRAVE_SEARCH_DEFAULT_COUNT,
+            )
+            self.BRAVE_SEARCH_DEFAULT_COUNT = 5
+
+        if self.BRAVE_SEARCH_TIMEOUT <= 0:
+            import logging
+            logging.getLogger(__name__).warning(
+                "BRAVE_SEARCH_TIMEOUT=%d 非法，回退默认 5",
+                self.BRAVE_SEARCH_TIMEOUT,
+            )
+            self.BRAVE_SEARCH_TIMEOUT = 5
 
 # 创建全局设置实例
 settings = Settings()

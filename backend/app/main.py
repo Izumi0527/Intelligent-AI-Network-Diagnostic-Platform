@@ -15,6 +15,7 @@ from app.config.settings import settings
 from app.core.rate_limit import InMemoryRateLimiter, RateLimitMiddleware, RateLimitRule
 from app.services.ai.manager import AIServiceManager
 from app.services.deepseek_service import DeepseekService
+from app.services.search.brave_search import BraveSearchClient
 from app.services.terminal_service import TerminalService
 from app.utils.api_errors import api_error_response, normalize_http_detail
 from app.utils.logger import get_logger
@@ -105,6 +106,7 @@ def _initialize_application_services(application: FastAPI) -> None:
     application.state.terminal_service = TerminalService()
     application.state.ai_service_manager = AIServiceManager()
     application.state.deepseek_service = DeepseekService()
+    application.state.brave_search_client = BraveSearchClient()
     application.state.rate_limiter = InMemoryRateLimiter()
 
 
@@ -147,6 +149,7 @@ async def lifespan(application: FastAPI):
             "terminal_service",
             "deepseek_service",
             "ai_service_manager",
+            "brave_search_client",
         ):
             if hasattr(application.state, service_name):
                 await _cleanup_service(getattr(application.state, service_name))

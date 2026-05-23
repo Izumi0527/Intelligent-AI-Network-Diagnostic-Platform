@@ -93,7 +93,10 @@ const handleSelectPrompt = (prompt: string): void => {
   chatInputRef.value?.fillText(prompt);
 };
 
-useAiKeyboard({ onClear: handleClear });
+useAiKeyboard({
+  onClear: handleClear,
+  onScrollToBottom: () => { chatMessagesRef.value?.scrollToBottom(); }
+});
 
 onMounted(async () => {
   try {

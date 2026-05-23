@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import AsyncIterator
 from unittest.mock import AsyncMock, MagicMock
 
@@ -245,3 +246,30 @@ async def test_extract_query_takes_last_user_message() -> None:
     call_args = brave.search.await_args
     query_arg = call_args.args[0] if call_args.args else call_args.kwargs.get("query")
     assert query_arg == "latest question"
+
+
+def test_format_search_block_includes_current_time_anchor() -> None:
+    """system block 必须包含当前真实时间锚点。
+
+    根因防回归：LLM 没有内置时间认知，若不显式注入真实时间，会把搜索结果摘要
+    里出现的某条新闻日期误当作"今天"——这是 temporal grounding 缺失。
+    """
+    fixed_now = datetime(2026, 5, 23, 22, 54, tzinfo=timezone.utc)
+    block = AIApplicationService._format_search_block(
+        [SearchResult(title="t", url="https://t.com", description="d")],
+        "今天是几号",
+        now=fixed_now,
+    )
+
+    assert "2026-05-23" in block, "system block 必须包含当前日期"
+    assert "当前真实时间" in block, "system block 必须显式声明这是时间锚点"
+
+
+def test_format_search_block_now_defaults_to_real_now() -> None:
+    """未传 now → 应自动使用当前时间，年份必须匹配。"""
+    block = AIApplicationService._format_search_block(
+        [SearchResult(title="t", url="https://t.com")],
+        "query",
+    )
+    current_year = str(datetime.now().year)
+    assert current_year in block

@@ -328,12 +328,31 @@ class AIApplicationService:
         return ""
 
     @staticmethod
-    def _format_search_block(results: list[SearchResult], query: str) -> str:
+    def _format_search_block(
+        results: list[SearchResult],
+        query: str,
+        *,
+        now: Optional[datetime] = None,
+    ) -> str:
         """把 Brave 搜索结果格式化为可注入的 system message 文本。
 
+        头部注入"当前真实时间"作为 temporal grounding：LLM 没有内置时间认知，
+        若不显式提供时间锚点，会把搜索结果摘要里出现的某条新闻日期误当作"今天"
+        ——这是 LLM 在 web 检索增强场景下经典的时间漂移失败模式。
+
         二次截断：单条 description 最长 240 字，整体不超过约 4KB。
+
+        Args:
+            results: Brave 返回的结构化结果列表。
+            query: 原始用户问题。
+            now: 测试注入用；None 时取 datetime.now().astimezone() 带本地时区。
         """
+        timestamp = (now or datetime.now().astimezone()).isoformat(timespec="seconds")
         lines: list[str] = [
+            f"当前真实时间: {timestamp}",
+            "请以此时间为准回答涉及\"今天/现在/最新\"等时间敏感问题；",
+            "若搜索结果摘要中出现的日期与上面声明的当前时间冲突，应以当前时间为准。",
+            "",
             "以下是来自网络的实时检索结果，请优先据此回答用户问题，并在回答末尾用 [n] 引用对应来源：",
             "",
         ]

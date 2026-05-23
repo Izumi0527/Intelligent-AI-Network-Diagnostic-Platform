@@ -21,14 +21,14 @@
       :class="[
         'bubble-base rounded-lg px-4 py-3 max-w-none break-words transition-colors fade-in',
         isUser
-          ? 'bubble-user mr-7 border border-primary/80 max-w-md'
+          ? 'bubble-user mr-7 border border-primary/80 max-w-[min(28rem,80vw)]'
           : 'bubble-assistant ml-7 border border-border/60',
         message.error !== undefined ? 'message-error-bubble' : ''
       ]"
     >
       <div
         v-if="!isUser"
-        class="prose prose-base max-w-none prose-gray dark:prose-invert leading-relaxed prose-p:mb-4 prose-ul:my-3 prose-ol:my-3 prose-li:mb-1 prose-h1:mb-4 prose-h2:mb-3 prose-h3:mb-3 prose-pre:bg-muted prose-pre:border prose-pre:border-border/60 prose-pre:p-3 prose-pre:rounded prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-blockquote:border-l-4 prose-blockquote:border-border"
+        class="prose prose-base max-w-none prose-gray dark:prose-invert leading-relaxed prose-p:mb-4 prose-ul:my-3 prose-ol:my-3 prose-li:mb-1 prose-h1:mb-4 prose-h2:mb-3 prose-h3:mb-3 prose-pre:bg-muted prose-pre:border prose-pre:border-border/60 prose-pre:p-3 prose-pre:rounded prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-blockquote:border-l-4 prose-blockquote:border-border dark:[&_p]:text-foreground/95 dark:[&_li]:text-foreground/95 dark:[&_strong]:text-foreground"
         v-html="formattedContent"
       ></div>
       <div

@@ -23,7 +23,7 @@
       class="px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5"
       :class="isConnected
         ? 'bg-success/15 text-emerald-800 dark:text-emerald-200'
-        : 'bg-destructive/15 text-destructive dark:text-destructive-foreground'"
+        : 'bg-destructive/25 text-red-800 dark:text-red-200'"
     >
       <span
         class="block w-1.5 h-1.5 rounded-full"

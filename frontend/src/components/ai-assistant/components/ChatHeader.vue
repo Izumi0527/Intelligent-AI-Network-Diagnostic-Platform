@@ -6,15 +6,19 @@
       </h2>
       <div class="flex gap-2">
         <shimmer-button
-          class="flex items-center gap-1 rounded-lg border border-border/40 px-2.5 py-1.5 text-xs font-medium text-foreground"
+          class="flex items-center gap-1 rounded-lg border border-border/40 px-2.5 py-1.5 text-xs font-medium"
           background="oklch(var(--secondary))"
           shimmer-color="oklch(var(--accent-purple) / 0.5)"
           border-radius="0.5rem"
           title="清空当前对话"
+          style="color: oklch(var(--secondary-foreground))"
           @click="openConfirm"
         >
-          <clear-icon class="w-3.5 h-3.5" />
-          <span class="hidden sm:inline">清空对话</span>
+          <clear-icon class="w-3.5 h-3.5 relative z-10" aria-hidden="true" />
+          <span
+            class="hidden sm:inline relative z-10"
+            style="color: oklch(var(--secondary-foreground))"
+          >清空对话</span>
         </shimmer-button>
       </div>
     </div>

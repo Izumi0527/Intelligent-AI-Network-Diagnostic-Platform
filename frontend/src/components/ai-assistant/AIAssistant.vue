@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-full w-full ai-assistant-panel">
     <chat-header @clear="handleClear">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+      <div class="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <model-selector
           :selected-model="store.selectedModel"
           :available-models="modelsForSelector"

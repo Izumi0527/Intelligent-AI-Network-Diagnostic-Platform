@@ -131,18 +131,25 @@ export interface StreamErrorChunk {
  *
  * 取代历史上的"层间 magic string"做法（`"🤔思考: ..."` / `"错误: ..."` 前缀），
  * 让事件类型回到结构化字段，避免 in-band signaling 与文本前缀冲突。
+ *
+ * Discriminated union：thinking/content/error 携带 text；search_results 携带 sources 与
+ * searchFailed —— 让消费方按 type 强制 narrow 字段，避免可选字段污染。
  */
-export interface ParsedStreamEvent {
-  type: 'thinking' | 'content' | 'error';
-  text: string;
-}
+export type ParsedStreamEvent =
+  | { type: 'thinking'; text: string }
+  | { type: 'content'; text: string }
+  | { type: 'error'; text: string }
+  | { type: 'search_results'; sources: SearchSource[]; searchFailed: boolean };
 
 /** 类型守卫：能否当作 ParsedStreamEvent 解释 */
 export function isParsedStreamEvent(x: unknown): x is ParsedStreamEvent {
   if (x === null || typeof x !== 'object') { return false; }
-  const obj = x as { type?: unknown; text?: unknown };
-  return (
-    (obj.type === 'thinking' || obj.type === 'content' || obj.type === 'error') &&
-    typeof obj.text === 'string'
-  );
+  const obj = x as { type?: unknown; text?: unknown; sources?: unknown; searchFailed?: unknown };
+  if (obj.type === 'thinking' || obj.type === 'content' || obj.type === 'error') {
+    return typeof obj.text === 'string';
+  }
+  if (obj.type === 'search_results') {
+    return Array.isArray(obj.sources) && typeof obj.searchFailed === 'boolean';
+  }
+  return false;
 }

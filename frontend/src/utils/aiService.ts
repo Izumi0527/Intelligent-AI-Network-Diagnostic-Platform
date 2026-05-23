@@ -8,6 +8,7 @@ import type {
   ModelsListResponse,
   OpenAIStreamChunk,
   ParsedStreamEvent,
+  SearchSource,
   StreamErrorChunk,
 } from '@/types/api';
 import { isStreamEvent } from '@/types/api';
@@ -132,9 +133,19 @@ export const aiService = {
             // 一行一条 JSON 事件输出，messaging.ts 用 buffer+split('\n') 解析。
             // 取代历史上的"层间 magic string"做法（前缀 🤔思考: / 错误:），
             // 让事件类型回到结构化字段，避免 in-band signaling 与内容前缀冲突。
-            const enqueueEvent = (type: ParsedStreamEvent['type'], text: string): void => {
+            const enqueueEvent = (type: 'thinking' | 'content' | 'error', text: string): void => {
               if (text === '') { return; }
               const payload: ParsedStreamEvent = { type, text };
+              controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+            };
+
+            // search_results 走独立 enqueue：sources/searchFailed 与 text 字段形状不同
+            const enqueueSearchResults = (sources: SearchSource[], searchFailed: boolean): void => {
+              const payload: ParsedStreamEvent = {
+                type: 'search_results',
+                sources,
+                searchFailed,
+              };
               controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
             };
 
@@ -197,13 +208,24 @@ export const aiService = {
                   return;
                 }
                 if (eventType === 'search_results') {
-                  // T2.2：识别并 log；T2.4 接入 UI 卡片
-                  const sources = (parsed as { sources?: unknown }).sources;
-                  const searchFailed = (parsed as { search_failed?: unknown }).search_failed;
-                  logger.info('收到联网搜索结果事件', {
-                    count: Array.isArray(sources) ? sources.length : 0,
-                    searchFailed,
-                  });
+                  // T2.4：识别后向 messaging.ts 派发结构化事件
+                  const raw = parsed as { sources?: unknown; search_failed?: unknown };
+                  const sources: SearchSource[] = Array.isArray(raw.sources)
+                    ? raw.sources
+                      .filter((item): item is { title: string; url: string; description?: string } => {
+                        if (item === null || typeof item !== 'object') { return false; }
+                        const obj = item as { title?: unknown; url?: unknown };
+                        return typeof obj.title === 'string' && typeof obj.url === 'string';
+                      })
+                      .map((item) => ({
+                        title: item.title,
+                        url: item.url,
+                        description: typeof item.description === 'string' ? item.description : '',
+                      }))
+                    : [];
+                  const searchFailed = raw.search_failed === true;
+                  logger.info('收到联网搜索结果事件', { count: sources.length, searchFailed });
+                  enqueueSearchResults(sources, searchFailed);
                   return;
                 }
 

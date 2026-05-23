@@ -37,6 +37,12 @@
       >{{ message.content }}</div>
     </div>
 
+    <search-sources-block
+      v-if="!isUser && (hasSources || message.searchFailed === true)"
+      :sources="message.sources ?? []"
+      :search-failed="message.searchFailed ?? false"
+    />
+
     <div v-if="showActions" class="ml-7 mt-1.5">
       <message-actions
         :message="message"
@@ -58,6 +64,7 @@ import { logger } from '@/utils/logger';
 import MessageMeta from './MessageMeta.vue';
 import ThinkingBlock from './ThinkingBlock.vue';
 import MessageActions from './MessageActions.vue';
+import SearchSourcesBlock from './SearchSourcesBlock.vue';
 
 interface Props {
   message: ChatMessage
@@ -83,6 +90,10 @@ const hasThinking = computed<boolean>(() =>
   props.message.role === 'assistant'
   && props.message.thinking !== undefined
   && props.message.thinking.content !== ''
+);
+
+const hasSources = computed<boolean>(() =>
+  Array.isArray(props.message.sources) && props.message.sources.length > 0
 );
 
 // 仅在 assistant 消息且非流式态、且内容非空时显示操作按钮

@@ -10,6 +10,7 @@ import ChatHeader from './ChatHeader.vue';
 import ModelSelector from './ModelSelector.vue';
 import StreamToggle from './StreamToggle.vue';
 import SearchToggle from './SearchToggle.vue';
+import SearchSourcesBlock from './SearchSourcesBlock.vue';
 import ChatMessages from './ChatMessages.vue';
 import ChatInput from './ChatInput.vue';
 import MessageActions from './MessageActions.vue';
@@ -21,6 +22,7 @@ export {
   ModelSelector,
   StreamToggle,
   SearchToggle,
+  SearchSourcesBlock,
   ChatMessages,
   ChatInput,
   MessageActions,

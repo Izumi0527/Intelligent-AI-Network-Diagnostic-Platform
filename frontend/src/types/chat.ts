@@ -1,6 +1,10 @@
 // 聊天与 AI 助手统一类型定义
 // 本文件是 stores/ai-assistant 与组件层共用的类型源头
 
+import type { SearchSource } from './api';
+
+export type { SearchSource };
+
 // ───────────────────────────────── 基础消息类型 ─────────────────────────────────
 
 export interface ThinkingContent {
@@ -42,6 +46,8 @@ export interface ChatMessage {
   error?: MessageError // 错误分类（用于 UI 决定是否显示 retry 按钮）
   aborted?: boolean // 用户主动中断
   status?: MessageStatus // 消息生命周期状态
+  sources?: SearchSource[] // 联网搜索引用的来源（assistant 消息且 enable_search 启用时）
+  searchFailed?: boolean // 联网搜索是否失败（启用但未取到结果或异常时为 true）
 }
 
 // 组件兼容的消息接口 - 用于 ChatMessages 组件

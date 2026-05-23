@@ -253,7 +253,15 @@ export const createMessagingActions = (
           refreshMessage();
           return;
         }
-        // 类型已 narrow 到 'content'：error/thinking 上面均 return
+        if (event.type === 'search_results') {
+          // 把联网搜索来源写到 assistantMessage，由 MessageBubble 渲染 SearchSourcesBlock；
+          // search_failed 配合空 sources 触发"联网搜索失败"警告。
+          assistantMessage.sources = event.sources;
+          assistantMessage.searchFailed = event.searchFailed;
+          refreshMessage();
+          return;
+        }
+        // 类型已 narrow 到 'content'：error/thinking/search_results 上面均 return
         await actions._addContentCharByChar(assistantMessage, event.text);
         contentReceived = true;
       };

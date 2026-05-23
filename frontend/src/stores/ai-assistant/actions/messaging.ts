@@ -9,6 +9,7 @@ interface MessagingActions {
   sendMessageStream(content: string): Promise<void>;
   stopGeneration(): void;
   retryLastMessage(): Promise<void>;
+  copyMessage(id: string): void;
   _handleStreamResponse(
     stream: ReadableStream<Uint8Array>,
     assistantMessage: ChatMessage,
@@ -484,6 +485,13 @@ export const createMessagingActions = (
       state.isThinking = false;
       state.currentThinkingContent = '';
       // abortController 在 sendMessage 的 finally 中清理；此处不立即置 null 避免竞态
+    },
+
+    // 复制消息：UI 层（MessageActions）已通过 navigator.clipboard 完成实际复制并显示反馈；
+    // store 侧只记录可观测性事件，为未来埋点 / 多选复制 / 复制审计预留扩展点。
+    copyMessage(id: string): void {
+      const msg = state.chatMessages.find(m => m.id === id);
+      logger.debug('[复制消息] id:', id, 'role:', msg?.role, 'len:', msg?.content.length ?? 0);
     },
 
     // 重试最后一次失败/中断的发送：定位末尾最近的 user 消息内容，删除该 user 及其后所有消息，

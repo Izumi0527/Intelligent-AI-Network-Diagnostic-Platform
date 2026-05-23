@@ -11,7 +11,7 @@
           shimmer-color="oklch(var(--accent-purple) / 0.5)"
           border-radius="0.5rem"
           title="清空当前对话"
-          @click="$emit('clear')"
+          @click="openConfirm"
         >
           <clear-icon class="w-3.5 h-3.5" />
           <span class="hidden sm:inline">清空对话</span>
@@ -20,15 +20,41 @@
     </div>
 
     <slot />
+
+    <confirm-dialog
+      :open="confirmOpen"
+      title="清空当前对话"
+      message="将清除当前模型下的全部聊天记录与缓存，且无法恢复。确定继续吗？"
+      confirm-text="清空"
+      cancel-text="取消"
+      @confirm="onConfirm"
+      @cancel="onCancel"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { ClearIcon } from '@/components/common/icons';
 import ShimmerButton from '@/components/ui/ShimmerButton.vue';
+import ConfirmDialog from './ConfirmDialog.vue';
 
-// 定义事件
-defineEmits<{
+const emit = defineEmits<{
   clear: []
 }>();
+
+const confirmOpen = ref(false);
+
+const openConfirm = (): void => {
+  confirmOpen.value = true;
+};
+
+const onConfirm = (): void => {
+  confirmOpen.value = false;
+  emit('clear');
+};
+
+const onCancel = (): void => {
+  confirmOpen.value = false;
+};
 </script>

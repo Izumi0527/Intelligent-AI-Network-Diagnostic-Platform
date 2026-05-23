@@ -94,6 +94,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   retry: []
+  copy: [id: string]
 }>();
 
 const copied = ref(false);
@@ -103,6 +104,9 @@ const onCopy = async (): Promise<void> => {
     await navigator.clipboard.writeText(props.message.content);
     copied.value = true;
     setTimeout(() => { copied.value = false; }, 1500);
+    if (props.message.id !== undefined) {
+      emit('copy', props.message.id);
+    }
   } catch (error) {
     logger.warn('复制到剪贴板失败:', error);
   }

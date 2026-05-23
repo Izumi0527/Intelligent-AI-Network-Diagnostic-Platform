@@ -1,7 +1,7 @@
 <template>
   <div
     ref="containerRef"
-    class="flex-1 overflow-y-auto p-4 space-y-6 bg-transparent"
+    class="chat-messages relative flex-1 overflow-y-auto p-4 space-y-6 bg-transparent"
     style="min-height: 400px;"
   >
     <!-- 空状态 -->
@@ -63,7 +63,8 @@
             'rounded-lg px-4 py-3 max-w-none break-words transition-colors fade-in',
             message.role === 'user'
               ? 'bg-primary text-primary-foreground mr-7 border border-primary/80 max-w-md'
-              : 'bg-muted/40 ml-7 border border-border/60'
+              : 'bg-muted/40 ml-7 border border-border/60',
+            message.error !== undefined ? 'message-error-bubble' : ''
           ]"
         >
           <div
@@ -75,6 +76,24 @@
             v-else
             class="whitespace-pre-wrap text-sm leading-relaxed text-primary-foreground"
           >{{ message.content }}</div>
+        </div>
+
+        <!-- 消息操作按钮：仅在 assistant 消息且非流式中时挂出 -->
+        <div
+          v-if="
+            message.role === 'assistant'
+              && !isMessageStreaming(message)
+              && message.content.trim() !== ''
+          "
+          class="ml-7 mt-1.5"
+        >
+          <message-actions
+            :message="message"
+            :can-retry="canRetryMessage(message)"
+            :visible="message.error !== undefined"
+            @retry="onRetry"
+            @copy="onCopy"
+          />
         </div>
       </div>
     </template>
@@ -154,15 +173,22 @@
         </div>
       </div>
     </div>
+
+    <!-- 悬浮"停止生成"按钮：覆盖在消息列表底部居中，仅在流式接收中或思考中显示 -->
+    <stop-generation-button :visible="canStop" @stop="onStop" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { useChatScroll } from '@/composables';
 import type { ChatMessage } from '@/types/chat';
+import { useAiAssistantStore } from '@/stores/ai-assistant';
 import { logger } from '@/utils/logger';
+import MessageActions from './MessageActions.vue';
+import StopGenerationButton from './StopGenerationButton.vue';
 
 export interface StreamState {
   isTyping: boolean
@@ -176,6 +202,8 @@ const props = defineProps<{
   messages: ChatMessage[]
   streamState: StreamState
 }>();
+
+const store = useAiAssistantStore();
 
 const { containerRef, scrollToBottom } = useChatScroll({
   messageCount: () => props.messages.length,
@@ -198,12 +226,45 @@ const formatMessage = (content: string): string => {
 };
 
 const formatTime = (timestamp?: number): string => {
-  if (!timestamp) { return ''; }
+  if (timestamp === undefined || timestamp === 0) { return ''; }
   const date = new Date(timestamp);
   return date.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit'
   });
+};
+
+// 一条消息当前是否处于"流式接收/思考"中——用于阻止 MessageActions 在未完成时挂出
+const isMessageStreaming = (message: ChatMessage): boolean => {
+  return message.status === 'streaming' || message.status === 'sending';
+};
+
+// 消息是否可重试：有 retryable 错误且当前未在响应中
+const canRetryMessage = (message: ChatMessage): boolean => {
+  if (message.error?.retryable !== true) { return false; }
+  return !store.isAIResponding && !store.isStreamingContent;
+};
+
+// "停止生成"按钮可见性：思考中 或 流式接收中
+const canStop = computed<boolean>(() =>
+  props.streamState.isThinking
+  || props.streamState.isStreamingContent
+  || props.streamState.isTyping
+);
+
+const onStop = (): void => {
+  logger.debug('[ChatMessages] 用户点击停止生成');
+  store.stopGeneration();
+};
+
+const onRetry = (): void => {
+  logger.debug('[ChatMessages] 用户点击重试');
+  void store.retryLastMessage();
+};
+
+const onCopy = (id: string): void => {
+  logger.debug('[ChatMessages] 用户复制消息', { id });
+  store.copyMessage(id);
 };
 
 defineExpose({ scrollToBottom });
@@ -217,20 +278,25 @@ defineExpose({ scrollToBottom });
   margin-bottom: 1.5rem;
 }
 
-.flex-1::-webkit-scrollbar {
+.message-error-bubble {
+  border-color: oklch(0.55 0.18 30 / 0.5) !important;
+  background: color-mix(in oklch, oklch(0.55 0.18 30 / 0.08), oklch(var(--background)) 70%);
+}
+
+.chat-messages::-webkit-scrollbar {
   width: 6px;
 }
 
-.flex-1::-webkit-scrollbar-track {
+.chat-messages::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.flex-1::-webkit-scrollbar-thumb {
+.chat-messages::-webkit-scrollbar-thumb {
   background: color-mix(in oklch, oklch(var(--muted)), oklch(var(--foreground)) 18%);
   border-radius: 3px;
 }
 
-.flex-1::-webkit-scrollbar-thumb:hover {
+.chat-messages::-webkit-scrollbar-thumb:hover {
   background: color-mix(in oklch, oklch(var(--muted)), oklch(var(--foreground)) 32%);
 }
 </style>

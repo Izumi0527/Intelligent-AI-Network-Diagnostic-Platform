@@ -14,7 +14,7 @@
     <thinking-block
       v-if="hasThinking && message.thinking"
       :thinking="message.thinking"
-      :is-streaming="false"
+      :is-streaming="isThinkingStreaming"
     />
 
     <div
@@ -90,6 +90,17 @@ const hasThinking = computed<boolean>(() =>
   props.message.role === 'assistant'
   && props.message.thinking !== undefined
   && props.message.thinking.content !== ''
+);
+
+// 流式状态由消息生命周期 + thinking 完成标记联合决定：
+// 既未完成 (isComplete=false) 且消息仍在 streaming 状态 → 显示蓝色脉冲点 + "AI助手思考中..."；
+// 否则回到完成态视觉 ("🤔 AI思考过程 ✓"，可折叠)。
+// 这取代了原 ChatMessages 底部那块"实时镜像 ThinkingBlock"，把流式视觉收回到消息原子单元内。
+const isThinkingStreaming = computed<boolean>(() =>
+  props.message.role === 'assistant'
+  && props.message.status === 'streaming'
+  && props.message.thinking !== undefined
+  && props.message.thinking.isComplete === false
 );
 
 const hasSources = computed<boolean>(() =>

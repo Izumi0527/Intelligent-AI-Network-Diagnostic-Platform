@@ -40,13 +40,6 @@
       />
     </template>
 
-    <!-- 实时思考流：AI 正在思考时显示 -->
-    <thinking-block
-      v-if="streamState.isThinking && streamState.currentThinkingContent !== ''"
-      :thinking="liveThinking"
-      :is-streaming="true"
-    />
-
     <!-- 非流式模式下接收中提示（非消息，状态指示器） -->
     <div
       v-if="streamState.isStreamingContent && !streamState.streamingEnabled"
@@ -108,11 +101,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useChatScroll } from '@/composables';
-import type { ChatMessage, ThinkingContent } from '@/types/chat';
+import type { ChatMessage } from '@/types/chat';
 import { useAiAssistantStore } from '@/stores/ai-assistant';
 import { logger } from '@/utils/logger';
 import MessageBubble from './MessageBubble.vue';
-import ThinkingBlock from './ThinkingBlock.vue';
 import StopGenerationButton from './StopGenerationButton.vue';
 import EmptyState from './EmptyState.vue';
 import ScrollToBottomButton from './ScrollToBottomButton.vue';
@@ -168,13 +160,6 @@ const isCompactMeta = (index: number): boolean => {
   const dt = currTs - prevTs;
   return dt >= 0 && dt < 60_000;
 };
-
-// 实时思考流 ThinkingBlock 的 prop：包一层让接口与历史态统一
-const liveThinking = computed<ThinkingContent>(() => ({
-  content: props.streamState.currentThinkingContent,
-  isComplete: false,
-  timestamp: Date.now()
-}));
 
 // 当前是否在响应中（透传给 MessageBubble 控制 retry 按钮可用性）
 const isResponding = computed<boolean>(() =>

@@ -113,20 +113,42 @@ export const aiService = {
         messageCount: formattedParams.messages.length
       });
 
-      // 使用不同的方式处理流式响应；signal 为 undefined 时不放进 config 以满足
-      // axios GenericAbortSignal 的非可空契约（exactOptionalPropertyTypes 严格）。
-      const axiosConfig: Parameters<typeof api.post>[2] = {
-        responseType: 'text',
-        timeout: 120000
+      // 用 fetch + 原生 response.body 拿真流式响应。axios 浏览器端基于 XHR，
+      // responseType:'text' 必须等响应完整结束才返回字符串——这会让上游 SSE 的
+      // 60+ thinking event 在前端被批处理成"45 秒零渲染→整段突现"。fetch 的
+      // response.body 是真 ReadableStream<Uint8Array>，按 TCP 节奏到达即可读。
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream'
+      };
+      if (internalApiToken !== undefined && internalApiToken !== '') {
+        headers.Authorization = `Bearer ${internalApiToken}`;
+      }
+      const fetchInit: RequestInit = {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(formattedParams)
       };
       if (options.signal !== undefined) {
-        axiosConfig.signal = options.signal;
+        fetchInit.signal = options.signal;
       }
-      const response = await api.post<string>('/ai/chat/stream', formattedParams, axiosConfig);
+      const response = await fetch('/api/ai/chat/stream', fetchInit);
+      if (!response.ok || response.body === null) {
+        // 走外层 catch 的 errorStream 兜底；构造 ApiError 形态保持日志/UI 一致
+        const text = await response.text().catch(() => '');
+        const err = new Error(`HTTP ${response.status}: ${text === '' ? response.statusText : text}`) as ApiError;
+        err.response = {
+          data: text === '' ? { detail: response.statusText } : { detail: text },
+          status: response.status,
+          statusText: response.statusText
+        };
+        throw err;
+      }
+      const responseBody = response.body;
 
       // 创建一个可读流，用于处理SSE格式的数据
       const stream = new ReadableStream<Uint8Array>({
-        start(controller): void {
+        async start(controller): Promise<void> {
           const encoder = new TextEncoder();
 
           try {
@@ -289,28 +311,46 @@ export const aiService = {
               }
             };
 
-            // 处理文本响应。api.post<string> 的泛型已保证 data 为 string。
-            const textData = response.data;
-            logger.debug('收到文本响应，长度：', textData.length);
+            // fetch 原生流：边接收 chunk 边解码、按 \n 切行、按 SSE 状态机派发
+            // (currentEvent / dataBuffer / flushEvent)。不再攒齐完整字符串才处理，
+            // 上游每个 thinking / content 事件到达即向下传播，让 messaging.ts 那
+            // 端的 reader 真正按时间分布拿到事件，恢复"逐字增长"的流式观感。
+            const reader = responseBody.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let lineBuffer = '';
 
-            if (typeof textData !== 'string') {
-              throw new Error(`响应数据类型意外：${typeof textData}`);
-            }
-
-            for (const rawLine of textData.split('\n')) {
+            const processLine = (rawLine: string): void => {
               const line = rawLine.replace(/\r$/, '');
               if (line === '') {
                 flushEvent();
-                continue;
+                return;
               }
-              if (line.startsWith(':')) { continue; }
+              if (line.startsWith(':')) { return; }
               if (line.startsWith('event:')) {
                 currentEvent = line.slice(6).trim();
-                continue;
+                return;
               }
               if (line.startsWith('data:')) {
                 dataBuffer.push(line.slice(5).replace(/^ /, ''));
-                continue;
+                return;
+              }
+            };
+
+            for (;;) {
+              const { value, done } = await reader.read();
+              if (done) { break; }
+              lineBuffer += decoder.decode(value, { stream: true });
+              const lines = lineBuffer.split('\n');
+              lineBuffer = lines.pop() ?? '';
+              for (const rawLine of lines) {
+                processLine(rawLine);
+              }
+            }
+            // flush decoder 跨字节字符尾部 + 兜底处理末尾不完整行
+            lineBuffer += decoder.decode();
+            if (lineBuffer !== '') {
+              for (const rawLine of lineBuffer.split('\n')) {
+                processLine(rawLine);
               }
             }
             // 部分上游不发尾随空行，兜底 flush

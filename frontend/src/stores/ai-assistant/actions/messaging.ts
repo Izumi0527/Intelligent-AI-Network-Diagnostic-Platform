@@ -241,7 +241,9 @@ export const createMessagingActions = (
         if (event.type === 'thinking') {
           thinkingContent += event.text;
           state.isThinking = true;
-          state.currentThinkingContent = thinkingContent;
+          // 不再写 state.currentThinkingContent：thinking 唯一渲染源是
+          // MessageBubble 内的 ThinkingBlock（绑定 assistantMessage.thinking），
+          // 不存在 ChatMessages 底部那块"实时镜像块"，避免双挂载。
           // 重建整个 thinking 对象（而非 mutate .content）：refreshMessage 做 { ...assistantMessage }
           // 浅拷贝后 chatMessages[idx].thinking 仍指向同一子对象，Vue lazy proxify 嵌套对象时
           // 通过原对象 mutate 属性绕过 proxy set trap，触发不了渲染——必须替换整个 thinking 引用。
@@ -262,6 +264,22 @@ export const createMessagingActions = (
           return;
         }
         // 类型已 narrow 到 'content'：error/thinking/search_results 上面均 return
+        // 首次进入 content 阶段：立即把 thinking 切完成态。语义边界——"thinking 已结束，content 开始"。
+        // 不能等流末尾完成分支(L358)再切：那里要等所有 content 字符播完 reader.read 才 done=true，
+        // _addContentCharByChar 每字 setTimeout(20ms) 阻塞 reader 循环，整段 content 可能播 10-60 秒，
+        // 期间 ThinkingBlock 会一直停在"AI助手思考中"流式态——这就是"思考结束等回答完才结束"的 BUG 形态。
+        // 用 `!contentReceived` 守卫，确保这块只在首个 content 事件触发一次；后续 content 直接走打字机。
+        if (!contentReceived
+            && assistantMessage.thinking !== undefined
+            && assistantMessage.thinking.isComplete === false) {
+          assistantMessage.thinking = {
+            content: assistantMessage.thinking.content,
+            isComplete: true,
+            timestamp: assistantMessage.thinking.timestamp
+          };
+          refreshMessage();
+          state.isThinking = false;
+        }
         await actions._addContentCharByChar(assistantMessage, event.text);
         contentReceived = true;
       };

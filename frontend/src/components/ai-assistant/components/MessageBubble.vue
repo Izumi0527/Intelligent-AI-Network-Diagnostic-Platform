@@ -19,10 +19,10 @@
 
     <div
       :class="[
-        'rounded-lg px-4 py-3 max-w-none break-words transition-colors fade-in',
+        'bubble-base rounded-lg px-4 py-3 max-w-none break-words transition-colors fade-in',
         isUser
-          ? 'bg-primary text-primary-foreground mr-7 border border-primary/80 max-w-md'
-          : 'bg-muted/40 ml-7 border border-border/60',
+          ? 'bubble-user mr-7 border border-primary/80 max-w-md'
+          : 'bubble-assistant ml-7 border border-border/60',
         message.error !== undefined ? 'message-error-bubble' : ''
       ]"
     >
@@ -33,7 +33,7 @@
       ></div>
       <div
         v-else
-        class="whitespace-pre-wrap text-sm leading-relaxed text-primary-foreground"
+        class="whitespace-pre-wrap text-sm leading-relaxed"
       >{{ message.content }}</div>
     </div>
 
@@ -121,6 +121,17 @@ const onRetry = (): void => { emit('retry'); };
 }
 .message-assistant {
   margin-bottom: 1.5rem;
+}
+
+.bubble-user {
+  background: var(--bubble-user-bg);
+  /* 用户气泡文字固定白色：bg 在 light/dark 两种主题下都是深蓝紫，foreground
+     不能跟随 --primary-foreground 翻转（dark 下会变深色，contrast 仅 3.1，
+     未达 WCAG AA 4.5:1） */
+  color: oklch(0.985 0 0);
+}
+.bubble-assistant {
+  background: var(--bubble-assistant-bg);
 }
 
 .message-error-bubble {

@@ -1,6 +1,9 @@
 <template>
   <div
     ref="containerRef"
+    role="log"
+    aria-live="polite"
+    aria-label="AI 对话消息列表"
     class="chat-messages relative flex-1 overflow-y-auto p-4 space-y-6 bg-transparent"
     style="min-height: 400px;"
   >
@@ -13,118 +16,27 @@
       </div>
     </div>
 
-    <!-- 消息列表 -->
+    <!-- 消息列表：MessageBubble 取代旧 80 行内联模板，ThinkingBlock 由 MessageBubble 内部聚合 -->
     <template v-else>
-      <div
+      <message-bubble
         v-for="(message, index) in messages"
         :key="message.id ?? index"
-        :class="[
-          message.role === 'user' ? 'message-user flex flex-col items-end' : 'message-assistant',
-          'group transition-[transform,opacity,background-color] duration-[var(--dur-base)] ease-[var(--ease-out)]'
-        ]"
-      >
-        <div
-          :class="[
-            'font-medium text-xs mb-1.5 opacity-70 group-hover:opacity-100 flex items-center gap-2 text-muted-foreground',
-            message.role === 'user' ? 'flex-row-reverse' : ''
-          ]"
-        >
-          <span class="inline-block w-5 h-5 rounded-full overflow-hidden flex items-center justify-center" aria-hidden="true">
-            <span v-if="message.role === 'user'" class="text-xs">👤</span>
-            <span v-else class="text-xs">🤖</span>
-          </span>
-          <span class="text-foreground/80">{{ message.role === 'user' ? '用户' : 'AI助手' }}</span>
-          <span class="text-muted-foreground/70 text-[10px]">{{ formatTime(message.timestamp) }}</span>
-        </div>
-
-        <!-- 思考内容（仅 AI 助手消息且有思考内容时显示） -->
-        <div
-          v-if="message.role === 'assistant' && message.thinking && message.thinking.content"
-          role="log"
-          aria-live="polite"
-          class="ml-7 mb-2 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg dark:from-blue-950/40 dark:to-purple-950/40 dark:border-blue-800"
-        >
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-blue-600 dark:text-blue-300 text-sm" aria-hidden="true">🤔</span>
-            <span class="text-blue-700 dark:text-blue-200 text-xs font-medium">AI思考过程</span>
-            <span
-              v-if="!message.thinking.isComplete"
-              class="text-blue-500 dark:text-blue-300 text-xs"
-              aria-busy="true"
-            >思考中...</span>
-          </div>
-          <div class="text-sm text-blue-800 dark:text-blue-100 whitespace-pre-wrap leading-relaxed">
-            {{ message.thinking.content }}
-          </div>
-        </div>
-
-        <div
-          :class="[
-            'rounded-lg px-4 py-3 max-w-none break-words transition-colors fade-in',
-            message.role === 'user'
-              ? 'bg-primary text-primary-foreground mr-7 border border-primary/80 max-w-md'
-              : 'bg-muted/40 ml-7 border border-border/60',
-            message.error !== undefined ? 'message-error-bubble' : ''
-          ]"
-        >
-          <div
-            v-if="message.role === 'assistant'"
-            class="prose prose-base max-w-none prose-gray dark:prose-invert leading-relaxed prose-p:mb-4 prose-ul:my-3 prose-ol:my-3 prose-li:mb-1 prose-h1:mb-4 prose-h2:mb-3 prose-h3:mb-3 prose-pre:bg-muted prose-pre:border prose-pre:border-border/60 prose-pre:p-3 prose-pre:rounded prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-blockquote:border-l-4 prose-blockquote:border-border"
-            v-html="formatMessage(message.content)"
-          ></div>
-          <div
-            v-else
-            class="whitespace-pre-wrap text-sm leading-relaxed text-primary-foreground"
-          >{{ message.content }}</div>
-        </div>
-
-        <!-- 消息操作按钮：仅在 assistant 消息且非流式中时挂出 -->
-        <div
-          v-if="
-            message.role === 'assistant'
-              && !isMessageStreaming(message)
-              && message.content.trim() !== ''
-          "
-          class="ml-7 mt-1.5"
-        >
-          <message-actions
-            :message="message"
-            :can-retry="canRetryMessage(message)"
-            :visible="message.error !== undefined"
-            @retry="onRetry"
-            @copy="onCopy"
-          />
-        </div>
-      </div>
+        :message="message"
+        :compact-meta="isCompactMeta(index)"
+        :is-responding="isResponding"
+        @copy="onCopy"
+        @retry="onRetry"
+      />
     </template>
 
     <!-- 实时思考流：AI 正在思考时显示 -->
-    <div
-      v-if="streamState.isThinking && streamState.currentThinkingContent"
-      role="log"
-      aria-live="polite"
-      aria-busy="true"
-      class="message-assistant group transition-[transform,opacity,background-color] duration-[var(--dur-base)] ease-[var(--ease-out)] fade-in"
-    >
-      <div class="font-medium text-xs mb-1.5 opacity-70 flex items-center gap-2 text-muted-foreground">
-        <span class="inline-block w-5 h-5 rounded-full overflow-hidden flex items-center justify-center" aria-hidden="true">
-          <span class="text-xs">🤔</span>
-        </span>
-        <span class="text-blue-700 dark:text-blue-200">AI助手思考中</span>
-        <span class="text-blue-400 dark:text-blue-300 text-[10px]">正在思考...</span>
-      </div>
-      <div class="rounded-lg px-3 py-2 bg-gradient-to-r from-blue-50 to-purple-50 ml-7 border border-blue-200 dark:from-blue-950/40 dark:to-purple-950/40 dark:border-blue-800">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse" aria-hidden="true"></div>
-          <span class="text-xs font-medium text-blue-700 dark:text-blue-200">思考过程</span>
-        </div>
-        <div class="text-sm text-blue-800 dark:text-blue-100 whitespace-pre-wrap leading-relaxed">
-          {{ streamState.currentThinkingContent }}
-        </div>
-      </div>
-    </div>
+    <thinking-block
+      v-if="streamState.isThinking && streamState.currentThinkingContent !== ''"
+      :thinking="liveThinking"
+      :is-streaming="true"
+    />
 
-    <!-- 非流式模式下接收中提示 -->
+    <!-- 非流式模式下接收中提示（非消息，状态指示器） -->
     <div
       v-if="streamState.isStreamingContent && !streamState.streamingEnabled"
       role="status"
@@ -139,7 +51,7 @@
         <span class="text-foreground/80">AI助手</span>
         <span class="text-muted-foreground/70 text-[10px]">正在回复...</span>
       </div>
-      <div class="rounded-lg px-3 py-2 bg-muted/40 ml-7 border border-border/60">
+      <div class="rounded-lg px-3 py-2 ml-7 border border-border/60 bubble-assistant-bg">
         <div class="flex items-center gap-1">
           <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse" aria-hidden="true"></div>
           <span class="text-sm text-muted-foreground ml-2">正在接收内容中...</span>
@@ -147,7 +59,7 @@
       </div>
     </div>
 
-    <!-- 非流式模式下打字气泡 -->
+    <!-- 非流式模式下打字气泡（非消息，状态指示器） -->
     <div
       v-if="streamState.isTyping && !streamState.isStreamingContent && !streamState.streamingEnabled"
       role="status"
@@ -162,7 +74,7 @@
         <span class="text-foreground/80">AI助手</span>
         <span class="text-muted-foreground/70 text-[10px]">正在输入...</span>
       </div>
-      <div class="rounded-lg px-3 py-2 bg-muted/40 ml-7 border border-border/60">
+      <div class="rounded-lg px-3 py-2 ml-7 border border-border/60 bubble-assistant-bg">
         <div class="flex items-center gap-1">
           <div class="flex space-x-1" aria-hidden="true">
             <div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
@@ -181,13 +93,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
 import { useChatScroll } from '@/composables';
-import type { ChatMessage } from '@/types/chat';
+import type { ChatMessage, ThinkingContent } from '@/types/chat';
 import { useAiAssistantStore } from '@/stores/ai-assistant';
 import { logger } from '@/utils/logger';
-import MessageActions from './MessageActions.vue';
+import MessageBubble from './MessageBubble.vue';
+import ThinkingBlock from './ThinkingBlock.vue';
 import StopGenerationButton from './StopGenerationButton.vue';
 
 export interface StreamState {
@@ -211,41 +122,33 @@ const { containerRef, scrollToBottom } = useChatScroll({
   isStreamingContent: () => props.streamState.isStreamingContent
 });
 
-const formatMessage = (content: string): string => {
-  try {
-    const parsed = marked.parse(content, { async: false });
-    const html = typeof parsed === 'string' ? parsed : content;
-    return DOMPurify.sanitize(html, {
-      ADD_TAGS: ['pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
-      ADD_ATTR: ['class', 'target', 'rel']
-    });
-  } catch (error) {
-    logger.error('Markdown 渲染错误:', error);
-    return DOMPurify.sanitize(content);
-  }
+// 是否紧凑 meta：上一条同 role 且时间差 < 60s 时折叠头像/角色名，仅显时间
+const isCompactMeta = (index: number): boolean => {
+  if (index === 0) { return false; }
+  const prev = props.messages[index - 1];
+  const curr = props.messages[index];
+  if (prev === undefined || curr === undefined) { return false; }
+  if (prev.role !== curr.role) { return false; }
+  const prevTs = prev.timestamp ?? 0;
+  const currTs = curr.timestamp ?? 0;
+  if (prevTs === 0 || currTs === 0) { return false; }
+  const dt = currTs - prevTs;
+  return dt >= 0 && dt < 60_000;
 };
 
-const formatTime = (timestamp?: number): string => {
-  if (timestamp === undefined || timestamp === 0) { return ''; }
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
+// 实时思考流 ThinkingBlock 的 prop：包一层让接口与历史态统一
+const liveThinking = computed<ThinkingContent>(() => ({
+  content: props.streamState.currentThinkingContent,
+  isComplete: false,
+  timestamp: Date.now()
+}));
 
-// 一条消息当前是否处于"流式接收/思考"中——用于阻止 MessageActions 在未完成时挂出
-const isMessageStreaming = (message: ChatMessage): boolean => {
-  return message.status === 'streaming' || message.status === 'sending';
-};
+// 当前是否在响应中（透传给 MessageBubble 控制 retry 按钮可用性）
+const isResponding = computed<boolean>(() =>
+  store.isAIResponding || store.isStreamingContent
+);
 
-// 消息是否可重试：有 retryable 错误且当前未在响应中
-const canRetryMessage = (message: ChatMessage): boolean => {
-  if (message.error?.retryable !== true) { return false; }
-  return !store.isAIResponding && !store.isStreamingContent;
-};
-
-// "停止生成"按钮可见性：思考中 或 流式接收中
+// "停止生成"按钮可见性：思考中 或 流式接收中 或 打字气泡中
 const canStop = computed<boolean>(() =>
   props.streamState.isThinking
   || props.streamState.isStreamingContent
@@ -271,16 +174,12 @@ defineExpose({ scrollToBottom });
 </script>
 
 <style scoped>
-.message-user {
-  margin-bottom: 1.5rem;
-}
 .message-assistant {
   margin-bottom: 1.5rem;
 }
 
-.message-error-bubble {
-  border-color: oklch(0.55 0.18 30 / 0.5) !important;
-  background: color-mix(in oklch, oklch(0.55 0.18 30 / 0.08), oklch(var(--background)) 70%);
+.bubble-assistant-bg {
+  background: var(--bubble-assistant-bg);
 }
 
 .chat-messages::-webkit-scrollbar {

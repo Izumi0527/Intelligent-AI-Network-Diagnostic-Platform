@@ -4,7 +4,7 @@
     role="log"
     aria-live="polite"
     :aria-busy="isBusy ? 'true' : 'false'"
-    class="thinking-block ml-7 mb-2 p-3 rounded-lg border bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 dark:from-blue-950/40 dark:to-purple-950/40 dark:border-blue-800"
+    class="thinking-block ml-7 mb-2 p-3 rounded-lg border border-blue-200 dark:border-blue-800"
   >
     <div class="flex items-center gap-2 mb-2">
       <template v-if="isStreaming">
@@ -12,19 +12,19 @@
           class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"
           aria-hidden="true"
         ></span>
-        <span class="text-blue-700 dark:text-blue-200 text-xs font-medium">AI助手思考中</span>
-        <span class="text-blue-400 dark:text-blue-300 text-[10px]">正在思考...</span>
+        <span class="thinking-title text-xs font-medium">AI助手思考中</span>
+        <span class="thinking-meta text-[10px]">正在思考...</span>
       </template>
       <template v-else>
-        <span class="text-blue-600 dark:text-blue-300 text-sm" aria-hidden="true">🤔</span>
-        <span class="text-blue-700 dark:text-blue-200 text-xs font-medium">AI思考过程</span>
+        <span class="thinking-title text-sm" aria-hidden="true">🤔</span>
+        <span class="thinking-title text-xs font-medium">AI思考过程</span>
         <span
           v-if="!thinking.isComplete"
-          class="text-blue-500 dark:text-blue-300 text-xs"
+          class="thinking-meta text-xs"
         >思考中...</span>
       </template>
     </div>
-    <div class="text-sm text-blue-800 dark:text-blue-100 whitespace-pre-wrap leading-relaxed">
+    <div class="thinking-content text-sm whitespace-pre-wrap leading-relaxed">
       {{ thinking.content }}
     </div>
   </div>
@@ -48,3 +48,18 @@ const isBusy = computed<boolean>(() =>
   props.isStreaming || !props.thinking.isComplete
 );
 </script>
+
+<style scoped>
+.thinking-block {
+  background: var(--thinking-bg);
+}
+.thinking-content {
+  color: var(--thinking-fg);
+}
+.thinking-title {
+  color: color-mix(in oklch, var(--thinking-fg) 85%, oklch(var(--primary)) 15%);
+}
+.thinking-meta {
+  color: color-mix(in oklch, var(--thinking-fg) 60%, transparent);
+}
+</style>

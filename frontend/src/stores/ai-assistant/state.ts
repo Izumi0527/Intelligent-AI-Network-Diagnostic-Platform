@@ -2,7 +2,7 @@ import type { AIAssistantState } from '@/types/chat';
 import { generateId } from '../../utils/helpers';
 
 export const initialState = (): AIAssistantState => ({
-  selectedModel: 'deepseek-v4-pro',
+  selectedModel: 'deepseek-v4-flash',
   availableModels: [], // 移除硬编码预设模型，统一使用后端配置
   isModelConnected: false,
   streamingEnabled: true,

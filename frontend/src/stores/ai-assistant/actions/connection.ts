@@ -92,7 +92,7 @@ export const createConnectionActions = (state: AIAssistantState): ConnectionActi
     if (state.availableModels.length === 0) {
       logger.warn('没有可用模型，使用最小默认配置');
       state.availableModels = [
-        { label: 'DeepSeek-V4-Pro', value: 'deepseek-v4-pro', available: true }
+        { label: 'DeepSeek-V4-Flash', value: 'deepseek-v4-flash', available: true }
       ];
     }
   }

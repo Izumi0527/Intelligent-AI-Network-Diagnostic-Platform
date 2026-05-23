@@ -59,7 +59,7 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "model": "deepseek-v4-pro",
+                "model": "deepseek-v4-flash",
                 "messages": [
                     {
                         "role": "user",
@@ -169,10 +169,10 @@ class ChatResponse(BaseModel):
             "example": {
                 "message": {
                     "role": "assistant",
-                    "content": "我是DeepSeek-V4-Pro大语言模型。",
+                    "content": "我是DeepSeek-V4-Flash大语言模型。",
                 },
-                "model": "deepseek-v4-pro",
-                "content": "我是DeepSeek-V4-Pro大语言模型。",
+                "model": "deepseek-v4-flash",
+                "content": "我是DeepSeek-V4-Flash大语言模型。",
                 "finish_reason": "stop",
                 "usage": {
                     "prompt_tokens": 10,
@@ -221,7 +221,7 @@ class DeepseekGenerateRequest(BaseModel):
     temperature: float = Field(0.7, description="生成文本的随机性", ge=0, le=2)
     stream: bool = Field(False, description="是否使用流式响应")
     model: str = Field(
-        "deepseek-v4-pro",
+        "deepseek-v4-flash",
         description="使用的模型名称",
         min_length=1,
         max_length=100,

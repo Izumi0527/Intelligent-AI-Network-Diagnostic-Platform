@@ -59,7 +59,7 @@ def test_env_example_uses_latest_supported_models():
         assert _split_env_list(values[key]) == expected_models
 
     assert values["CLAUDE_MODEL_VERSION"] == "claude-opus-4-7"
-    assert values["DEEPSEEK_MODEL_VERSION"] == "deepseek-v4-pro"
+    assert values["DEEPSEEK_MODEL_VERSION"] == "deepseek-v4-flash"
 
 
 def test_builtin_default_models_are_current_when_parser_falls_back():

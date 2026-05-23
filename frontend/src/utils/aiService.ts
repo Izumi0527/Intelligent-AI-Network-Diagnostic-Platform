@@ -43,6 +43,7 @@ interface SendMessageParams {
     model: string;
     messages: MessageHistoryItem[] | ChatMessage[];
     stream?: boolean;
+    enable_search?: boolean;
 }
 
 // 控制选项，与业务参数分离

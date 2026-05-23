@@ -143,7 +143,8 @@ export const createMessagingActions = (
             {
               model: state.selectedModel,
               messages: messageHistory,
-              stream: true
+              stream: true,
+              enable_search: state.searchEnabled
             },
             signal !== undefined ? { signal } : {}
           );
@@ -458,7 +459,8 @@ export const createMessagingActions = (
 
         const response = await aiService.sendMessageWithRetry({
           model: state.selectedModel,
-          messages: messagesToSend
+          messages: messagesToSend,
+          enable_search: state.searchEnabled
         }, 3);
 
         const assistantContent = response.data.content ?? response.data.message?.content;

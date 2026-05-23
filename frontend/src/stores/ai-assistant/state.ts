@@ -6,6 +6,7 @@ export const initialState = (): AIAssistantState => ({
   availableModels: [], // 移除硬编码预设模型，统一使用后端配置
   isModelConnected: false,
   streamingEnabled: true,
+  searchEnabled: false,
   isAIResponding: false,
   isStreamingContent: false,  // 新增：正在接收流式内容
   isThinking: false, // 新增：是否正在思考中

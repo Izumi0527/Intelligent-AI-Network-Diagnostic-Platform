@@ -8,7 +8,10 @@
           :is-connected="store.isModelConnected"
           @model-change="handleModelChange"
         />
-        <stream-toggle :enabled="store.streamingEnabled" @toggle="store.toggleStreamingMode" />
+        <div class="flex flex-col gap-2 sm:gap-4 sm:flex-row sm:items-center">
+          <search-toggle :enabled="store.searchEnabled" @toggle="handleSearchToggle" />
+          <stream-toggle :enabled="store.streamingEnabled" @toggle="store.toggleStreamingMode" />
+        </div>
       </div>
     </chat-header>
 
@@ -31,11 +34,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { ChatHeader, ModelSelector, StreamToggle, ChatMessages, ChatInput } from './components';
+import { ChatHeader, ModelSelector, StreamToggle, SearchToggle, ChatMessages, ChatInput } from './components';
 import { useAiAssistantStore } from '@/stores/ai-assistant';
 import { useAiKeyboard } from '@/composables';
 import type { ChatMessage } from '@/types/chat';
 import { logger } from '@/utils/logger';
+
+const SEARCH_TOGGLE_STORAGE_KEY = 'ai_assistant_search_enabled';
 
 const store = useAiAssistantStore();
 const chatMessagesRef = ref<InstanceType<typeof ChatMessages> | null>(null);
@@ -80,6 +85,17 @@ const handleModelChange = async (value: string): Promise<void> => {
   }
 };
 
+// SearchToggle 是用户级偏好，独立 localStorage key 持久化；
+// 与 streamingEnabled 的"每对话 settings"不同，搜索开关在跨对话场景应稳定。
+const handleSearchToggle = (): void => {
+  store.toggleSearchMode();
+  try {
+    localStorage.setItem(SEARCH_TOGGLE_STORAGE_KEY, String(store.searchEnabled));
+  } catch (error) {
+    logger.warn('保存 SearchToggle 状态失败:', error);
+  }
+};
+
 const handleSendMessage = async (content: string): Promise<void> => {
   if (!content || store.isLoading || store.isAIResponding) { return; }
   try {
@@ -103,6 +119,15 @@ useAiKeyboard({
 onMounted(async () => {
   try {
     store.isLoading = true;
+    // 恢复用户偏好：联网搜索开关（默认 false；非 'true' 字面量一律视为关闭）
+    try {
+      const persisted = localStorage.getItem(SEARCH_TOGGLE_STORAGE_KEY);
+      if (persisted === 'true' && !store.searchEnabled) {
+        store.toggleSearchMode();
+      }
+    } catch (error) {
+      logger.warn('读取 SearchToggle 持久化状态失败:', error);
+    }
     await store.loadAvailableModels();
     if (store.selectedModel) {
       await store.checkModelConnection();

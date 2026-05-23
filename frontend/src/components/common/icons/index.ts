@@ -21,3 +21,4 @@ export { default as ClearIcon } from './ClearIcon.vue';
 export { default as SunIcon } from './SunIcon.vue';
 export { default as MoonIcon } from './MoonIcon.vue';
 export { default as ChevronDownIcon } from './ChevronDownIcon.vue';
+export { default as SearchIcon } from './SearchIcon.vue';

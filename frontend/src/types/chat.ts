@@ -117,6 +117,7 @@ export interface AIAssistantState {
   availableModels: AIModel[]
   isModelConnected: boolean
   streamingEnabled: boolean
+  searchEnabled: boolean
   isAIResponding: boolean
   isStreamingContent: boolean // 正在接收流式内容
   isThinking: boolean // 是否正在思考中

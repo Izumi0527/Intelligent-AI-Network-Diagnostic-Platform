@@ -97,9 +97,6 @@ onMounted(() => {
 
   // 添加监听
   mediaQuery.addEventListener('change', handleChange);
-
-  // 检查服务器连接状态
-  appStore.checkServerConnection();
 });
 
 // 根据暗黑模式状态添加/移除 dark 类

@@ -25,8 +25,16 @@ export interface ModelDescriptor {
   description?: string;
 }
 
+// 后端 /ai/models 响应附带的 provider 级状态 map
+export interface ProviderStatus {
+  connected: boolean;
+  message?: string;
+  last_check?: string;
+}
+
 export interface ModelsListResponse {
   models: ModelDescriptor[];
+  status?: Record<string, ProviderStatus>;
 }
 
 // ───────────────────────────────── 对话 ─────────────────────────────────

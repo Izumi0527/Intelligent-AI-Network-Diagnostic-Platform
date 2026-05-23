@@ -44,7 +44,9 @@ const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 const modelsForSelector = computed(() =>
   store.availableModels.map((model) => ({
     value: String(model.value),
-    label: model.label ?? String(model.value)
+    label: model.label ?? String(model.value),
+    // available 由 connection.ts 从后端 /api/ai/models 响应填充；缺省视为可用
+    available: model.available !== false
   }))
 );
 

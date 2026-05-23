@@ -13,8 +13,11 @@
           v-for="model in availableModels"
           :key="model.value"
           :value="model.value"
+          :disabled="!model.available"
+          :title="model.available ? '' : '该 provider API 密钥未配置或连接失败'"
+          :class="model.available ? '' : 'text-muted-foreground opacity-60'"
         >
-          {{ model.label }}
+          {{ model.label }}{{ model.available ? '' : '（未配置）' }}
         </option>
       </select>
     </div>
@@ -39,6 +42,7 @@
 interface ModelOption {
   value: string
   label: string
+  available: boolean
 }
 
 defineProps<{

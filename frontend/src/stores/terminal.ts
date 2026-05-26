@@ -105,7 +105,7 @@ export const useTerminalStore = defineStore('terminal', {
         this.connectionStatus = 'error';
         this.canCancelConnection = false;
 
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = extractErrorMessage(error);
         if (errorMessage.includes('timeout')) {
           this.terminalOutput.push('连接超时: 请检查设备地址和端口是否正确，或者设备是否响应缓慢');
           this.terminalOutput.push('建议: 请确认设备可访问性，或稍后重试');

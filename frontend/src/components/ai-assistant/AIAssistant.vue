@@ -25,8 +25,8 @@
 
     <chat-input
       ref="chatInputRef"
-      :disabled="store.isLoading || store.isAIResponding"
-      :status-text="store.isAIResponding ? 'AI 正在响应...' : ''"
+      :disabled="isInputDisabled"
+      :status-text="inputStatusText"
       @send="handleSendMessage"
     />
   </div>
@@ -45,6 +45,7 @@ const SEARCH_TOGGLE_STORAGE_KEY = 'ai_assistant_search_enabled';
 const store = useAiAssistantStore();
 const chatMessagesRef = ref<InstanceType<typeof ChatMessages> | null>(null);
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
+const modelUnavailableStatusText = '当前模型未连接，无法发送消息';
 
 const modelsForSelector = computed(() =>
   store.availableModels.map((model) => ({
@@ -66,6 +67,16 @@ const streamState = computed(() => ({
   currentThinkingContent: store.currentThinkingContent,
   streamingEnabled: store.streamingEnabled
 }));
+
+const isInputDisabled = computed<boolean>(() =>
+  store.isLoading || store.isAIResponding || !store.isModelConnected
+);
+
+const inputStatusText = computed<string>(() => {
+  if (store.isAIResponding) { return 'AI 正在响应...'; }
+  if (!store.isModelConnected) { return modelUnavailableStatusText; }
+  return '';
+});
 
 const handleClear = async (): Promise<void> => {
   try {
@@ -97,7 +108,7 @@ const handleSearchToggle = (): void => {
 };
 
 const handleSendMessage = async (content: string): Promise<void> => {
-  if (!content || store.isLoading || store.isAIResponding) { return; }
+  if (!content || store.isLoading || store.isAIResponding || !store.isModelConnected) { return; }
   try {
     await store.sendMessage(content);
     chatMessagesRef.value?.scrollToBottom();

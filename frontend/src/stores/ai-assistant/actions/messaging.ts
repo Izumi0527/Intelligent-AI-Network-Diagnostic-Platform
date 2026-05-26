@@ -196,6 +196,10 @@ export const createMessagingActions = (
           logger.debug(`流式响应处理完成，会话ID: ${sessionId}`);
         } catch (error) {
           const errMsg = error instanceof Error ? error.message : String(error);
+          if (state.abortController?.signal.aborted === true || assistantMessage.aborted === true) {
+            logger.debug(`流式响应已被用户主动停止，忽略请求中断: ${errMsg}, 会话ID: ${sessionId}`);
+            return;
+          }
           logger.error(`流式响应错误: ${errMsg}, 会话ID: ${sessionId}`);
           actions._handleStreamError(assistantMessage, error instanceof Error ? error.message : '请求失败');
         }
@@ -228,6 +232,38 @@ export const createMessagingActions = (
           state.chatMessages[idx] = { ...assistantMessage };
           state.chatMessages = [...state.chatMessages];
         }
+      };
+
+      const resetStreamState = (): void => {
+        state.isAIResponding = false;
+        state.isStreamingContent = false;
+        state.isThinking = false;
+        state.currentThinkingContent = '';
+      };
+
+      const markStreamAborted = (): void => {
+        assistantMessage.aborted = true;
+        assistantMessage.status = 'aborted';
+
+        const stoppedMarker = '（已停止生成）';
+        if (!assistantMessage.content.includes(stoppedMarker)) {
+          if (assistantMessage.content.trim() === '') {
+            assistantMessage.content = stoppedMarker;
+          } else {
+            assistantMessage.content += `\n\n${stoppedMarker}`;
+          }
+        }
+
+        if (assistantMessage.thinking !== undefined && assistantMessage.thinking.isComplete === false) {
+          assistantMessage.thinking = {
+            content: assistantMessage.thinking.content,
+            isComplete: true,
+            timestamp: assistantMessage.thinking.timestamp
+          };
+        }
+
+        refreshMessage();
+        resetStreamState();
       };
 
       const dispatchEvent = async (event: ParsedStreamEvent): Promise<void> => {
@@ -289,15 +325,12 @@ export const createMessagingActions = (
           // 用户主动中断：立即取消 reader 并退出循环
           if (signal?.aborted === true) {
             logger.debug(`[流式处理] 检测到 abort，停止读取，会话ID: ${sessionId}`);
-            await reader.cancel();
-            assistantMessage.aborted = true;
-            assistantMessage.status = 'aborted';
-            if (assistantMessage.content.trim() === '') {
-              assistantMessage.content = '（已停止生成）';
-            } else {
-              assistantMessage.content += '\n\n（已停止生成）';
+            try {
+              await reader.cancel();
+            } catch (cancelError) {
+              logger.debug('[流式处理] 取消 reader 时已中断，忽略:', cancelError);
             }
-            refreshMessage();
+            markStreamAborted();
             break;
           }
 
@@ -353,6 +386,11 @@ export const createMessagingActions = (
           }
         }
 
+        if (signal?.aborted === true || assistantMessage.aborted === true) {
+          markStreamAborted();
+          return;
+        }
+
         // flush decoder 最终状态（可能含跨字节字符的尾部）
         const finalChunk = decoder.decode();
         if (finalChunk.trim() !== '' && !finalChunk.includes('[DONE]')) {
@@ -395,19 +433,18 @@ export const createMessagingActions = (
 
         // 流式内容接收完成，重置状态
         logger.debug(`[流式状态] 流式接收完成，重置状态，会话ID: ${sessionId}`);
-        state.isAIResponding = false;
-        state.isStreamingContent = false;
-        state.isThinking = false;
-        state.currentThinkingContent = '';
+        resetStreamState();
 
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : String(e);
+        if (signal?.aborted === true || assistantMessage.aborted === true) {
+          logger.debug(`[流式处理] 用户主动停止生成，忽略流读取中断: ${errMsg}, 会话ID: ${sessionId}`);
+          markStreamAborted();
+          return;
+        }
         logger.error(`[流式处理] 流读取错误: ${errMsg}, 会话ID: ${sessionId}`);
         actions._handleStreamError(assistantMessage, `读取流数据失败 - ${errMsg}`);
-        state.isAIResponding = false;
-        state.isStreamingContent = false;
-        state.isThinking = false;
-        state.currentThinkingContent = '';
+        resetStreamState();
       }
     },
 

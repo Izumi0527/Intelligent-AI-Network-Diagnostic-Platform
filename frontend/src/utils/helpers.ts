@@ -35,10 +35,58 @@ export function isApiError(
   );
 }
 
+type BackendErrorPayload = {
+  detail?: string | Array<{ msg?: string }>
+  message?: unknown
+  error?: {
+    message?: unknown
+  }
+}
+
+export function extractBackendErrorMessage(error: unknown): string {
+  if (!isApiError(error)) {
+    return '';
+  }
+
+  const payload = error.response.data as BackendErrorPayload | undefined;
+  if (payload === undefined) {
+    return '';
+  }
+
+  if (payload.error !== undefined) {
+    const message = payload.error.message;
+    if (typeof message === 'string' && message.trim() !== '') {
+      return message;
+    }
+  }
+
+  if (typeof payload.detail === 'string' && payload.detail.trim() !== '') {
+    return payload.detail;
+  }
+
+  if (Array.isArray(payload.detail) && payload.detail.length > 0) {
+    const message = payload.detail[0]?.msg;
+    if (typeof message === 'string' && message.trim() !== '') {
+      return message;
+    }
+  }
+
+  if (typeof payload.message === 'string' && payload.message.trim() !== '') {
+    return payload.message;
+  }
+
+  return '';
+}
+
 /**
  * 安全的错误消息提取
  */
 export function extractErrorMessage(error: unknown): string {
+  const backendMessage = extractBackendErrorMessage(error);
+  if (backendMessage !== '') {
+    return backendMessage;
+  }
+
   if (error instanceof Error) {
     return error.message;
   }

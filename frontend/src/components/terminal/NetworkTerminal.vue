@@ -25,9 +25,11 @@ import {
 
 const store = useTerminalStore();
 
+const promptUsername = computed<string>(() => store.username.trim() || 'admin');
+
 const devicePrompt = computed<string>(() => {
   if (!store.deviceAddress) { return '$ '; }
   const prefix = store.connectionType === 'ssh' ? 'ssh' : 'telnet';
-  return `admin@${store.deviceAddress}:~${prefix}# `;
+  return `${promptUsername.value}@${store.deviceAddress}:~${prefix}# `;
 });
 </script>

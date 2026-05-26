@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
+const DEFAULT_DEV_HOST = '127.0.0.1'
+const DEFAULT_DEV_PORT = 5180
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
@@ -11,6 +14,8 @@ export default defineConfig({
     }
   },
   server: {
+    host: DEFAULT_DEV_HOST,
+    port: DEFAULT_DEV_PORT,
     proxy: {
       '/api': {
         target: 'http://localhost:8000',

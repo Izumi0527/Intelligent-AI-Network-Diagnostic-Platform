@@ -4,7 +4,7 @@ param(
     [string]$BackendHost = "0.0.0.0",
     [int]$BackendPort = 8000,
     [string]$FrontendHost = "0.0.0.0",
-    [int]$FrontendPort = 5173,
+    [int]$FrontendPort = 5180,
     [int]$BackendTimeoutSeconds = 90,
     [switch]$SkipFrontendInstall
 )

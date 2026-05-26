@@ -5,6 +5,8 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $ScriptsDir = Join-Path $ProjectRoot "scripts"
 $ReadmePath = Join-Path $ProjectRoot "README.md"
+$ViteConfigPath = Join-Path $ProjectRoot "frontend/vite.config.ts"
+$DefaultFrontendPort = "5180"
 
 function Assert-True {
     param(
@@ -39,6 +41,7 @@ $ExpectedScripts = @(
     "lint.sh",
     "backend-check.sh",
     "p3_axe_audit.py",
+    "p6_axe_audit.py",
     "clean-python-cache.ps1",
     "clean-python-cache.sh"
 )
@@ -65,6 +68,7 @@ foreach ($scriptName in @("dev.ps1", "prod.ps1")) {
 }
 
 $DevPowerShell = Get-Content -Path (Join-Path $ScriptsDir "dev.ps1") -Raw
+Assert-True $DevPowerShell.Contains("[int]`$FrontendPort = $DefaultFrontendPort") "dev.ps1 must default frontend port to $DefaultFrontendPort"
 Assert-Contains $DevPowerShell "Get-DevelopmentInternalApiToken" "dev.ps1 must prepare development internal API token"
 Assert-Contains $DevPowerShell "API_AUTH_ENABLED" "dev.ps1 must enable backend internal API auth"
 Assert-Contains $DevPowerShell "INTERNAL_API_TOKEN" "dev.ps1 must pass backend internal API token"
@@ -85,10 +89,16 @@ foreach ($scriptName in @("dev.sh", "prod.sh")) {
 }
 
 $DevShell = Get-Content -Path (Join-Path $ScriptsDir "dev.sh") -Raw
+$ExpectedDevShellPort = 'FRONTEND_PORT="${FRONTEND_PORT:-' + $DefaultFrontendPort + '}"'
+Assert-True $DevShell.Contains($ExpectedDevShellPort) "dev.sh must default frontend port to $DefaultFrontendPort"
 Assert-Contains $DevShell "development_internal_api_token" "dev.sh must prepare development internal API token"
 Assert-Contains $DevShell "API_AUTH_ENABLED" "dev.sh must enable backend internal API auth"
 Assert-Contains $DevShell "INTERNAL_API_TOKEN" "dev.sh must pass backend internal API token"
 Assert-Contains $DevShell "VITE_INTERNAL_API_TOKEN" "dev.sh must pass matching frontend internal API token"
+
+$ViteConfig = Get-Content -Path $ViteConfigPath -Raw
+Assert-Contains $ViteConfig "DEFAULT_DEV_HOST\s*=\s*'127\.0\.0\.1'" "vite.config.ts must default to loopback host for local development"
+Assert-Contains $ViteConfig "DEFAULT_DEV_PORT\s*=\s*$DefaultFrontendPort" "vite.config.ts must default frontend port to $DefaultFrontendPort"
 
 foreach ($scriptName in @("backend-check.ps1", "backend-check.sh")) {
     $path = Join-Path $ScriptsDir $scriptName

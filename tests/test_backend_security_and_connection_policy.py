@@ -489,14 +489,14 @@ def test_cors_origins_remove_wildcard_and_empty_items(monkeypatch):
     """开启凭证模式时，CORS 示例与解析结果都不能保留通配 origin。"""
     monkeypatch.setenv(
         "CORS_ORIGINS",
-        "http://localhost:5173, *, http://localhost:5174,,",
+        "http://localhost:5180, *, http://localhost:5181,,",
     )
 
     parsed = Settings()
 
     assert parsed.BACKEND_CORS_ORIGINS == [
-        "http://localhost:5173",
-        "http://localhost:5174",
+        "http://localhost:5180",
+        "http://localhost:5181",
     ]
 
 
@@ -505,7 +505,7 @@ def test_cors_preflight_rejects_unlisted_headers():
     response = TestClient(app).options(
         "/api/v1/health",
         headers={
-            "Origin": "http://localhost:5173",
+            "Origin": "http://localhost:5180",
             "Access-Control-Request-Method": "POST",
             "Access-Control-Request-Headers": "X-Debug-Header",
         },

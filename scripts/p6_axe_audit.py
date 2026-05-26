@@ -18,7 +18,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 AXE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js"
-APP_URL = "http://127.0.0.1:5173"
+APP_URL = "http://127.0.0.1:5180"
 OUT_DIR = Path(__file__).resolve().parent.parent / "discuss" / "redesign-p6"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

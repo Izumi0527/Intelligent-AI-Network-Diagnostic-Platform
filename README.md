@@ -304,7 +304,7 @@ Windows 用户只需要使用两个统一入口。脚本会先弹出后端窗口
 .\scripts\dev.ps1
 
 # 自定义端口
-.\scripts\dev.ps1 -BackendPort 8080 -FrontendPort 5174
+.\scripts\dev.ps1 -BackendPort 8080 -FrontendPort 5181
 
 # 生产环境：后端非热重载 + 前端 preview
 .\scripts\prod.ps1
@@ -484,7 +484,7 @@ npm run lint       # eslint .
 
 ## 访问应用
 
-- 前端：默认运行在 http://localhost:5173
+- 前端：默认运行在 http://localhost:5180
 - 后端API：默认运行在 http://localhost:8000
 - API文档：http://localhost:8000/api/v1/docs
 
@@ -502,7 +502,7 @@ Windows 用户统一使用 `dev.ps1` 和 `prod.ps1`。两个脚本都会先启�
 .\scripts\dev.ps1
 
 # 如果遇到端口占用问题
-.\scripts\dev.ps1 -BackendPort 8080 -FrontendPort 5174
+.\scripts\dev.ps1 -BackendPort 8080 -FrontendPort 5181
 
 # 生产环境基本诊断
 .\scripts\prod.ps1

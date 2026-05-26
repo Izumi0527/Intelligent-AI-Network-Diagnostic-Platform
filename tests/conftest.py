@@ -11,7 +11,7 @@ DEFAULT_TEST_ENV = {
     "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": "30",
     "HOST": "127.0.0.1",
     "PORT": "8000",
-    "CORS_ORIGINS": "http://localhost:5173,http://localhost:5174",
+    "CORS_ORIGINS": "http://localhost:5180,http://localhost:5181",
     "SESSION_IDLE_TIMEOUT": "600",
     "MAX_TERMINAL_SESSIONS": "5",
     "LOG_LEVEL": "INFO",

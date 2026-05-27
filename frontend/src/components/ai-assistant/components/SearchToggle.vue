@@ -1,25 +1,17 @@
 <template>
-  <div class="flex items-center gap-2">
-    <search-icon class="text-foreground/60" :size="14" aria-hidden="true" />
-    <span :id="labelId" class="text-sm text-foreground/70">联网搜索</span>
+  <div class="toggle-row">
+    <search-icon class="toggle-row__icon" :size="13" aria-hidden="true" />
+    <span :id="labelId" class="toggle-row__label">联网搜索</span>
     <button
-      class="relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none"
-      :class="enabled ? 'bg-primary shadow-glow-sm' : 'bg-muted/70'"
+      class="toggle-switch"
+      :class="{ 'toggle-switch--on': enabled }"
       type="button"
       role="switch"
       :aria-checked="enabled"
       :aria-labelledby="labelId"
       @click="$emit('toggle')"
     >
-      <span
-        class="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-200"
-        :class="enabled ? 'translate-x-5' : 'translate-x-0'"
-      >
-        <span
-          class="h-2.5 w-2.5 rounded-full"
-          :class="enabled ? 'bg-primary' : 'bg-muted-foreground'"
-        ></span>
-      </span>
+      <span class="toggle-switch__thumb" />
     </button>
   </div>
 </template>
@@ -27,14 +19,68 @@
 <script setup lang="ts">
 import { SearchIcon } from '@/components/common/icons';
 
-defineProps<{
-  enabled: boolean
-}>();
+defineProps<{ enabled: boolean }>();
+defineEmits<{ toggle: [] }>();
 
-defineEmits<{
-  toggle: []
-}>();
-
-// 静态 ID：组件每实例一次即可；当前页面布局只有一份 SearchToggle，不会冲突
 const labelId = 'search-toggle-label';
 </script>
+
+<style scoped>
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle-row__icon {
+  color: var(--muted-foreground);
+}
+
+.toggle-row__label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background-color var(--dur-enter) var(--ease-standard);
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.toggle-switch:hover {
+  border-color: color-mix(in oklch, var(--foreground) 16%, transparent);
+}
+
+.toggle-switch:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--primary) 50%, transparent);
+  outline-offset: 2px;
+}
+
+.toggle-switch--on {
+  background-color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary), black 8%);
+}
+
+.toggle-switch__thumb {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--background);
+  transition: transform var(--dur-enter) var(--ease-standard);
+}
+
+.toggle-switch--on .toggle-switch__thumb {
+  transform: translate(14px, -50%);
+}
+</style>

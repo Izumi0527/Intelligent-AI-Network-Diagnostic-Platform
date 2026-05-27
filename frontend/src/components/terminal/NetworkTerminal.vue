@@ -1,8 +1,6 @@
 <template>
-  <div
-    class="flex flex-col h-full w-full min-h-0 bg-terminal text-terminal-foreground overflow-hidden shadow-glow-lg border-tech rounded-xl"
-  >
-    <div class="p-4 border-b border-border/80 terminal-config-panel">
+  <div class="network-terminal">
+    <div class="network-terminal__config">
       <terminal-connection-form />
       <terminal-status-bar />
     </div>
@@ -33,3 +31,24 @@ const devicePrompt = computed<string>(() => {
   return `${promptUsername.value}@${store.deviceAddress}:~${prefix}# `;
 });
 </script>
+
+<style scoped>
+.network-terminal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background-color: var(--terminal-bg);
+  color: var(--terminal-fg);
+  border: 1px solid var(--terminal-border);
+  border-radius: calc(var(--radius) + 4px);
+  overflow: hidden;
+}
+
+.network-terminal__config {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--terminal-border);
+  background-color: color-mix(in oklch, var(--terminal-bg), white 2%);
+}
+</style>

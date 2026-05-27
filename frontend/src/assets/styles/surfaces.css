@@ -1,121 +1,113 @@
 /* ============================================================
-   Surfaces：通用面板 / 玻璃态 / 边框 / 阴影 / 通用动画
+   Surfaces：通用面板 / 按钮 / 边框 / 阴影 / 通用动画
+   设计语言：Linear/Vercel 系 — 1px border + 极少阴影 + 极简过渡
    ============================================================ */
 
-/* ─── 玻璃态 ─────────────────────────────────────────────── */
-.glass-effect {
-  background: rgb(255 255 255 / 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgb(255 255 255 / 0.2);
-}
-
-.dark .glass-effect {
-  background: rgb(0 0 0 / 0.2);
-  border: 1px solid rgb(255 255 255 / 0.1);
-}
-
-/* ─── 科技感发光边框 ─────────────────────────────────────── */
-.border-tech {
+/* ─── 表面层级 ──────────────────────────────────────────── */
+.surface-base {
+  background-color: var(--background);
   border: 1px solid var(--border);
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 85%);
+  border-radius: calc(var(--radius) + 2px);
 }
 
-.border-tech:hover {
-  border-color: color-mix(in oklch, var(--border-glow), transparent 20%);
-  box-shadow: 0 0 8px 0 color-mix(in oklch, var(--border-glow), transparent 70%);
-}
-
-.dark .border-tech {
+.surface-elevated {
+  background-color: var(--card);
   border: 1px solid var(--border);
-  box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 60%),
-    inset 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 85%);
-}
-
-.dark .border-tech:hover {
-  box-shadow:
-    0 0 12px 0 color-mix(in oklch, var(--border-glow), transparent 50%),
-    inset 0 0 0 1px color-mix(in oklch, var(--border-glow), transparent 75%);
-}
-
-.border-glow {
-  box-shadow: 0 0 0 1px oklch(var(--border-glow) / 0.3);
-}
-
-.border-glow-hover:hover {
-  box-shadow: 0 0 8px 0 oklch(var(--border-glow) / 0.4);
-}
-
-/* ─── 按钮 / 输入框发光 ─────────────────────────────────── */
-.btn-glow {
-  box-shadow: 0 0 20px -5px oklch(var(--primary) / 0.3);
-  transition:
-    box-shadow var(--dur-slow) var(--ease-out),
-    transform var(--dur-slow) var(--ease-out);
-}
-
-.btn-glow:hover {
-  box-shadow: 0 0 30px -3px oklch(var(--primary) / 0.5);
-  transform: translateY(-1px);
-}
-
-.input-glow {
-  transition: box-shadow var(--dur-slow) var(--ease-out), border-color var(--dur-slow) var(--ease-out);
-}
-
-.input-glow:focus {
-  box-shadow: 0 0 15px -3px oklch(var(--primary) / 0.4);
-  border-color: oklch(var(--primary));
-}
-
-/* ─── 阴影层级 ──────────────────────────────────────────── */
-.shadow-glow-sm {
-  box-shadow: 0 0 10px -2px oklch(var(--primary) / 0.2);
-}
-
-.shadow-glow-md {
-  box-shadow: 0 0 20px -5px oklch(var(--primary) / 0.3);
-}
-
-.shadow-glow-lg {
-  box-shadow: 0 0 30px -8px oklch(var(--primary) / 0.4);
-}
-
-.dark .shadow-glow-sm {
-  box-shadow: 0 0 10px -2px oklch(var(--border-glow) / 0.3);
-}
-
-.dark .shadow-glow-md {
-  box-shadow: 0 0 20px -5px oklch(var(--border-glow) / 0.4);
-}
-
-.dark .shadow-glow-lg {
-  box-shadow: 0 0 30px -8px oklch(var(--border-glow) / 0.5);
-}
-
-.card-shadow {
+  border-radius: calc(var(--radius) + 2px);
   box-shadow: var(--shadow-card);
 }
 
+.surface-popover {
+  background-color: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow: var(--shadow-popover);
+}
+
+/* ─── 按钮 ──────────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid color-mix(in oklch, var(--primary), black 8%);
+  border-radius: var(--radius);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-enter) var(--ease-standard),
+    transform var(--dur-enter) var(--ease-standard),
+    opacity var(--dur-enter) var(--ease-standard);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--primary), white 6%);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  background-color: transparent;
+  color: var(--foreground);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-enter) var(--ease-standard),
+    color var(--dur-enter) var(--ease-standard);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--muted);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  background-color: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-enter) var(--ease-standard),
+    border-color var(--dur-enter) var(--ease-standard);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: var(--muted);
+  border-color: color-mix(in oklch, var(--foreground) 14%, transparent);
+}
+
 /* ─── 通用动画 ──────────────────────────────────────────── */
-.pulse-animation {
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
 .fade-in {
-  animation: fadeIn var(--dur-slow) var(--ease-out);
+  animation: fadeIn var(--dur-base) var(--ease-standard);
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -123,20 +115,29 @@
   }
 }
 
-/* ─── 页面标题（共享外观） ──────────────────────────────── */
-.page-title {
-  color: var(--ai-page-title);
-  font-size: 28px;
+.scale-in {
+  animation: scaleIn var(--dur-enter) var(--ease-standard);
 }
 
-@media (max-width: 1024px) {
-  .page-title {
-    font-size: 24px;
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-@media (min-width: 1440px) {
-  .page-title {
-    font-size: 32px;
+/* ─── 数据包信号灯关键帧 (PacketSignal 组件复用) ──────── */
+@keyframes packetPulse {
+  0%, 100% {
+    background-color: var(--zinc-400);
+    transform: scale(1);
+  }
+  50% {
+    background-color: var(--primary);
+    transform: scale(1.15);
   }
 }

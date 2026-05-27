@@ -13,14 +13,14 @@
       <div class="confirm-actions">
         <button
           type="button"
-          class="btn btn-cancel"
+          class="confirm-btn confirm-btn--cancel"
           @click="onCancel"
         >
           {{ cancelText }}
         </button>
         <button
           type="button"
-          class="btn btn-confirm"
+          class="confirm-btn confirm-btn--danger"
           autofocus
           @click="onConfirm"
         >
@@ -73,7 +73,6 @@ const onCancel = (): void => {
   emit('cancel');
 };
 
-// 点击 backdrop 关闭：原生 dialog 的 click 事件 target 为 dialog 本身时即点击在 backdrop
 const onBackdropClick = (event: MouseEvent): void => {
   if (event.target === dialogRef.value) {
     onCancel();
@@ -92,31 +91,32 @@ const onBackdropClick = (event: MouseEvent): void => {
 }
 
 .confirm-dialog::backdrop {
-  background: oklch(0 0 0 / 0.45);
+  background: oklch(0 0 0 / 0.4);
   backdrop-filter: blur(4px);
 }
 
 .confirm-panel {
-  padding: 20px 24px 16px;
-  background: oklch(var(--background));
-  color: oklch(var(--foreground));
-  border: 1px solid oklch(var(--border));
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-ai-panel);
+  padding: 20px 22px 16px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: var(--shadow-popover);
 }
 
 .confirm-title {
-  margin: 0 0 8px;
-  font-size: 16px;
+  margin: 0 0 6px;
+  font-size: 15px;
   font-weight: 600;
-  color: oklch(var(--foreground));
+  color: var(--foreground);
+  letter-spacing: -0.01em;
 }
 
 .confirm-msg {
-  margin: 0 0 20px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: oklch(var(--muted-foreground));
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
 }
 
 .confirm-actions {
@@ -125,53 +125,50 @@ const onBackdropClick = (event: MouseEvent): void => {
   gap: 8px;
 }
 
-.btn {
-  padding: 6px 14px;
-  font-size: 13px;
+.confirm-btn {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 1.4;
-  border-radius: var(--radius-md);
+  line-height: 1;
+  border-radius: var(--radius);
   border: 1px solid transparent;
   cursor: pointer;
   transition:
-    background-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
-    transform var(--dur-fast) var(--ease-out);
+    background-color var(--dur-enter) var(--ease-standard),
+    color var(--dur-enter) var(--ease-standard),
+    border-color var(--dur-enter) var(--ease-standard),
+    transform var(--dur-enter) var(--ease-standard);
 }
 
-.btn:focus-visible {
-  outline: 2px solid oklch(var(--primary) / 0.6);
+.confirm-btn:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--primary) 55%, transparent);
   outline-offset: 2px;
 }
 
-.btn:active {
-  transform: scale(0.97);
-}
+.confirm-btn:active { transform: scale(0.97); }
 
-.btn-cancel {
-  color: oklch(var(--muted-foreground));
+.confirm-btn--cancel {
+  color: var(--muted-foreground);
   background: transparent;
-  border-color: oklch(var(--border));
+  border-color: var(--border);
 }
 
-.btn-cancel:hover {
-  color: oklch(var(--foreground));
-  background: oklch(var(--muted) / 0.4);
+.confirm-btn--cancel:hover {
+  color: var(--foreground);
+  background: var(--muted);
 }
 
-.btn-confirm {
-  color: oklch(0.98 0 0);
-  background: oklch(0.55 0.18 30);
-  border-color: oklch(0.55 0.18 30);
+.confirm-btn--danger {
+  color: var(--destructive-foreground);
+  background: var(--destructive);
+  border-color: color-mix(in oklch, var(--destructive), black 8%);
 }
 
-.btn-confirm:hover {
-  background: oklch(0.5 0.2 30);
-  border-color: oklch(0.5 0.2 30);
+.confirm-btn--danger:hover {
+  background: color-mix(in oklch, var(--destructive), white 6%);
 }
 
-/* 进出场动画 */
 .confirm-dialog[open] {
   animation: confirmIn var(--dur-base) var(--ease-spring);
 }

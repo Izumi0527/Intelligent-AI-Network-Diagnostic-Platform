@@ -1,6 +1,10 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* 字体：Geist Sans/Mono 可变字体（fontsource 自托管 woff2，无 CDN 依赖） */
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
 @import './styles/tokens.css';
 @import './styles/base.css';
 @import './styles/surfaces.css';

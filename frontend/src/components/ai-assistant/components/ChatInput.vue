@@ -1,7 +1,7 @@
 <template>
-  <div class="p-4 border-t border-border/60 bg-transparent rounded-b-xl">
-    <div class="flex gap-2 items-end">
-      <div class="flex-1 relative">
+  <div class="chat-input">
+    <div class="chat-input__row">
+      <div class="chat-input__textarea-wrap">
         <label for="chat-message-input" class="sr-only">输入消息</label>
         <textarea
           id="chat-message-input"
@@ -11,10 +11,10 @@
           :disabled="isLocked"
           :placeholder="placeholder"
           autocomplete="off"
-          class="w-full resize-none rounded-lg border border-border/85 bg-background/50 px-3 py-2 text-sm min-h-[40px] max-h-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(var(--primary)/0.5)] focus-visible:border-primary dark:focus-visible:ring-[oklch(var(--primary)/0.7)] disabled:bg-muted/30 disabled:border-muted disabled:text-muted-foreground input-glow transition-colors placeholder:text-muted-foreground/60"
+          class="chat-input__textarea ai-input"
           :class="{
-            'cursor-not-allowed': isLocked,
-            'pr-10': hasError
+            'chat-input__textarea--locked': isLocked,
+            'chat-input__textarea--has-error': hasError
           }"
           :aria-invalid="hasError ? 'true' : 'false'"
           :aria-describedby="hasError ? 'chat-message-input-error' : undefined"
@@ -22,23 +22,21 @@
           @input="handleInput"
         />
 
-        <!-- 字数进度条：底部 1px 条，颜色随占比阶梯切换 -->
         <div
-          class="absolute left-0 right-0 -bottom-px h-px overflow-hidden rounded-b-lg pointer-events-none"
+          class="chat-input__progress"
           aria-hidden="true"
         >
           <div
-            class="h-full transition-[width,background-color] duration-[var(--dur-fast)]"
-            :class="progressColorClass"
+            class="chat-input__progress-bar"
+            :data-state="progressState"
             :style="{ width: `${Math.min(progressPercent, 100)}%` }"
-          ></div>
+          />
         </div>
 
-        <!-- 错误提示 -->
         <div
           v-if="hasError"
           id="chat-message-input-error"
-          class="absolute right-2 top-2 text-destructive"
+          class="chat-input__error"
           :title="errorMessage"
           role="alert"
           aria-live="polite"
@@ -50,35 +48,38 @@
         </div>
       </div>
 
-      <shimmer-button
+      <button
+        type="button"
+        class="chat-input__send-btn btn-primary"
         :disabled="!canSend"
-        class="flex items-center justify-center w-11 h-11 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-glow-sm ring-1 ring-primary/40"
-        background="oklch(var(--primary))"
-        shimmer-color="oklch(1 0 0 / 0.6)"
-        border-radius="0.5rem"
-        title="发送消息"
+        title="发送消息 (Enter)"
         aria-label="发送消息"
         @click="handleSend"
       >
         <send-icon class="w-4 h-4" />
-      </shimmer-button>
+      </button>
     </div>
 
-    <!-- 字符计数和提示 -->
-    <div class="flex flex-wrap justify-between items-center mt-2 text-xs text-muted-foreground gap-x-4 gap-y-1">
-      <div class="flex items-center gap-4">
-        <span :class="counterColorClass">{{ message.length }}/{{ maxLength }} 字符</span>
-        <span v-if="disabled" class="text-orange-700 dark:text-orange-300">{{ statusText }}</span>
-      </div>
-      <div class="text-[10px] text-foreground/70">Shift+Enter 换行 · Enter 发送 · Esc 清空 · Ctrl+L 跳到底</div>
+    <div class="chat-input__hints">
+      <span :class="counterColorClass">{{ message.length }}/{{ maxLength }}</span>
+      <span v-if="disabled" class="chat-input__status">{{ statusText }}</span>
+      <span class="chat-input__sep">·</span>
+      <span class="chat-input__shortcut">
+        <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行
+      </span>
+      <span class="chat-input__shortcut">
+        <kbd>Enter</kbd> 发送
+      </span>
+      <span class="chat-input__shortcut">
+        <kbd>⌘L</kbd> 跳底
+      </span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { SendIcon } from '@/components/common/icons';
-import ShimmerButton from '@/components/ui/ShimmerButton.vue';
 import { useAutoResizeTextarea } from '@/composables';
 
 const props = withDefaults(defineProps<{
@@ -90,7 +91,7 @@ const props = withDefaults(defineProps<{
   disabled: false,
   statusText: '',
   maxLength: 2000,
-  placeholder: '输入你的问题...(Shift+Enter 换行 · Enter 发送 · Esc 清空)'
+  placeholder: '问点什么…（Shift+Enter 换行 · Enter 发送 · Esc 清空）'
 });
 
 const emit = defineEmits<{
@@ -101,37 +102,33 @@ const emit = defineEmits<{
 const message = ref('');
 const { textareaRef: messageInput, resize: adjustTextareaHeight } = useAutoResizeTextarea({ maxHeight: 120 });
 
-// 字数占比（可超过 100% 用于触发主动锁定）
 const progressPercent = computed<number>(() =>
   props.maxLength > 0 ? (message.value.length / props.maxLength) * 100 : 0
 );
 
-// 进度条颜色阶梯：< 80% primary / 80-100% 橙黄 / ≥ 100% 红
-const progressColorClass = computed<string>(() => {
+/** 进度条状态：normal / warning / danger */
+const progressState = computed<'normal' | 'warning' | 'danger'>(() => {
   const p = progressPercent.value;
-  if (p >= 100) { return 'bg-[oklch(0.6_0.22_27)]'; }
-  if (p >= 80) { return 'bg-[oklch(0.7_0.15_60)]'; }
-  return 'bg-primary';
+  if (p >= 100) { return 'danger'; }
+  if (p >= 80) { return 'warning'; }
+  return 'normal';
 });
 
 const counterColorClass = computed<string>(() => {
-  const p = progressPercent.value;
-  if (p >= 100) { return 'text-destructive font-medium'; }
-  if (p >= 80) { return 'text-orange-700 dark:text-orange-300'; }
-  return '';
+  if (progressState.value === 'danger') { return 'chat-input__counter--danger'; }
+  if (progressState.value === 'warning') { return 'chat-input__counter--warning'; }
+  return 'chat-input__counter';
 });
 
 const hasError = computed(() => message.value.length > props.maxLength);
 
-// 主动锁定：超出 maxLength 时禁用输入框（plan P5 第 263 行要求），
-// 不依赖 disabled prop（disabled 是外部"AI 正在响应"控制的语义）
 const isLocked = computed<boolean>(() =>
   props.disabled || message.value.length > props.maxLength
 );
 
-const canSend = computed(() => {
-  return !props.disabled && message.value.trim().length > 0 && message.value.length <= props.maxLength;
-});
+const canSend = computed(() =>
+  !props.disabled && message.value.trim().length > 0 && message.value.length <= props.maxLength
+);
 
 const errorMessage = computed(() => {
   if (hasError.value) {
@@ -156,8 +153,6 @@ const handleKeyDown = (event: KeyboardEvent): void => {
     handleSend();
     return;
   }
-  // Escape：清空当前输入，不影响对话历史。仅在 textarea 内监听，
-  // 避免全局 Escape 干扰对话框、菜单等
   if (event.key === 'Escape' && message.value.length > 0) {
     event.preventDefault();
     clear();
@@ -179,9 +174,160 @@ const fillText = (text: string): void => {
 
 watch(() => props.disabled, (disabled) => { if (!disabled) { focus(); } });
 
+/** 全局自定义事件：命令面板的 chat.focus 命令通过此事件触发 */
+const onGlobalFocusInput = (): void => { focus(); };
+onMounted(() => window.addEventListener('ai-focus-input', onGlobalFocusInput));
+onUnmounted(() => window.removeEventListener('ai-focus-input', onGlobalFocusInput));
+
 defineExpose({ focus, clear, fillText });
 </script>
 
 <style scoped>
-textarea { field-sizing: content; }
+.chat-input {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  border-bottom-left-radius: calc(var(--radius) + 4px);
+  border-bottom-right-radius: calc(var(--radius) + 4px);
+}
+
+.chat-input__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.chat-input__textarea-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-input__textarea {
+  width: 100%;
+  resize: none;
+  min-height: 38px;
+  max-height: 120px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: var(--radius);
+  field-sizing: content;
+}
+
+.chat-input__textarea--locked {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.chat-input__textarea--has-error {
+  padding-right: 36px;
+  border-color: color-mix(in oklch, var(--destructive) 55%, transparent) !important;
+}
+
+.chat-input__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  overflow: hidden;
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+  pointer-events: none;
+}
+
+.chat-input__progress-bar {
+  height: 100%;
+  transition:
+    width var(--dur-enter) var(--ease-standard),
+    background-color var(--dur-enter) var(--ease-standard);
+}
+
+.chat-input__progress-bar[data-state='normal'] {
+  background-color: var(--primary);
+}
+
+.chat-input__progress-bar[data-state='warning'] {
+  background-color: var(--warning);
+}
+
+.chat-input__progress-bar[data-state='danger'] {
+  background-color: var(--destructive);
+}
+
+.chat-input__error {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  color: var(--destructive);
+}
+
+.chat-input__send-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: var(--radius);
+}
+
+.chat-input__hints {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.chat-input__counter {
+  font-family: var(--app-font-mono);
+}
+
+.chat-input__counter--warning {
+  font-family: var(--app-font-mono);
+  color: var(--warning);
+  font-weight: 500;
+}
+
+.chat-input__counter--danger {
+  font-family: var(--app-font-mono);
+  color: var(--destructive);
+  font-weight: 600;
+}
+
+.chat-input__status {
+  color: var(--warning);
+  font-size: 11px;
+}
+
+.chat-input__sep {
+  opacity: 0.4;
+}
+
+.chat-input__shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-input__shortcut kbd {
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 640px) {
+  .chat-input__shortcut {
+    display: none;
+  }
+  .chat-input__sep {
+    display: none;
+  }
+}
 </style>

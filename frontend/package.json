@@ -12,6 +12,8 @@
     "lint:fix": "eslint . --ext .vue,.js,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.2.9",
+    "@fontsource-variable/geist-mono": "^5.2.8",
     "@tailwindcss/postcss": "^4.1.13",
     "@vueuse/core": "^11.0.0",
     "axios": "^1.9.0",

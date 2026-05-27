@@ -1,13 +1,13 @@
 <template>
-  <div class="border-t border-border bg-terminal/90 backdrop-blur-md p-4">
-    <div class="flex gap-2 items-center">
-      <span class="terminal-prompt font-mono font-semibold">{{ devicePrompt }}</span>
+  <div class="terminal-cmd">
+    <div class="terminal-cmd__row">
+      <span class="terminal-cmd__prompt">{{ devicePrompt }}</span>
       <label for="terminal-command" class="sr-only">终端命令</label>
       <input
         id="terminal-command"
         v-model="command"
         name="command"
-        class="flex-1 rounded-lg border border-border bg-terminal/70 terminal-text px-3 py-2 text-sm font-mono input-glow focus:border-primary backdrop-blur-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)]"
+        class="terminal-cmd__input"
         placeholder="输入命令..."
         type="text"
         autocomplete="off"
@@ -18,19 +18,17 @@
       />
       <button
         :disabled="store.connectionStatus !== 'connected'"
-        class="terminal-send-button px-4 py-2 rounded-lg font-medium text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed"
+        class="terminal-send-button"
         @click="handleExecute"
       >
         发送
       </button>
     </div>
-    <div class="text-xs text-gray-400 mt-2 px-1 font-mono">
-      <span
-        >提示: 使用
-        <kbd class="px-2 py-0.5 rounded bg-gray-700 text-gray-300 border border-gray-600 font-mono text-xs">↑</kbd>
-        <kbd class="px-2 py-0.5 rounded bg-gray-700 text-gray-300 border border-gray-600 font-mono text-xs">↓</kbd>
-        浏览历史命令</span
-      >
+    <div class="terminal-cmd__hint">
+      <span>使用</span>
+      <kbd>↑</kbd>
+      <kbd>↓</kbd>
+      <span>浏览历史命令</span>
     </div>
   </div>
 </template>
@@ -53,3 +51,69 @@ const handleExecute = async (): Promise<void> => {
   reset();
 };
 </script>
+
+<style scoped>
+.terminal-cmd {
+  padding: 12px 16px;
+  border-top: 1px solid var(--terminal-border);
+  background-color: color-mix(in oklch, var(--terminal-bg), white 2%);
+}
+
+.terminal-cmd__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal-cmd__prompt {
+  font-family: var(--app-font-mono);
+  font-weight: 600;
+  color: var(--terminal-prompt);
+  font-size: 13px;
+}
+
+.terminal-cmd__input {
+  flex: 1;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: var(--app-font-mono);
+  background-color: color-mix(in oklch, var(--terminal-bg), black 8%);
+  color: var(--terminal-fg);
+  border: 1px solid var(--terminal-border);
+  border-radius: var(--radius);
+  transition: border-color var(--dur-enter) var(--ease-standard);
+}
+
+.terminal-cmd__input:focus,
+.terminal-cmd__input:focus-visible {
+  outline: none;
+  border-color: color-mix(in oklch, var(--primary) 55%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 20%, transparent);
+}
+
+.terminal-cmd__input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.terminal-cmd__hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: color-mix(in oklch, var(--terminal-fg) 55%, transparent);
+  font-family: var(--app-font-mono);
+}
+
+.terminal-cmd__hint kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background-color: color-mix(in oklch, var(--terminal-bg), white 8%);
+  border: 1px solid var(--terminal-border);
+  color: var(--terminal-fg);
+  font-size: 10px;
+}
+</style>

@@ -1,8 +1,9 @@
 <template>
   <div
     :class="[
-      'group transition-[transform,opacity,background-color] duration-[var(--dur-base)] ease-[var(--ease-out)] fade-in',
-      isUser ? 'message-user flex flex-col items-end' : 'message-assistant'
+      'message-row',
+      isUser ? 'message-row--user' : 'message-row--assistant',
+      'fade-in'
     ]"
   >
     <message-meta
@@ -19,21 +20,30 @@
 
     <div
       :class="[
-        'bubble-base rounded-lg px-4 py-3 max-w-none break-words transition-colors fade-in',
-        isUser
-          ? 'bubble-user mr-7 border border-primary/80 max-w-[min(28rem,80vw)]'
-          : 'bubble-assistant ml-7 border border-border/60',
-        message.error !== undefined ? 'message-error-bubble' : ''
+        'bubble',
+        isUser ? 'bubble--user' : 'bubble--assistant',
+        message.error !== undefined ? 'bubble--error' : ''
       ]"
     >
       <div
         v-if="!isUser"
-        class="prose prose-base max-w-none prose-gray dark:prose-invert leading-relaxed prose-p:mb-4 prose-ul:my-3 prose-ol:my-3 prose-li:mb-1 prose-h1:mb-4 prose-h2:mb-3 prose-h3:mb-3 prose-pre:bg-muted prose-pre:border prose-pre:border-border/60 prose-pre:p-3 prose-pre:rounded prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-blockquote:border-l-4 prose-blockquote:border-border dark:[&_p]:text-foreground/95 dark:[&_li]:text-foreground/95 dark:[&_strong]:text-foreground"
+        class="bubble__content prose prose-sm max-w-none dark:prose-invert
+               prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1
+               prose-h1:mb-3 prose-h1:mt-4 prose-h2:mb-2 prose-h2:mt-3
+               prose-h3:mb-2 prose-h3:mt-3
+               prose-pre:bg-zinc-900 prose-pre:text-zinc-100 prose-pre:border-0
+               prose-pre:rounded-md prose-pre:p-3 prose-pre:font-mono prose-pre:text-xs
+               prose-code:font-mono prose-code:text-[12px]
+               prose-code:bg-muted prose-code:rounded prose-code:px-1.5 prose-code:py-0.5
+               prose-code:before:content-none prose-code:after:content-none
+               prose-strong:text-foreground
+               prose-blockquote:border-l-2 prose-blockquote:border-border
+               prose-blockquote:not-italic prose-blockquote:text-muted-foreground"
         v-html="formattedContent"
-      ></div>
+      />
       <div
         v-else
-        class="whitespace-pre-wrap text-sm leading-relaxed"
+        class="bubble__user-text"
       >{{ message.content }}</div>
     </div>
 
@@ -43,7 +53,7 @@
       :search-failed="message.searchFailed ?? false"
     />
 
-    <div v-if="showActions" class="ml-7 mt-1.5">
+    <div v-if="showActions" class="message-actions-wrap">
       <message-actions
         :message="message"
         :can-retry="canRetry"
@@ -68,9 +78,7 @@ import SearchSourcesBlock from './SearchSourcesBlock.vue';
 
 interface Props {
   message: ChatMessage
-  /** 紧凑 meta：上一条同 role 且时间差 < 60s 时由父组件传 true */
   compactMeta?: boolean
-  /** 当前 AI 是否在响应中：true 时禁用 retry */
   isResponding?: boolean
 }
 
@@ -92,10 +100,6 @@ const hasThinking = computed<boolean>(() =>
   && props.message.thinking.content !== ''
 );
 
-// 流式状态由消息生命周期 + thinking 完成标记联合决定：
-// 既未完成 (isComplete=false) 且消息仍在 streaming 状态 → 显示蓝色脉冲点 + "AI助手思考中..."；
-// 否则回到完成态视觉 ("🤔 AI思考过程 ✓"，可折叠)。
-// 这取代了原 ChatMessages 底部那块"实时镜像 ThinkingBlock"，把流式视觉收回到消息原子单元内。
 const isThinkingStreaming = computed<boolean>(() =>
   props.message.role === 'assistant'
   && props.message.status === 'streaming'
@@ -107,7 +111,6 @@ const hasSources = computed<boolean>(() =>
   Array.isArray(props.message.sources) && props.message.sources.length > 0
 );
 
-// 仅在 assistant 消息且非流式态、且内容非空时显示操作按钮
 const showActions = computed<boolean>(() => {
   if (props.message.role !== 'assistant') { return false; }
   if (props.message.status === 'streaming' || props.message.status === 'sending') { return false; }
@@ -138,26 +141,80 @@ const onRetry = (): void => { emit('retry'); };
 </script>
 
 <style scoped>
-.message-user {
-  margin-bottom: 1.5rem;
-}
-.message-assistant {
-  margin-bottom: 1.5rem;
+.message-row {
+  margin-bottom: 20px;
+  transition: opacity var(--dur-base) var(--ease-standard);
 }
 
-.bubble-user {
+.message-row--user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.bubble {
+  max-width: none;
+  padding: 10px 14px;
+  border-radius: calc(var(--radius) + 2px);
+  word-break: break-word;
+  transition:
+    border-color var(--dur-base) var(--ease-standard),
+    background-color var(--dur-base) var(--ease-standard);
+}
+
+.bubble--user {
   background: var(--bubble-user-bg);
-  /* 用户气泡文字固定白色：bg 在 light/dark 两种主题下都是深蓝紫，foreground
-     不能跟随 --primary-foreground 翻转（dark 下会变深色，contrast 仅 3.1，
-     未达 WCAG AA 4.5:1） */
-  color: oklch(0.985 0 0);
-}
-.bubble-assistant {
-  background: var(--bubble-assistant-bg);
+  color: var(--bubble-user-fg);
+  border: 1px solid color-mix(in oklch, var(--bubble-user-bg), black 12%);
+  margin-right: 28px;
+  max-width: min(32rem, 82vw);
+  border-bottom-right-radius: var(--radius);
 }
 
-.message-error-bubble {
-  border-color: oklch(0.55 0.18 30 / 0.5) !important;
-  background: color-mix(in oklch, oklch(0.55 0.18 30 / 0.08), oklch(var(--background)) 70%);
+.bubble--assistant {
+  background: var(--bubble-assistant-bg);
+  color: var(--bubble-assistant-fg);
+  border: 1px solid var(--border);
+  margin-left: 28px;
+  border-bottom-left-radius: var(--radius);
+}
+
+.bubble--error {
+  border-color: color-mix(in oklch, var(--destructive) 55%, transparent) !important;
+  background: color-mix(in oklch, var(--destructive) 6%, var(--background));
+}
+
+.bubble__user-text {
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.bubble__content {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bubble__content :deep(pre) {
+  font-family: var(--app-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.bubble__content :deep(a) {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.bubble__content :deep(a:hover) {
+  text-decoration-thickness: 2px;
+}
+
+.message-actions-wrap {
+  margin-left: 28px;
+  margin-top: 4px;
 }
 </style>

@@ -1,76 +1,92 @@
 /* ============================================================
    设计 Token：色彩 / 间距 / 圆角 / 阴影 / 动效 / 字体 / Z 轴
    ------------------------------------------------------------
-   - 色彩使用 OKLCH，便于色彩空间感知一致的明暗映射
-   - motion / spacing / shadow / typography 集中管理
-   - .dark 覆盖仅写差异，避免重复
+   设计语言：Linear/Vercel 系现代极简 + 网络运维工程驾驶舱指纹
+   - 色彩 OKLCH 空间，明暗映射感知一致
+   - Zinc 12 级中性灰阶作为骨架，光纤蓝 (cyan-teal 之间) 作唯一强调色
+   - 不使用紫色、玻璃态、发光阴影
    ============================================================ */
 
 :root {
-  /* ─── 基础色 ─────────────────────────────────────────────── */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  /* ─── 中性骨架：Zinc 12 级 (OKLCH) ───────────────────────── */
+  --zinc-50: oklch(0.985 0 0);
+  --zinc-100: oklch(0.97 0 0);
+  --zinc-200: oklch(0.922 0 0);
+  --zinc-300: oklch(0.87 0 0);
+  --zinc-400: oklch(0.708 0 0);
+  --zinc-500: oklch(0.556 0 0);
+  --zinc-600: oklch(0.439 0 0);
+  --zinc-700: oklch(0.371 0 0);
+  --zinc-800: oklch(0.269 0 0);
+  --zinc-850: oklch(0.205 0 0);
+  --zinc-900: oklch(0.165 0 0);
+  --zinc-950: oklch(0.105 0 0);
+
+  /* ─── 基础语义色 (light) ─────────────────────────────────── */
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.145 0.005 240);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --card-hovered: oklch(0.98 0.002 240);
+  --card-foreground: oklch(0.145 0.005 240);
+  --card-hovered: var(--zinc-100);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
+  --popover-foreground: oklch(0.145 0.005 240);
 
-  --primary: oklch(0.55 0.15 265);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  /* 光纤蓝主色 — 强调用 */
+  --primary: oklch(0.72 0.16 195);
+  --primary-foreground: oklch(0.13 0 0);
 
-  --accent: oklch(0.7 0.12 200);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --accent-cyan: oklch(0.65 0.2 190);
-  --accent-purple: oklch(0.7 0.25 280);
+  /* user 气泡专用：亮度降到 0.55 保证白字 ≥ 4.5:1 (WCAG AA) */
+  --primary-bubble: oklch(0.55 0.18 230);
+  --primary-bubble-foreground: oklch(0.99 0 0);
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.6 0.18 142);
+  --secondary: var(--zinc-100);
+  --secondary-foreground: var(--zinc-900);
+  --muted: var(--zinc-100);
+  --muted-foreground: var(--zinc-500);
 
-  --border: oklch(0.4 0.01 250);
-  --border-glow: oklch(0.5 0.1 260);
-  --input: oklch(0.4 0.01 250);
-  --ring: oklch(0.705 0.015 286.067);
+  --accent: var(--zinc-100);
+  --accent-foreground: var(--zinc-900);
 
-  /* ─── 终端工程师审美色 ─────────────────────────────────── */
-  --terminal-bg: oklch(0.13 0.013 260);
-  --terminal-fg: oklch(0.92 0.007 230);
-  --terminal-success: oklch(0.78 0.21 142);
-  --terminal-error: oklch(0.65 0.24 27);
-  --terminal-warning: oklch(0.78 0.16 65);
-  --terminal-command: oklch(0.92 0.007 230);
-  --terminal-prompt: oklch(0.85 0.16 95);
-  --terminal-border: oklch(0.27 0.013 260);
+  --destructive: oklch(0.6 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.76 0.15 75);
+  --warning-foreground: oklch(0.13 0 0);
+  --success: oklch(0.66 0.16 145);
+  --success-foreground: oklch(0.99 0 0);
 
-  --config-panel-bg: oklch(0.28 0.012 260);
-  --config-input-bg: oklch(0.18 0.012 260);
-  --config-input-border: oklch(0.32 0.012 260);
-  --config-button-bg: oklch(0.5 0.21 27);
-  --config-button-hover: oklch(0.42 0.2 27);
+  /* 极薄边框 (alpha 0.08，几乎不可见) */
+  --border: oklch(0.13 0.005 240 / 0.08);
+  --input: oklch(0.13 0.005 240 / 0.12);
+  --ring: oklch(0.72 0.16 195);
 
-  /* ─── AI 对话 conversational 审美色 ─────────────────────── */
-  --ai-panel-bg: oklch(1 0 0);
-  --ai-panel-border: oklch(0.88 0.005 280);
-  --ai-title-color: oklch(0.6 0.18 270);
-  --ai-beta-bg: oklch(0.95 0.04 270);
-  --ai-input-bg: oklch(0.98 0.002 280);
-  --ai-page-title: oklch(0.63 0.18 230);
+  /* ─── 终端区色 (light/dark 共享 token, terminal 内永远暗底) ── */
+  --terminal-bg: oklch(0.165 0.006 240);
+  --terminal-fg: oklch(0.92 0.005 240);
+  --terminal-success: oklch(0.7 0.16 145);
+  --terminal-error: oklch(0.65 0.22 25);
+  --terminal-warning: oklch(0.78 0.13 75);
+  --terminal-command: oklch(0.92 0.005 240);
+  --terminal-prompt: oklch(0.78 0.13 95);
+  --terminal-border: oklch(0.99 0 0 / 0.08);
 
-  /* ─── P3 气泡视觉层次 token（MessageBubble / ThinkingBlock 消费） ─── */
-  /* user-bg lightness=0.5：用户气泡白字对此底 contrast ≈ 4.7:1（WCAG AA 通过）；
-     若提到 0.55 会降到 4.32 临界失败，axe-core 已多次验证 */
-  --bubble-user-bg: oklch(0.5 0.18 265 / 0.95);
-  --bubble-assistant-bg: oklch(0.98 0.005 265);
-  --thinking-bg: oklch(0.97 0.02 250);
-  --thinking-fg: oklch(0.25 0.05 250);
+  /* ─── AI 面板 (light) ──────────────────────────────────── */
+  --ai-panel-bg: var(--background);
+  --ai-panel-border: var(--border);
+  --ai-input-bg: var(--background);
+
+  /* ─── 气泡 (light) ─────────────────────────────────────── */
+  --bubble-user-bg: var(--primary-bubble);
+  --bubble-user-fg: var(--primary-bubble-foreground);
+  --bubble-assistant-bg: var(--background);
+  --bubble-assistant-fg: var(--foreground);
+
+  /* ─── 思考块 (light) ───────────────────────────────────── */
+  --thinking-bg: color-mix(in oklch, var(--primary) 6%, var(--background));
+  --thinking-fg: oklch(0.25 0.04 240);
+  --thinking-border: color-mix(in oklch, var(--primary) 22%, transparent);
 
   /* ─── 尺寸 / 圆角 ───────────────────────────────────────── */
-  --radius: 0.75rem;
+  --radius: 0.5rem;
 
   /* ─── 间距 ──────────────────────────────────────────────── */
   --space-1: 0.25rem;
@@ -81,67 +97,89 @@
   --space-8: 2rem;
   --space-12: 3rem;
 
-  /* ─── 动效 ──────────────────────────────────────────────── */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* ─── 动效曲线 (Linear 系标准) ───────────────────────────── */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --dur-fast: 120ms;
-  --dur-base: 200ms;
-  --dur-slow: 320ms;
+  --dur-enter: 120ms;
+  --dur-base: 160ms;
+  --dur-exit: 100ms;
+  --dur-slow: 240ms;
+  /* 兼容旧引用（保留以免大规模回归） */
+  --ease-out: var(--ease-standard);
+  --dur-fast: var(--dur-enter);
 
-  /* ─── 阴影 ──────────────────────────────────────────────── */
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
-  --shadow-card: 0 2px 8px rgb(0 0 0 / 0.1);
-  --shadow-ai-panel: 0 18px 40px -28px rgb(15 23 42 / 0.45);
+  /* ─── 阴影 (极简, 几乎不用阴影) ──────────────────────────── */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.05), 0 0 0 1px oklch(0 0 0 / 0.02);
+  --shadow-popover: 0 4px 16px oklch(0 0 0 / 0.08), 0 0 0 1px oklch(0 0 0 / 0.04);
 
-  /* ─── 字体 ──────────────────────────────────────────────── */
-  --font-sans: 'Inter var', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+  /* ─── 字体 (内部命名, 避免 @theme inline 自引用歧义) ────── */
+  --app-font-sans: 'Geist Variable', 'HarmonyOS Sans SC', 'PingFang SC',
+    'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  --app-font-mono: 'Geist Mono Variable', 'JetBrains Mono', 'Fira Code',
+    Consolas, Monaco, monospace;
+  --app-font-display: var(--app-font-sans);
 
   /* ─── Z 轴 ──────────────────────────────────────────────── */
   --z-popover: 40;
   --z-modal: 50;
+  --z-cmdk: 55;
   --z-tooltip: 60;
 }
 
+/* ─── Dark mode overrides ─────────────────────────────────── */
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.141 0.005 285.823);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.141 0.005 285.823);
-  --popover-foreground: oklch(0.985 0 0);
+  /* 炭黑底 (非纯黑, 眼睛更舒服) */
+  --background: oklch(0.135 0.006 240);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.165 0.006 240);
+  --card-foreground: oklch(0.97 0 0);
+  --card-hovered: oklch(0.2 0.006 240);
+  --popover: oklch(0.165 0.006 240);
+  --popover-foreground: oklch(0.97 0 0);
 
-  --primary: oklch(0.7 0.18 265);
-  --primary-foreground: oklch(0.1 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
+  --primary: oklch(0.78 0.15 195);
+  --primary-foreground: oklch(0.13 0 0);
 
-  --accent: oklch(0.6 0.15 200);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.5 0.18 25);
-  --destructive-foreground: oklch(0.9 0.05 25);
+  --primary-bubble: oklch(0.62 0.16 230);
+  --primary-bubble-foreground: oklch(0.99 0 0);
 
-  --border: oklch(0.9 0.25 195);
-  --border-glow: oklch(0.95 0.3 190);
-  --input: oklch(0.65 0.15 210);
-  --ring: oklch(0.442 0.017 285.786);
+  --secondary: var(--zinc-850);
+  --secondary-foreground: var(--zinc-100);
+  --muted: var(--zinc-850);
+  --muted-foreground: var(--zinc-400);
 
-  /* AI 面板深色覆盖 */
-  --ai-panel-bg: oklch(0.18 0.012 260);
-  --ai-panel-border: oklch(0.32 0.012 260);
-  --ai-title-color: oklch(0.82 0.12 250);
-  --ai-beta-bg: oklch(0.32 0.08 260);
-  --ai-input-bg: oklch(0.28 0.012 260);
+  --accent: var(--zinc-850);
+  --accent-foreground: var(--zinc-100);
 
-  /* P3 气泡深色覆盖（thinking-fg 对 thinking-bg contrast ≥ 4.5:1） */
-  --bubble-user-bg: oklch(0.5 0.18 265 / 0.95);
-  --bubble-assistant-bg: oklch(0.22 0.012 265);
-  --thinking-bg: oklch(0.22 0.04 250);
-  --thinking-fg: oklch(0.88 0.04 250);
+  --destructive: oklch(0.66 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.8 0.14 75);
+  --success: oklch(0.7 0.15 145);
 
-  --shadow-ai-panel: 0 18px 40px -28px rgb(15 23 42 / 0.6);
+  --border: oklch(0.99 0 0 / 0.09);
+  --input: oklch(0.99 0 0 / 0.12);
+  --ring: oklch(0.78 0.15 195);
+
+  /* AI 面板 dark */
+  --ai-panel-bg: var(--background);
+  --ai-panel-border: var(--border);
+  --ai-input-bg: oklch(0.165 0.006 240);
+
+  /* 气泡 dark */
+  --bubble-assistant-bg: oklch(0.18 0.006 240);
+  --bubble-assistant-fg: var(--foreground);
+
+  /* 思考块 dark */
+  --thinking-bg: color-mix(in oklch, var(--primary) 10%, var(--background));
+  --thinking-fg: oklch(0.92 0.02 240);
+  --thinking-border: color-mix(in oklch, var(--primary) 28%, transparent);
+
+  /* 阴影 dark (低强度, 几乎只剩 border) */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(0.99 0 0 / 0.04);
+  --shadow-popover: 0 8px 24px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(0.99 0 0 / 0.06);
 }
 
 /* ─── @theme inline：把 CSS 变量映射给 Tailwind v4 ────────── */
@@ -162,23 +200,39 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-border: var(--border);
-  --color-border-glow: var(--border-glow);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-success: var(--success);
+  --color-zinc-50: var(--zinc-50);
+  --color-zinc-100: var(--zinc-100);
+  --color-zinc-200: var(--zinc-200);
+  --color-zinc-300: var(--zinc-300);
+  --color-zinc-400: var(--zinc-400);
+  --color-zinc-500: var(--zinc-500);
+  --color-zinc-600: var(--zinc-600);
+  --color-zinc-700: var(--zinc-700);
+  --color-zinc-800: var(--zinc-800);
+  --color-zinc-850: var(--zinc-850);
+  --color-zinc-900: var(--zinc-900);
+  --color-zinc-950: var(--zinc-950);
   --color-terminal: var(--terminal-bg);
   --color-terminal-foreground: var(--terminal-fg);
   --color-terminal-success: var(--terminal-success);
   --color-terminal-error: var(--terminal-error);
+  --color-terminal-warning: var(--terminal-warning);
   --color-terminal-command: var(--terminal-command);
   --color-terminal-prompt: var(--terminal-prompt);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+  --font-display: var(--app-font-display);
 }

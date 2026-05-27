@@ -123,7 +123,6 @@ const handleSelectPrompt = (prompt: string): void => {
 };
 
 useAiKeyboard({
-  onClear: handleClear,
   onScrollToBottom: () => { chatMessagesRef.value?.scrollToBottom(); }
 });
 

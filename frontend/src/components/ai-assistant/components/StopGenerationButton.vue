@@ -9,16 +9,7 @@
       @click="emit('stop')"
     >
       <span class="stop-icon" aria-hidden="true">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          stroke="none"
-          aria-hidden="true"
-          focusable="false"
-        >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
           <rect x="6" y="6" width="12" height="12" rx="1.5" />
         </svg>
       </span>
@@ -43,38 +34,35 @@ const emit = defineEmits<{
 .stop-btn {
   position: absolute;
   left: 50%;
-  bottom: 12px;
+  bottom: 16px;
   transform: translateX(-50%);
   z-index: 5;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   font-size: 12px;
   font-weight: 500;
   line-height: 1;
-  color: oklch(var(--foreground));
-  background: color-mix(in oklch, oklch(var(--background)) 80%, oklch(var(--muted)) 20%);
-  border: 1px solid oklch(var(--border));
+  color: var(--foreground);
+  background-color: var(--background);
+  border: 1px solid var(--border);
   border-radius: 999px;
   box-shadow: var(--shadow-card);
   cursor: pointer;
-  backdrop-filter: blur(8px);
   transition:
-    background-color var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
-    transform var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
+    background-color var(--dur-enter) var(--ease-standard),
+    border-color var(--dur-enter) var(--ease-standard),
+    transform var(--dur-enter) var(--ease-standard);
 }
 
 .stop-btn:hover {
-  background: color-mix(in oklch, oklch(var(--background)) 65%, oklch(var(--muted)) 35%);
-  border-color: oklch(0.55 0.18 30 / 0.5);
-  box-shadow: 0 4px 12px oklch(0.55 0.18 30 / 0.15);
+  border-color: color-mix(in oklch, var(--destructive) 50%, transparent);
+  background-color: color-mix(in oklch, var(--destructive) 6%, var(--background));
 }
 
 .stop-btn:focus-visible {
-  outline: 2px solid oklch(0.55 0.18 30 / 0.6);
+  outline: 2px solid color-mix(in oklch, var(--destructive) 55%, transparent);
   outline-offset: 2px;
 }
 
@@ -84,18 +72,16 @@ const emit = defineEmits<{
 
 .stop-icon {
   display: inline-flex;
-  color: oklch(0.55 0.18 30);
+  color: var(--destructive);
 }
 
-.stop-label {
-  user-select: none;
-}
+.stop-label { user-select: none; }
 
-/* 进出场动画 */
 .stop-fade-enter-active,
 .stop-fade-leave-active {
-  transition: opacity var(--dur-base) var(--ease-out),
-              transform var(--dur-base) var(--ease-out);
+  transition:
+    opacity var(--dur-base) var(--ease-standard),
+    transform var(--dur-base) var(--ease-standard);
 }
 .stop-fade-enter-from,
 .stop-fade-leave-to {

@@ -1,41 +1,38 @@
 <template>
-  <form class="grid grid-cols-6 gap-4" @submit.prevent="handleConnect">
-    <!-- 1. 连接方式 -->
-    <div>
-      <label for="terminal-connection-type" class="text-sm font-medium mb-1 block text-gray-400">连接方式</label>
+  <form class="terminal-form" @submit.prevent="handleConnect">
+    <div class="terminal-form__field">
+      <label for="terminal-connection-type" class="terminal-form__label">连接方式</label>
       <select
         id="terminal-connection-type"
         v-model="store.connectionType"
         name="connectionType"
-        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50"
+        class="terminal-config-input terminal-form__select"
       >
         <option value="telnet">Telnet</option>
         <option value="ssh">SSH</option>
       </select>
     </div>
 
-    <!-- 2. 设备地址 -->
-    <div>
-      <label for="terminal-device-address" class="text-sm font-medium mb-1 block text-gray-400">设备地址</label>
+    <div class="terminal-form__field">
+      <label for="terminal-device-address" class="terminal-form__label">设备地址</label>
       <input
         id="terminal-device-address"
         v-model="store.deviceAddress"
         name="deviceAddress"
-        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
+        class="terminal-config-input terminal-form__input"
         placeholder="192.168.20.1"
         type="text"
         autocomplete="off"
       />
     </div>
 
-    <!-- 3. 端口 -->
-    <div>
-      <label for="terminal-port" class="text-sm font-medium mb-1 block text-gray-400">端口</label>
+    <div class="terminal-form__field terminal-form__field--narrow">
+      <label for="terminal-port" class="terminal-form__label">端口</label>
       <input
         id="terminal-port"
         v-model="store.port"
         name="port"
-        class="w-20 rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
+        class="terminal-config-input terminal-form__input"
         :placeholder="store.connectionType === 'ssh' ? '22' : '23'"
         type="number"
         inputmode="numeric"
@@ -43,63 +40,54 @@
       />
     </div>
 
-    <!-- 4. 用户名 -->
-    <div>
-      <label for="terminal-username" class="text-sm font-medium mb-1 block text-gray-400">用户名</label>
+    <div class="terminal-form__field">
+      <label for="terminal-username" class="terminal-form__label">用户名</label>
       <input
         id="terminal-username"
         v-model="store.username"
         name="username"
-        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
+        class="terminal-config-input terminal-form__input"
         placeholder="admin"
         type="text"
         autocomplete="username"
       />
     </div>
 
-    <!-- 5. 密码 -->
-    <div>
-      <label for="terminal-password" class="text-sm font-medium mb-1 block text-gray-400">密码</label>
+    <div class="terminal-form__field">
+      <label for="terminal-password" class="terminal-form__label">密码</label>
       <input
         id="terminal-password"
         v-model="store.password"
         name="password"
-        class="w-full rounded-lg border terminal-config-input px-3 py-2 text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)] hover:border-primary/50 focus:border-primary"
+        class="terminal-config-input terminal-form__input"
         type="password"
         placeholder="••••••••"
         autocomplete="current-password"
       />
     </div>
 
-    <!-- 6. 执行 / 取消 -->
-    <div class="flex items-end">
-      <div class="w-full flex gap-2">
+    <div class="terminal-form__field terminal-form__field--actions">
+      <span class="terminal-form__label">&nbsp;</span>
+      <div class="terminal-form__btn-group">
         <button
           type="submit"
-          :class="[
-            'flex-1 h-10 terminal-config-button rounded-lg font-medium text-sm',
-            store.connectionStatus === 'connected'
-              ? 'bg-red-600 hover:bg-red-700'
-              : 'terminal-config-button'
-          ]"
+          class="terminal-config-button"
+          :class="{ 'terminal-config-button--danger': store.connectionStatus === 'connected' }"
           :disabled="store.connectionStatus === 'connecting' && !store.canCancelConnection"
         >
-          <div class="flex items-center justify-center">
-            <span
-              v-if="store.connectionStatus === 'connecting' && !store.canCancelConnection"
-              class="pulse-animation"
-            >连接中...</span>
-            <span v-else>{{ store.connectionStatus === 'connected' ? '断开连接' : '执行连接' }}</span>
-          </div>
+          <span v-if="store.connectionStatus === 'connecting' && !store.canCancelConnection">
+            连接中…
+          </span>
+          <span v-else>{{ store.connectionStatus === 'connected' ? '断开' : '连接' }}</span>
         </button>
 
         <button
           v-if="store.canCancelConnection && store.connectionStatus === 'connecting'"
           type="button"
-          class="h-10 px-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm transition-[transform,opacity,background-color,border-color,box-shadow,color] duration-[var(--dur-base)] ease-[var(--ease-out)]"
+          class="terminal-config-button terminal-config-button--cancel"
           @click="handleCancelConnect"
         >
-          取消连接
+          取消
         </button>
       </div>
     </div>
@@ -119,3 +107,75 @@ const handleCancelConnect = async (): Promise<void> => {
   await store.cancelConnection();
 };
 </script>
+
+<style scoped>
+.terminal-form {
+  display: grid;
+  grid-template-columns: 110px 1fr 80px 1fr 1fr 110px;
+  gap: 10px;
+  align-items: end;
+}
+
+.terminal-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.terminal-form__field--narrow {
+  max-width: 100px;
+}
+
+.terminal-form__field--actions .terminal-form__btn-group {
+  display: flex;
+  gap: 6px;
+}
+
+.terminal-form__label {
+  font-size: 10.5px;
+  font-family: var(--app-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: color-mix(in oklch, var(--terminal-fg) 55%, transparent);
+}
+
+.terminal-form__select,
+.terminal-form__input {
+  width: 100%;
+}
+
+.terminal-config-button--danger {
+  background-color: var(--destructive);
+  border-color: color-mix(in oklch, var(--destructive), black 8%);
+}
+
+.terminal-config-button--danger:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--destructive), white 6%);
+}
+
+.terminal-config-button--cancel {
+  background-color: var(--warning);
+  color: var(--warning-foreground);
+  border-color: color-mix(in oklch, var(--warning), black 8%);
+}
+
+.terminal-config-button--cancel:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--warning), white 6%);
+}
+
+@media (max-width: 1024px) {
+  .terminal-form {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .terminal-form__field--narrow {
+    max-width: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .terminal-form {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>

@@ -1,59 +1,53 @@
 <template>
   <div
-    v-if="thinking.content !== ''"
     role="log"
     aria-live="polite"
     :aria-busy="isBusy ? 'true' : 'false'"
-    class="thinking-block ml-7 mb-2 rounded-lg border"
-    :class="isStreaming
-      ? 'border-blue-400 dark:border-blue-600'
-      : 'border-blue-200 dark:border-blue-800'"
+    class="thinking-block"
+    :class="isStreaming ? 'thinking-block--streaming' : 'thinking-block--done'"
   >
     <button
       type="button"
-      class="thinking-header w-full flex items-center gap-2 px-3 py-2 text-left rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(var(--primary)/0.5)]"
-      :class="isStreaming ? 'cursor-default' : 'cursor-pointer hover:bg-blue-100/40 dark:hover:bg-blue-900/30'"
+      class="thinking-header"
+      :class="{ 'thinking-header--locked': isStreaming }"
       :disabled="isStreaming"
       :aria-expanded="isExpanded || isStreaming ? 'true' : 'false'"
       aria-controls="thinking-content-region"
       @click="toggleExpanded"
     >
       <template v-if="isStreaming">
-        <span
-          class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"
-          aria-hidden="true"
-        ></span>
-        <span class="thinking-title text-xs font-medium">AI助手思考中</span>
-        <span class="thinking-meta text-[10px]">正在思考...</span>
+        <packet-signal mode="sending" />
+        <span class="thinking-title">AI 助手正在思考</span>
+        <span class="thinking-meta">正在分析…</span>
       </template>
       <template v-else>
-        <span class="thinking-title text-sm" aria-hidden="true">🤔</span>
-        <span class="thinking-title text-xs font-medium">AI思考过程</span>
+        <span class="thinking-icon" aria-hidden="true" v-html="radioIconSvg" />
+        <span class="thinking-title">思考过程</span>
         <span
           v-if="!thinking.isComplete"
-          class="thinking-meta text-xs"
-        >思考中...</span>
+          class="thinking-meta"
+        >未完成</span>
         <span
           v-else-if="formattedTime !== ''"
-          class="thinking-meta text-[11px]"
+          class="thinking-meta thinking-meta--time"
           :title="absoluteTime"
         >{{ formattedTime }}</span>
         <transition name="thinking-check">
           <span
             v-if="showCheckmark"
-            class="thinking-check inline-flex items-center text-green-600 dark:text-green-400 text-sm font-semibold"
+            class="thinking-check"
             aria-hidden="true"
           >✓</span>
         </transition>
-        <span class="flex-1"></span>
+        <span class="thinking-spacer" />
         <span
           v-if="!isExpanded && previewText !== ''"
-          class="thinking-meta text-[11px] truncate max-w-[55%]"
+          class="thinking-preview"
           :title="previewText"
         >{{ previewText }}</span>
         <chevron-down-icon
-          class="thinking-chevron h-4 w-4 transition-transform duration-200"
-          :class="isExpanded ? 'rotate-0' : '-rotate-90'"
+          class="thinking-chevron"
+          :class="{ 'thinking-chevron--collapsed': !isExpanded }"
         />
       </template>
     </button>
@@ -66,7 +60,7 @@
       <div
         v-show="isExpanded || isStreaming"
         id="thinking-content-region"
-        class="thinking-content text-sm whitespace-pre-wrap leading-relaxed px-3 pb-3 overflow-hidden"
+        class="thinking-content"
       >
         {{ thinking.content }}
       </div>
@@ -78,6 +72,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ThinkingContent } from '@/types/chat';
 import { ChevronDownIcon } from '@/components/common/icons';
+import PacketSignal from '@/components/decoration/PacketSignal.vue';
 
 interface Props {
   thinking: ThinkingContent
@@ -90,11 +85,11 @@ const props = withDefaults(defineProps<Props>(), {
   defaultExpanded: true
 });
 
-// 完成态可折叠；流式态强制展开（disabled button + 视觉脉冲点）
-// eslint-disable-next-line vue/no-setup-props-destructure -- defaultExpanded 仅作初始值，无需响应性
+const radioIconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>';
+
+// eslint-disable-next-line vue/no-setup-props-destructure
 const isExpanded = ref<boolean>(props.defaultExpanded);
 
-// 完成提示绿勾：流式 → 完成态切换瞬间淡入 → 1.5s 后自动消失
 const showCheckmark = ref<boolean>(false);
 let checkmarkTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -112,19 +107,16 @@ const toggleExpanded = (): void => {
   isExpanded.value = !isExpanded.value;
 };
 
-// 折叠态预览：思考首行前 80 字符（剥除多余空白）
 const previewText = computed<string>(() => {
   const cleaned = props.thinking.content.replace(/\s+/g, ' ').trim();
   if (cleaned.length <= 80) { return cleaned; }
   return `${cleaned.slice(0, 80)}…`;
 });
 
-// aria-busy=true 条件：实时流式态，或历史态但 thinking 尚未标记完成
 const isBusy = computed<boolean>(() =>
   props.isStreaming || !props.thinking.isComplete
 );
 
-// 相对时间：每 30s 触发一次重算，组件卸载清理定时器
 const nowMs = ref<number>(Date.now());
 let nowTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -157,21 +149,18 @@ const absoluteTime = computed<string>(() => {
   return new Date(ts).toLocaleString('zh-CN');
 });
 
-// 折叠展开 max-height + opacity 过渡：用 Vue Transition JS 钩子，避免给 Tailwind 写死 max-h
 const onCollapseEnter = (el: Element): void => {
   const node = el as HTMLElement;
   node.style.maxHeight = '0px';
   node.style.opacity = '0';
-  // 强制 reflow 让起始值生效，再切换到目标值触发过渡
   void node.offsetHeight;
-  node.style.transition = 'max-height 240ms var(--ease-out, ease), opacity 200ms var(--ease-out, ease)';
+  node.style.transition = 'max-height var(--dur-slow) var(--ease-standard), opacity var(--dur-base) var(--ease-standard)';
   node.style.maxHeight = `${node.scrollHeight}px`;
   node.style.opacity = '1';
 };
 
 const onCollapseAfterEnter = (el: Element): void => {
   const node = el as HTMLElement;
-  // 还原 inline style，避免影响流式期内容追加导致的 scrollHeight 变化
   node.style.maxHeight = '';
   node.style.transition = '';
   node.style.opacity = '';
@@ -182,7 +171,7 @@ const onCollapseLeave = (el: Element): void => {
   node.style.maxHeight = `${node.scrollHeight}px`;
   node.style.opacity = '1';
   void node.offsetHeight;
-  node.style.transition = 'max-height 200ms var(--ease-out, ease), opacity 160ms var(--ease-out, ease)';
+  node.style.transition = 'max-height var(--dur-base) var(--ease-exit), opacity var(--dur-exit) var(--ease-exit)';
   node.style.maxHeight = '0px';
   node.style.opacity = '0';
 };
@@ -190,43 +179,117 @@ const onCollapseLeave = (el: Element): void => {
 
 <style scoped>
 .thinking-block {
+  margin-left: 28px;
+  margin-bottom: 8px;
+  border: 1px solid var(--thinking-border);
+  border-radius: var(--radius);
   background: var(--thinking-bg);
-  transition: border-color 300ms var(--ease-out, ease), background 300ms var(--ease-out, ease);
+  transition:
+    border-color var(--dur-base) var(--ease-standard),
+    background-color var(--dur-base) var(--ease-standard);
 }
+
+.thinking-block--streaming {
+  border-color: color-mix(in oklch, var(--primary) 38%, transparent);
+}
+
 .thinking-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  text-align: left;
   background: transparent;
   border: none;
   color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background-color var(--dur-enter) var(--ease-standard);
 }
-.thinking-header:disabled {
+
+.thinking-header:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--primary) 6%, transparent);
+}
+
+.thinking-header:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--primary) 60%, transparent);
+  outline-offset: -2px;
+}
+
+.thinking-header--locked {
   cursor: default;
 }
-.thinking-content {
-  color: var(--thinking-fg);
+
+.thinking-icon {
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
 }
+
 .thinking-title {
-  color: color-mix(in oklch, var(--thinking-fg) 85%, oklch(var(--primary)) 15%);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--app-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: color-mix(in oklch, var(--thinking-fg) 85%, transparent);
 }
+
 .thinking-meta {
+  font-size: 10px;
+  color: color-mix(in oklch, var(--thinking-fg) 55%, transparent);
+}
+
+.thinking-meta--time {
+  font-family: var(--app-font-mono);
+}
+
+.thinking-check {
+  display: inline-flex;
+  align-items: center;
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.thinking-spacer { flex: 1; }
+
+.thinking-preview {
+  font-size: 11px;
   color: color-mix(in oklch, var(--thinking-fg) 60%, transparent);
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
 .thinking-chevron {
-  color: color-mix(in oklch, var(--thinking-fg) 70%, transparent);
+  width: 14px;
+  height: 14px;
+  color: color-mix(in oklch, var(--thinking-fg) 60%, transparent);
+  transition: transform var(--dur-enter) var(--ease-standard);
 }
 
-/* 完成态绿勾淡入淡出 */
+.thinking-chevron--collapsed {
+  transform: rotate(-90deg);
+}
+
+.thinking-content {
+  padding: 0 12px 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--thinking-fg);
+  white-space: pre-wrap;
+  overflow: hidden;
+  font-family: var(--app-font-mono);
+}
+
 .thinking-check-enter-from,
-.thinking-check-leave-to {
-  opacity: 0;
-}
-.thinking-check-enter-active {
-  transition: opacity 200ms var(--ease-out, ease);
-}
-.thinking-check-leave-active {
-  transition: opacity 240ms var(--ease-out, ease);
-}
+.thinking-check-leave-to { opacity: 0; }
+.thinking-check-enter-active { transition: opacity var(--dur-base) var(--ease-standard); }
+.thinking-check-leave-active { transition: opacity var(--dur-slow) var(--ease-exit); }
 
-/* 尊重 prefers-reduced-motion：移除装饰性过渡 */
 @media (prefers-reduced-motion: reduce) {
   .thinking-block,
   .thinking-chevron,

@@ -1,5 +1,5 @@
 /* ============================================================
-   Base：reset / html / body / 主题 color-scheme
+   Base：reset / html / body / 主题 color-scheme / a11y 偏好
    ============================================================ */
 
 @layer base {
@@ -7,21 +7,38 @@
     @apply border-border outline-ring/50;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    transition:
-      background-color var(--dur-slow) var(--ease-out),
-      color var(--dur-slow) var(--ease-out);
+  html {
+    font-family: var(--app-font-sans);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Tabular numerals 让数字/IP/时间戳等宽对齐 */
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
 
-  /* 键盘焦点可见环 — WCAG AA（用 primary 取色保证 light/dark 双模对比） */
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--app-font-sans);
+    transition:
+      background-color var(--dur-base) var(--ease-standard),
+      color var(--dur-base) var(--ease-standard);
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--app-font-mono);
+  }
+
+  /* 键盘焦点可见环 — WCAG AA */
   :focus-visible {
-    outline: 2px solid oklch(var(--primary));
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
     border-radius: 2px;
   }
 
-  /* 用户偏好减少动效时禁用过渡 */
+  /* 用户偏好减少动效时禁用所有过渡与动画 */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -30,6 +47,12 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.001ms !important;
     }
+  }
+
+  /* 选中文字色 */
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 32%, transparent);
+    color: var(--foreground);
   }
 }
 

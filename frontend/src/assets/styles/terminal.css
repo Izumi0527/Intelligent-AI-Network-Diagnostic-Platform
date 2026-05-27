@@ -1,24 +1,23 @@
 /* ============================================================
-   Terminal：工程师审美 — mono 字体 / 深色面板 / status pill
+   Terminal：工程师审美 — mono 字体 / 暗色面板 / 简洁状态色
+   与 AI 区共用同一 token 体系, 但终端区永远使用暗底
    ============================================================ */
 
 .terminal-border {
   background: var(--terminal-bg);
-  border: 1px solid oklch(var(--border));
+  border: 1px solid var(--terminal-border);
+  border-radius: calc(var(--radius) + 2px);
 }
 
 .terminal-display {
   background-color: var(--terminal-bg);
-  border: 1px solid oklch(var(--border));
-  border-radius: 8px;
+  border: 1px solid var(--terminal-border);
+  border-radius: var(--radius);
   padding: 16px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.dark .terminal-display {
-  border: 1px solid oklch(var(--border));
+  font-family: var(--app-font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--terminal-fg);
 }
 
 .terminal-text {
@@ -39,29 +38,53 @@
 
 .terminal-prompt {
   color: var(--terminal-prompt);
+  font-family: var(--app-font-mono);
 }
 
 /* ─── 连接配置面板 ──────────────────────────────────────── */
 .terminal-config-panel {
-  background-color: var(--config-panel-bg);
-  border-radius: 8px;
+  background-color: color-mix(in oklch, var(--terminal-bg), white 4%);
+  border: 1px solid var(--terminal-border);
+  border-radius: var(--radius);
 }
 
 .terminal-config-input {
-  background-color: var(--config-input-bg);
-  border-color: var(--config-input-border);
-  color: white;
+  background-color: color-mix(in oklch, var(--terminal-bg), black 8%);
+  border: 1px solid var(--terminal-border);
+  color: var(--terminal-fg);
+  border-radius: calc(var(--radius) - 2px);
+  font-family: var(--app-font-mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  transition: border-color var(--dur-enter) var(--ease-standard);
+}
+
+.terminal-config-input:focus,
+.terminal-config-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in oklch, var(--primary) 55%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 20%, transparent);
 }
 
 .terminal-config-button {
-  background-color: var(--config-button-bg);
-  color: white;
-  padding: 8px 24px;
-  transition: background-color var(--dur-base) var(--ease-out);
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid color-mix(in oklch, var(--primary), black 8%);
+  border-radius: var(--radius);
+  padding: 6px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-enter) var(--ease-standard),
+    transform var(--dur-enter) var(--ease-standard);
 }
 
-.terminal-config-button:hover {
-  background-color: var(--config-button-hover);
+.terminal-config-button:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--primary), white 6%);
+}
+
+.terminal-config-button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 /* ─── 响应式 ────────────────────────────────────────────── */
@@ -92,63 +115,35 @@
   }
 }
 
-@media (min-width: 1440px) {
-  .terminal-display {
-    font-size: 15px;
-  }
-}
-
-/* ─── 发送按钮：深色 / 浅色双模渐变 ─────────────────────────── */
+/* ─── 发送按钮：扁平 + 极小反馈 ──────────────────────────── */
 .terminal-send-button {
-  background: linear-gradient(
-    135deg,
-    oklch(var(--primary)),
-    color-mix(in oklch, oklch(var(--primary)), black 15%)
-  );
-  color: oklch(var(--primary-foreground));
-  border: 1px solid color-mix(in oklch, oklch(var(--primary)), transparent 35%);
-  box-shadow: 0 14px 28px -18px oklch(var(--primary) / 0.6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid color-mix(in oklch, var(--primary), black 8%);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-enter) var(--ease-standard),
+    transform var(--dur-enter) var(--ease-standard),
+    opacity var(--dur-enter) var(--ease-standard);
 }
 
 .terminal-send-button:hover:not(:disabled) {
-  background: linear-gradient(
-    135deg,
-    color-mix(in oklch, oklch(var(--primary)), black 12%),
-    color-mix(in oklch, oklch(var(--primary)), black 28%)
-  );
-  box-shadow: 0 16px 32px -16px oklch(var(--primary) / 0.55);
+  background-color: color-mix(in oklch, var(--primary), white 6%);
 }
 
 .terminal-send-button:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: 0 10px 22px -18px oklch(var(--primary) / 0.65);
+  transform: scale(0.97);
 }
 
 .terminal-send-button:disabled {
-  background: linear-gradient(
-    135deg,
-    oklch(var(--primary) / 0.2),
-    oklch(var(--primary) / 0.25)
-  );
-  color: oklch(var(--muted-foreground));
-  border-color: oklch(var(--border) / 0.6);
-}
-
-.dark .terminal-send-button {
-  background: linear-gradient(
-    135deg,
-    color-mix(in oklch, oklch(var(--primary)), white 8%),
-    color-mix(in oklch, oklch(var(--primary)), black 35%)
-  );
-  color: oklch(var(--primary-foreground));
-  border-color: color-mix(in oklch, oklch(var(--primary)), white 15%);
-}
-
-.dark .terminal-send-button:hover:not(:disabled) {
-  background: linear-gradient(
-    135deg,
-    oklch(var(--primary)),
-    color-mix(in oklch, oklch(var(--primary)), black 15%)
-  );
-  box-shadow: 0 18px 34px -18px oklch(var(--primary) / 0.55);
+  opacity: 0.4;
+  cursor: not-allowed;
 }

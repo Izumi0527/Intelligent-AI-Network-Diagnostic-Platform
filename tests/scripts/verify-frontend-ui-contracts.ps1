@@ -43,6 +43,7 @@ Assert-Contains $AIAssistant "!store\.isModelConnected" "AI input must be disabl
 Assert-Contains $AIAssistant "modelUnavailableStatusText" "AI input must explain why sending is unavailable"
 Assert-True (-not $AIAssistant.Contains("<stream-toggle")) "AI assistant must not render the stream response toggle"
 Assert-True (-not $AIAssistant.Contains("SEARCH_TOGGLE_STORAGE_KEY")) "web search must default off on each page load instead of restoring a persisted enabled state"
+Assert-True (-not (Test-Path (Join-Path $FrontendSrc "components/ai-assistant/components/StreamToggle.vue"))) "stream toggle component must be removed"
 
 $Messaging = Get-Content -Path (Join-Path $FrontendSrc "stores/ai-assistant/actions/messaging.ts") -Raw
 Assert-Contains $Messaging "markStreamAborted" "stream aborts must be marked without surfacing low-level read errors"

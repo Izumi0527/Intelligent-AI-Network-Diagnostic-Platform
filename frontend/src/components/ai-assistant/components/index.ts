@@ -8,7 +8,6 @@
 
 import ChatHeader from './ChatHeader.vue';
 import ModelSelector from './ModelSelector.vue';
-import StreamToggle from './StreamToggle.vue';
 import SearchToggle from './SearchToggle.vue';
 import SearchSourcesBlock from './SearchSourcesBlock.vue';
 import ChatMessages from './ChatMessages.vue';
@@ -20,7 +19,6 @@ import ConfirmDialog from './ConfirmDialog.vue';
 export {
   ChatHeader,
   ModelSelector,
-  StreamToggle,
   SearchToggle,
   SearchSourcesBlock,
   ChatMessages,

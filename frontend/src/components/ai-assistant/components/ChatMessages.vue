@@ -36,42 +36,6 @@
       />
     </template>
 
-    <!-- 非流式模式接收中提示 -->
-    <div
-      v-if="streamState.isStreamingContent && !streamState.streamingEnabled"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-      class="stream-hint fade-in"
-    >
-      <div class="stream-hint__head">
-        <span class="stream-hint__role">AI</span>
-        <span class="stream-hint__meta">正在回复…</span>
-      </div>
-      <div class="stream-hint__body">
-        <packet-signal mode="sending" />
-        <span class="stream-hint__text">正在接收内容中…</span>
-      </div>
-    </div>
-
-    <!-- 非流式模式打字气泡 -->
-    <div
-      v-if="streamState.isTyping && !streamState.isStreamingContent && !streamState.streamingEnabled"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-      class="stream-hint fade-in"
-    >
-      <div class="stream-hint__head">
-        <span class="stream-hint__role">AI</span>
-        <span class="stream-hint__meta">正在思考…</span>
-      </div>
-      <div class="stream-hint__body">
-        <packet-signal mode="sending" />
-        <span class="stream-hint__text">AI 正在思考中…</span>
-      </div>
-    </div>
-
     <stop-generation-button :visible="canStop" @stop="onStop" />
 
     <scroll-to-bottom-button :visible="showScrollToBottom" @scroll="onScrollToBottom" />
@@ -88,14 +52,12 @@ import MessageBubble from './MessageBubble.vue';
 import StopGenerationButton from './StopGenerationButton.vue';
 import EmptyState from './EmptyState.vue';
 import ScrollToBottomButton from './ScrollToBottomButton.vue';
-import PacketSignal from '@/components/decoration/PacketSignal.vue';
 
 export interface StreamState {
   isTyping: boolean
   isStreamingContent: boolean
   isThinking: boolean
   currentThinkingContent: string
-  streamingEnabled: boolean
 }
 
 const props = defineProps<{
@@ -230,50 +192,6 @@ defineExpose({ scrollToBottom });
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton-bar { animation: none !important; }
-}
-
-.stream-hint {
-  margin-left: 0;
-  margin-bottom: 16px;
-}
-
-.stream-hint__head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  margin-left: 28px;
-  font-size: 10px;
-  color: var(--muted-foreground);
-}
-
-.stream-hint__role {
-  font-family: var(--app-font-mono);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: color-mix(in oklch, var(--foreground) 70%, transparent);
-}
-
-.stream-hint__meta {
-  font-size: 10px;
-  color: color-mix(in oklch, var(--muted-foreground) 80%, transparent);
-}
-
-.stream-hint__body {
-  margin-left: 28px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bubble-assistant-bg);
-}
-
-.stream-hint__text {
-  font-size: 12px;
-  color: var(--muted-foreground);
 }
 
 .chat-messages::-webkit-scrollbar {

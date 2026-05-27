@@ -7,7 +7,6 @@ interface UtilActions {
   addUserMessage(content: string): ChatMessage;
   addAssistantMessage(content: string): void;
   addMessage(message: ChatMessage): void;
-  toggleStreamingMode(): void;
   toggleSearchMode(): void;
   setSelectedModel(modelValue: string): void;
   classifyError(error: ApiError | Error): MessageError;
@@ -121,10 +120,6 @@ export const createUtilActions = (state: AIAssistantState): UtilActions => ({
 
   addMessage(message: ChatMessage): void {
     state.chatMessages.push(message);
-  },
-
-  toggleStreamingMode(): void {
-    state.streamingEnabled = !state.streamingEnabled;
   },
 
   toggleSearchMode(): void {

@@ -89,15 +89,6 @@ export interface ApiError extends Error {
   validationErrors?: Array<{ msg: string; type: string }>
 }
 
-export interface MessageRequest {
-  model: string
-  messages: Array<{
-    role: 'user' | 'assistant' | 'system'
-    content: string
-  }>
-  stream?: boolean
-}
-
 export interface APIResponse {
   data?: {
     content?: string
@@ -122,7 +113,6 @@ export interface AIAssistantState {
   selectedModel: string
   availableModels: AIModel[]
   isModelConnected: boolean
-  streamingEnabled: boolean
   searchEnabled: boolean
   isAIResponding: boolean
   isStreamingContent: boolean // 正在接收流式内容
@@ -145,7 +135,6 @@ export interface AIAssistantState {
 export interface ChatSettings {
   temperature?: number
   maxTokens?: number
-  streamMode?: boolean
   model?: string
 }
 

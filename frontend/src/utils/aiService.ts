@@ -2,7 +2,6 @@ import axios, { AxiosHeaders, AxiosResponse } from 'axios';
 import type { ChatMessage, FormattedMessage, MessageHistoryItem } from '@/types';
 import type { ApiError } from '@/types/chat';
 import type {
-  ChatCompletionResponse,
   ClaudeStreamChunk,
   ModelStatusResponse,
   ModelsListResponse,
@@ -43,7 +42,6 @@ api.interceptors.request.use((config) => {
 interface SendMessageParams {
     model: string;
     messages: MessageHistoryItem[] | ChatMessage[];
-    stream?: boolean;
     enable_search?: boolean;
 }
 
@@ -406,129 +404,4 @@ export const aiService = {
     }
   },
 
-  async sendMessage(params: SendMessageParams): Promise<AxiosResponse<ChatCompletionResponse>> {
-    // 确保消息格式正确
-    const formattedParams = {
-      ...params,
-      messages: formatMessages(params.messages)
-    };
-
-    try {
-      return api.post<ChatCompletionResponse>('/ai/chat', formattedParams);
-    } catch (error: unknown) {
-      logger.error('消息发送错误:', error);
-      throw error;
-    }
-  },
-
-  /**
-     * 发送消息，带重试机制
-     */
-  async sendMessageWithRetry(params: SendMessageParams, maxRetries = 3): Promise<AxiosResponse<ChatCompletionResponse>> {
-    // 参数验证
-    if (!params.model) {
-      const error = new Error('未指定模型参数');
-      logger.error('发送消息失败:', error);
-      throw error;
-    }
-
-    // 确保消息列表不为空
-    if (!Array.isArray(params.messages) || params.messages.length === 0) {
-      const error = new Error('消息列表不能为空');
-      logger.error('发送消息失败:', error);
-      throw error;
-    }
-
-    // 格式化消息
-    const formattedMessages = formatMessages(params.messages);
-
-    // 格式化后的消息列表不能为空
-    if (formattedMessages.length === 0) {
-      const error = new Error('格式化后的消息列表为空，无法发送请求');
-      logger.error('发送消息失败:', error);
-      throw error;
-    }
-
-    let retries = 0;
-    let lastError = null;
-
-    while (retries < maxRetries) {
-      try {
-        const formattedParams = {
-          ...params,
-          messages: formattedMessages
-        };
-
-        logger.debug(`发送聊天请求 (尝试 ${retries + 1}/${maxRetries}):`, {
-          model: formattedParams.model,
-          messageCount: formattedParams.messages.length
-        });
-
-        const response = await api.post<ChatCompletionResponse>('/ai/chat', formattedParams);
-
-        // 验证响应结构：ChatCompletionResponse schema 已保证 response.data 是对象
-        // 优先使用content字段，其次使用message.content结构
-        if ((response.data.content === undefined || response.data.content === '')
-            && response.data.message?.content !== undefined
-            && response.data.message.content !== '') {
-          response.data.content = response.data.message.content;
-        }
-
-        // 如果仍然没有content，记录响应并标记为错误
-        if (response.data.content === undefined || response.data.content === '') {
-          logger.error('响应中缺少content字段', response.data);
-          throw new Error('响应格式异常：缺少内容');
-        }
-
-        return response;
-      } catch (error: unknown) {
-        lastError = error;
-
-        // 记录详细错误信息
-        if (axios.isAxiosError(error) && error.response) {
-          const statusCode = error.response.status;
-          const data: unknown = error.response.data;
-
-          // 特别处理422错误，详细记录错误信息
-          if (statusCode === 422) {
-            logger.error('请求参数验证失败 (422错误):', {
-              status: statusCode,
-              data: data,
-              params: {
-                model: params.model,
-                messageCount: params.messages.length,
-                messagesPreview: params.messages.slice(0, 2).map(m => ({ role: m.role, contentLength: m.content.length }))
-              }
-            });
-
-            // 如果是参数验证错误，不再重试
-            throw error;
-          }
-
-          logger.error(`请求失败 (尝试 ${retries + 1}/${maxRetries}):`, {
-            status: statusCode,
-            data: data
-          });
-        } else {
-          logger.error(`请求失败 (尝试 ${retries + 1}/${maxRetries}):`, error);
-        }
-
-        // 网络错误或服务器错误才重试
-        if (!axios.isAxiosError(error) || !error.response || error.response.status >= 500) {
-          retries++;
-          if (retries < maxRetries) {
-            // 延迟重试，随重试次数增加等待时间
-            const delay = 1000 * retries;
-            logger.debug(`等待 ${delay}ms 后重试...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            continue;
-          }
-        }
-
-        throw error;
-      }
-    }
-
-    throw lastError;
-  }
 };

@@ -46,18 +46,6 @@ export interface SearchSource {
   description?: string;
 }
 
-/** 非流式 /ai/chat 与 /ai/chat (retry) 的返回 schema */
-export interface ChatCompletionResponse {
-  content?: string;
-  message?: {
-    content?: string;
-  };
-  /** 联网搜索引用的来源（enable_search 启用时） */
-  sources?: SearchSource[];
-  /** 联网搜索是否失败（启用但未取到结果或异常时为 true） */
-  search_failed?: boolean;
-}
-
 // ───────────────────────────────── 终端 ─────────────────────────────────
 
 export interface TerminalConnectResponse {

@@ -29,7 +29,6 @@ export const createStorageActions = (state: AIAssistantState): StorageActions =>
       settings: {
         temperature: 0.7,
         maxTokens: 1000,
-        streamMode: state.streamingEnabled,
         model: state.selectedModel
       }
     };
@@ -54,7 +53,6 @@ export const createStorageActions = (state: AIAssistantState): StorageActions =>
           settings: {
             temperature: 0.7,
             maxTokens: 1000,
-            streamMode: state.streamingEnabled,
             model: state.selectedModel
           }
         };

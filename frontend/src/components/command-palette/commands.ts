@@ -81,14 +81,6 @@ export function createCommands(stores: Stores, hooks: { onClearChat: () => void;
       },
     },
     {
-      id: 'chat.toggleStream',
-      label: ai.streamingEnabled ? '关闭流式响应' : '开启流式响应',
-      group: '对话',
-      icon: icon.zap,
-      keywords: ['stream', 'streaming', '流式'],
-      action: (): void => { ai.toggleStreamingMode(); },
-    },
-    {
       id: 'chat.toggleSearch',
       label: ai.searchEnabled ? '关闭联网搜索' : '开启联网搜索',
       group: '对话',

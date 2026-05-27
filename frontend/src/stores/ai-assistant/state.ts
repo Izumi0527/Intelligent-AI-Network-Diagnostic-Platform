@@ -5,7 +5,6 @@ export const initialState = (): AIAssistantState => ({
   selectedModel: 'deepseek-v4-flash',
   availableModels: [], // 移除硬编码预设模型，统一使用后端配置
   isModelConnected: false,
-  streamingEnabled: true,
   searchEnabled: false,
   isAIResponding: false,
   isStreamingContent: false,  // 新增：正在接收流式内容

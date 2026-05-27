@@ -19,7 +19,6 @@ interface MessagingActions {
   ): Promise<void>;
   _addContentCharByChar(assistantMessage: ChatMessage, chunk: string): Promise<void>;
   _handleStreamError(assistantMessage: ChatMessage, errorMsg: string): void;
-  sendMessageRegular(content: string): Promise<void>;
 }
 
 export const createMessagingActions = (
@@ -38,7 +37,7 @@ export const createMessagingActions = (
         return;
       }
 
-      logger.debug('[消息发送] 开始发送消息，流式模式:', state.streamingEnabled);
+      logger.debug('[消息发送] 开始发送消息，默认使用流式响应');
 
       state.chatMessages.push({
         id: generateId(),
@@ -58,7 +57,6 @@ export const createMessagingActions = (
         settings: {
           temperature: 0.7,
           maxTokens: 1000,
-          streamMode: state.streamingEnabled,
           model: state.selectedModel
         }
       });
@@ -74,13 +72,8 @@ export const createMessagingActions = (
       logger.debug('[消息发送] 设置思考状态 - isAIResponding: true, isStreamingContent: false');
 
       try {
-        if (state.streamingEnabled) {
-          logger.debug('[消息发送] 调用流式发送方法');
-          await actions.sendMessageStream(content);
-        } else {
-          logger.debug('[消息发送] 调用非流式发送方法');
-          await actions.sendMessageRegular(content);
-        }
+        logger.debug('[消息发送] 调用流式发送方法');
+        await actions.sendMessageStream(content);
       } catch (error: unknown) {
         // 用户主动中断不视为错误：用本地 abortController 引用，避开异步置空的歧义
         if (abortController.signal.aborted) {
@@ -104,7 +97,6 @@ export const createMessagingActions = (
           settings: {
             temperature: 0.7,
             maxTokens: 1000,
-            streamMode: state.streamingEnabled,
             model: state.selectedModel
           }
         });
@@ -143,7 +135,6 @@ export const createMessagingActions = (
             {
               model: state.selectedModel,
               messages: messageHistory,
-              stream: true,
               enable_search: state.searchEnabled
             },
             signal !== undefined ? { signal } : {}
@@ -189,7 +180,6 @@ export const createMessagingActions = (
             settings: {
               temperature: 0.7,
               maxTokens: 1000,
-              streamMode: state.streamingEnabled,
               model: state.selectedModel
             }
           });
@@ -497,53 +487,6 @@ export const createMessagingActions = (
       state.isThinking = false;
       state.currentThinkingContent = '';
       state.abortController = null;
-    },
-
-    async sendMessageRegular(content: string): Promise<void> {
-      try {
-        state.isLoading = true;
-        state.error = null;
-
-        const messageHistory = state.chatMessages.map(msg => ({
-          role: msg.role === 'system' ? 'user' : msg.role,
-          content: msg.content
-        }));
-        let messagesToSend = [...messageHistory];
-
-        if (messagesToSend.length === 0) {
-          logger.warn('消息历史为空，将只发送当前用户消息');
-          messagesToSend = [{
-            role: 'user',
-            content: content
-          }];
-        }
-
-        logger.debug(`发送非流式请求，消息数: ${messagesToSend.length}`);
-
-        const response = await aiService.sendMessageWithRetry({
-          model: state.selectedModel,
-          messages: messagesToSend,
-          enable_search: state.searchEnabled
-        }, 3);
-
-        const assistantContent = response.data.content ?? response.data.message?.content;
-        if (assistantContent !== undefined && assistantContent !== '') {
-          state.chatMessages.push({
-            id: generateId(),
-            role: 'assistant',
-            content: assistantContent,
-            timestamp: Date.now(),
-            status: 'done'
-          });
-        } else {
-          logger.error('响应格式异常，无法获取内容:', response.data);
-          throw new Error('响应格式异常：缺少内容');
-        }
-
-        state.isLoading = false;
-      } catch (error) {
-        utilActions.handleMessageError(error as ApiError | Error, content);
-      }
     },
 
     // 用户主动停止生成：abort 进行中的 axios 请求，标记最后一条助手消息为 aborted。

@@ -653,6 +653,9 @@ logs/
 
 前端入口为 `frontend/src/main.ts`。
 
+开发模式默认由 Vite 监听 `http://localhost:5180`。如需临时更换端口，
+优先通过根目录启动脚本的前端端口参数或 `FRONTEND_PORT` 环境变量覆盖。
+
 启动链路：
 
 1. 创建 Vue 应用。
@@ -682,6 +685,7 @@ Vite 配置位于 `frontend/vite.config.ts`。
 
 开发代理配置：
 
+- 前端开发地址：`http://localhost:5180`
 - 浏览器请求前缀：`/api`
 - 后端目标：`http://localhost:8000`
 - 重写规则：`/api` -> `/api/v1`

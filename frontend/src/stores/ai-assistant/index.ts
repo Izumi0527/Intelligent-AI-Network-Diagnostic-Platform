@@ -18,11 +18,6 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
   const utilActions = createUtilActions(state);
   const messagingActions = createMessagingActions(state, utilActions, storageActions);
 
-  // 工具方法
-  const toggleStreamingMode = (): void => {
-    state.streamingEnabled = !state.streamingEnabled;
-  };
-
   const toggleSearchMode = (): void => {
     state.searchEnabled = !state.searchEnabled;
   };
@@ -45,7 +40,6 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     selectedModel: stateRefs.selectedModel,
     availableModels: stateRefs.availableModels,
     isModelConnected: stateRefs.isModelConnected,
-    streamingEnabled: stateRefs.streamingEnabled,
     searchEnabled: stateRefs.searchEnabled,
     isAIResponding: stateRefs.isAIResponding,
     isStreamingContent: stateRefs.isStreamingContent,
@@ -66,7 +60,6 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     ...messagingActions,
     // 工具方法
     ...utilActions,
-    toggleStreamingMode,
     toggleSearchMode,
     setSelectedModel,
     changeModel,

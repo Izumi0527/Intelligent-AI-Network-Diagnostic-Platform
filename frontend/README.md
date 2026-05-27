@@ -95,6 +95,9 @@ frontend/
 底层 `npm run dev / build / typecheck / lint / lint:fix` 仍可用，但日常请走 `scripts/`
 统一入口，方便对齐全局规则 Layer 4.1。
 
+前端开发服务默认监听 `http://localhost:5180`。如需临时覆盖，优先使用根目录启动脚本的
+前端端口参数或 `FRONTEND_PORT` 环境变量，避免文档、Vite 配置和后端 CORS 白名单再次漂移。
+
 ## 状态管理
 
 使用 Pinia 拆分：

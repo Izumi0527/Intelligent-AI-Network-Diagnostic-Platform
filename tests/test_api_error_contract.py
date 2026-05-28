@@ -26,7 +26,7 @@ from app.services.terminal_exceptions import SessionNotFound
 
 
 class FailingAIApplicationService:
-    async def chat(self, _request):
+    def chat_stream(self, _request):
         raise AIApplicationError("AI 服务暂时不可用，请稍后重试", status_code=502)
 
 
@@ -48,7 +48,7 @@ class StaticRateLimiter:
 def test_validation_error_uses_standard_api_error_shape():
     """FastAPI validation 错误必须使用统一 error 包装。"""
     response = TestClient(create_app(), raise_server_exceptions=False).post(
-        "/api/v1/ai/chat",
+        "/api/v1/ai/chat/stream",
         json={"model": "", "messages": []},
     )
 
@@ -87,7 +87,7 @@ def test_rate_limit_error_uses_standard_api_error_shape():
     with TestClient(test_app, raise_server_exceptions=False) as client:
         test_app.state.rate_limiter = StaticRateLimiter()
         response = client.post(
-            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
             json={
                 "model": "deepseek-v4-pro",
                 "messages": [{"role": "user", "content": "ping"}],
@@ -130,7 +130,7 @@ def test_upstream_error_uses_standard_api_error_shape():
     )
 
     response = TestClient(test_app, raise_server_exceptions=False).post(
-        "/api/v1/ai/chat",
+        "/api/v1/ai/chat/stream",
         json={
             "model": "deepseek-v4-pro",
             "messages": [{"role": "user", "content": "ping"}],

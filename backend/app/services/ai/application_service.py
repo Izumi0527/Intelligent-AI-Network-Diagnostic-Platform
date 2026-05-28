@@ -9,8 +9,6 @@ from pydantic import ValidationError
 
 from app.models.ai import (
     ChatRequest,
-    ChatResponse,
-    DeepseekGenerateRequest,
     Message,
     ModelConnectionStatus,
     ModelsResponse,
@@ -71,29 +69,6 @@ class AIApplicationService:
             message=message if is_connected else safe_ai_client_message(message),
             last_check=datetime.now().isoformat(),
         )
-
-    async def chat(self, request: ChatRequest) -> ChatResponse:
-        """处理非流式聊天请求。"""
-        try:
-            self._ensure_model(request.model)
-            self._log_chat_request("接收聊天请求", request)
-            self._normalize_message_timestamps(request)
-
-            sources, search_failed = await self._maybe_inject_search(request)
-
-            response = await self.ai_manager.chat(request)
-            if not getattr(response, "content", None):
-                response.content = response.message.content
-            response.sources = sources
-            response.search_failed = search_failed
-            return response
-        except ValidationError as e:
-            raise self._validation_error_from_pydantic(e) from e
-        except AIApplicationError:
-            raise
-        except Exception as e:
-            logger.error(f"处理聊天请求时出错: {str(e)}", exc_info=True)
-            raise AIApplicationError("内部服务器错误") from e
 
     def chat_stream(self, request: ChatRequest) -> AIStreamingResult:
         """处理聊天流式请求。"""
@@ -194,56 +169,6 @@ class AIApplicationService:
             "message": message if is_connected else safe_ai_client_message(message),
             "models": [model.value for model in deepseek_models],
         }
-
-    async def generate_text(
-        self,
-        payload: DeepseekGenerateRequest,
-    ) -> dict[str, Any] | AIStreamingResult:
-        """处理 DeepSeek 兼容生成入口。"""
-        try:
-            request = ChatRequest(
-                model=payload.model,
-                messages=payload.messages,
-                max_tokens=payload.max_tokens,
-                temperature=payload.temperature,
-                top_p=payload.top_p,
-                stream=payload.stream,
-            )
-
-            if payload.stream:
-                return AIStreamingResult(self._generate_deepseek_stream(request))
-
-            response = await self.ai_manager.chat(request)
-            return {
-                "content": response.message.content,
-                "model": response.model,
-                "usage": response.usage,
-                "id": getattr(response, "id", None),
-            }
-        except Exception as e:
-            logger.error(f"Deepseek文本生成失败: {str(e)}", exc_info=True)
-            raise AIApplicationError("文本生成失败") from e
-
-    async def _generate_deepseek_stream(self, request: ChatRequest) -> AsyncIterator[str]:
-        """生成 DeepSeek 兼容流式文本。"""
-        try:
-            async for event in self.ai_manager.chat_stream(request):
-                if event.type == "content":
-                    content = event.data.get("content", "")
-                    if content:
-                        yield encode_sse_event("content", {"content": content})
-                elif event.type == "done":
-                    yield encode_sse_event("done", {"done": True})
-                    break
-                elif event.type == "error":
-                    error_msg = safe_ai_client_message(
-                        event.data.get("error", "未知错误")
-                    )
-                    yield encode_sse_event("error", {"error": error_msg})
-                    break
-        except Exception as e:
-            logger.error(f"Deepseek流式文本生成失败: {str(e)}", exc_info=True)
-            yield encode_sse_event("error", {"error": "内部服务器错误"})
 
     def _ensure_model(self, model: str) -> None:
         if not model:

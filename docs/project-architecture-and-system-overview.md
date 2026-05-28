@@ -24,7 +24,7 @@
 
 - 网络设备终端连接：支持 SSH 与 Telnet。
 - 终端命令执行：支持会话保持、命令历史、输出清洗、基础分页处理。
-- AI 对话助手：支持模型列表加载、模型连通性检查、普通响应和流式响应。
+- AI 对话助手：支持模型列表加载、模型连通性检查、流式响应。
 - 多模型厂商接入：OpenAI、Anthropic Claude、DeepSeek。
 - DeepSeek 专项网络日志分析：提供日志类型识别、错误分析、性能分析、安全分析等封装。
 - 服务健康检查：提供后端健康状态、AI 服务状态、网络服务状态与连接统计。
@@ -223,10 +223,8 @@ AI 端点位于 `backend/app/api/api_v1/endpoints/ai.py`。
   - 会检查各 Provider 连通性。
 - `GET /api/v1/ai/models/{model_id}/status`
   - 检查指定模型状态。
-- `POST /api/v1/ai/chat`
-  - 非流式 AI 对话。
 - `POST /api/v1/ai/chat/stream`
-  - 流式 AI 对话。
+  - AI 对话接口（SSE 流式响应，唯一对话入口）。
 - `POST /api/v1/ai/debug/request-format`
   - 返回请求格式诊断信息。
 - `GET /api/v1/ai/deepseek/status`
@@ -720,7 +718,6 @@ AI 助手状态位于：
 - 当前模型选择。
 - 可用模型列表。
 - 模型连接状态。
-- 流式响应开关。
 - AI 回复状态。
 - DeepSeek 思考内容状态。
 - 对话消息列表。
@@ -811,7 +808,6 @@ AI 客户端位于 `frontend/src/utils/aiService.ts`。
 - 加载模型列表。
 - 检查模型连接。
 - 切换模型。
-- 切换流式响应。
 - 发送消息。
 - 清空对话。
 - 展示 AI 消息和用户消息。
@@ -854,24 +850,7 @@ AIAssistant onMounted
   -> localStorage 缓存 ai_available_models
 ```
 
-### 12.2 AI 非流式对话
-
-```text
-用户输入消息
-  -> aiAssistantStore.sendMessage()
-  -> sendMessageRegular()
-  -> aiService.sendMessageWithRetry()
-  -> POST /api/ai/chat
-  -> Vite 代理重写为 /api/v1/ai/chat
-  -> AIServiceManager.chat()
-  -> 根据模型路由 Provider
-  -> Provider 调用外部模型接口
-  -> ChatResponse 返回前端
-  -> 前端追加 assistant 消息
-  -> localStorage 保存会话
-```
-
-### 12.3 AI 流式对话
+### 12.2 AI 流式对话
 
 ```text
 用户输入消息
@@ -887,7 +866,7 @@ AIAssistant onMounted
   -> ChatMessages 实时展示回复和思考过程
 ```
 
-### 12.4 终端连接
+### 12.3 终端连接
 
 ```text
 用户填写连接信息
@@ -902,7 +881,7 @@ AIAssistant onMounted
   -> 前端进入 connected 状态
 ```
 
-### 12.5 终端命令执行
+### 12.4 终端命令执行
 
 ```text
 用户输入命令
@@ -917,7 +896,7 @@ AIAssistant onMounted
   -> 前端追加终端输出
 ```
 
-### 12.6 Netmiko 通用网络命令
+### 12.5 Netmiko 通用网络命令
 
 ```text
 外部调用 /network/connect

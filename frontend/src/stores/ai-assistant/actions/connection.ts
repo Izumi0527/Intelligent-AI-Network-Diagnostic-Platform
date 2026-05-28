@@ -13,6 +13,14 @@ export const createConnectionActions = (state: AIAssistantState): ConnectionActi
   let pendingCheck: Promise<boolean> | null = null;
   let pendingCheckModel: string | null = null;
 
+  // 根据 model.value 前缀推断所属 provider，与 /api/ai/models 响应里的 status map key 对齐
+  const providerOf = (value: string): string | null => {
+    if (value.startsWith('gpt-')) { return 'openai'; }
+    if (value.startsWith('claude-')) { return 'anthropic'; }
+    if (value.startsWith('deepseek-')) { return 'deepseek'; }
+    return null;
+  };
+
   return {
     async checkModelConnection(): Promise<boolean> {
       const model = state.selectedModel;
@@ -37,6 +45,23 @@ export const createConnectionActions = (state: AIAssistantState): ConnectionActi
               logger.error('无法识别的响应格式:', response.data);
               state.isModelConnected = false;
             }
+
+            // 单一真值源纠偏：单模型 status 端点（/api/ai/models/{model}/status）
+            // 用 8s 超时确认了 provider 可用 → 同 provider 的所有模型应一并解锁"（未配置）"。
+            // 避免 /api/ai/models 在冷启动时因 3-8s 超时把 available 误置为 false 后
+            // UI 出现"徽章已连接 + 选项未配置"的矛盾态。
+            // 只做 false→true 上调，不做下调：避免单模型测试失败误伤同 provider 其他模型。
+            if (state.isModelConnected) {
+              const provider = providerOf(model);
+              if (provider !== null) {
+                state.availableModels = state.availableModels.map((m) =>
+                  providerOf(m.value) === provider && m.available === false
+                    ? { ...m, available: true }
+                    : m
+                );
+              }
+            }
+
             return state.isModelConnected;
           }
 
@@ -61,14 +86,6 @@ export const createConnectionActions = (state: AIAssistantState): ConnectionActi
 
     async loadAvailableModels(): Promise<void> {
       const MODELS_CACHE_KEY = 'ai_available_models';
-
-      // 根据 model.value 前缀推断所属 provider，与 /api/ai/models 响应里的 status map key 对齐
-      const providerOf = (value: string): string | null => {
-        if (value.startsWith('gpt-')) { return 'openai'; }
-        if (value.startsWith('claude-')) { return 'anthropic'; }
-        if (value.startsWith('deepseek-')) { return 'deepseek'; }
-        return null;
-      };
 
       try {
         logger.debug('开始从后端加载模型列表...');

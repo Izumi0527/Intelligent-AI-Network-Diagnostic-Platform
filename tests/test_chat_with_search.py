@@ -1,42 +1,69 @@
 """ChatRequest.enable_search 注入链路集成测试。
 
 策略：
-- 用 AsyncMock 模拟 AIServiceManager.chat / chat_stream，避免真实 provider。
+- 用 MagicMock 模拟 AIServiceManager.chat_stream，避免真实 provider。
 - 用 AsyncMock 模拟 BraveSearchClient，避免真实网络。
-- 端到端走 AIApplicationService.chat / chat_stream，断言 system message 注入、
-  sources/search_failed 回填、流式响应 yield search_results 事件。
+- 端到端走 AIApplicationService.chat_stream，断言 system message 注入、
+  search_results 事件 yield、sources/search_failed 字段值。
+
+历史背景：原版有同时覆盖非流式 service.chat 与流式 service.chat_stream 的测试；
+2026-05-28 清理后仅保留流式调用链，所有 Brave Search 注入行为统一通过消费
+SSE 事件来验证。
 """
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import datetime, timezone
 from typing import AsyncIterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.models.ai import ChatRequest, ChatResponse, Message, StreamEvent
-from app.services.ai.application_service import AIApplicationService
+from app.models.ai import ChatRequest, Message, StreamEvent
+from app.services.ai.application_service import AIApplicationService, AIStreamingResult
 from app.services.search.brave_search import SearchResult
 
 
-def _make_ai_manager_chat_response(content: str = "answer") -> ChatResponse:
-    """构造 ai_manager.chat 的返回值。"""
-    return ChatResponse(
-        message=Message(role="assistant", content=content),
-        model="deepseek-v4-flash",
-        finish_reason="stop",
-        usage={"total_tokens": 10},
-    )
+async def _consume_stream(result: AIStreamingResult) -> list[str]:
+    """收集 SSE 流的全部 chunks。"""
+    return [chunk async for chunk in result.chunks]
+
+
+def _extract_search_event(chunks: list[str]) -> dict | None:
+    """从 SSE chunks 中提取 search_results 事件的 data JSON，未出现时返回 None。
+
+    SSE 编码格式（见 application_service.encode_sse_event）：
+        event: search_results\ndata: {...json...}\n\n
+    每个 chunk 是单条事件，data 行不含换行（json.dumps 默认 indent=None）。
+    """
+    for chunk in chunks:
+        if "event: search_results" not in chunk:
+            continue
+        # data 行的 JSON 在单行内，不需 DOTALL
+        match = re.search(r"data:\s*(\{[^\n]*\})", chunk)
+        if match:
+            return json.loads(match.group(1))
+    return None
+
+
+def _default_stream_events() -> list[StreamEvent]:
+    """提供最小可消费的流事件序列，确保 chat_stream 可正常关闭。"""
+    return [
+        StreamEvent(type="content", data={"content": "ok"}),
+        StreamEvent(type="done", data={"done": True}),
+    ]
 
 
 def _make_ai_manager(stream_events: list[StreamEvent] | None = None) -> MagicMock:
-    """构造 AIServiceManager mock。"""
+    """构造 AIServiceManager mock，仅暴露 chat_stream。"""
     ai_manager = MagicMock()
-    ai_manager.chat = AsyncMock(return_value=_make_ai_manager_chat_response())
+
+    events = stream_events if stream_events is not None else _default_stream_events()
 
     async def _stream_gen(_req) -> AsyncIterator[StreamEvent]:
-        for event in stream_events or []:
+        for event in events:
             yield event
 
     ai_manager.chat_stream = _stream_gen
@@ -57,7 +84,7 @@ def _make_brave_client(
 
 @pytest.mark.asyncio
 async def test_chat_with_search_injects_system_and_returns_sources() -> None:
-    """enable_search=true + Brave 有结果 → 注入 system + 回填 sources/search_failed=False。"""
+    """enable_search=true + Brave 有结果 → 注入 system + search_results 事件携带 sources。"""
     fake_results = [
         SearchResult(title="OSPF 详解", url="https://x.com/ospf", description="链路状态协议"),
         SearchResult(title="OSPF 工作原理", url="https://y.com/ospf", description="SPF 计算"),
@@ -71,7 +98,7 @@ async def test_chat_with_search_injects_system_and_returns_sources() -> None:
         messages=[Message(role="user", content="解释 OSPF 协议")],
         enable_search=True,
     )
-    response = await service.chat(request)
+    chunks = await _consume_stream(service.chat_stream(request))
 
     # Brave 被调，传入用户最后一条 message
     brave.search.assert_awaited_once()
@@ -83,16 +110,18 @@ async def test_chat_with_search_injects_system_and_returns_sources() -> None:
     assert "OSPF 详解" in request.messages[0].content
     assert "https://x.com/ospf" in request.messages[0].content
 
-    # response 携带 sources + search_failed=False
-    assert response.search_failed is False
-    assert len(response.sources) == 2
-    assert response.sources[0].title == "OSPF 详解"
-    assert response.sources[0].url == "https://x.com/ospf"
+    # SSE 事件携带 sources + search_failed=False
+    event = _extract_search_event(chunks)
+    assert event is not None, "应该有一条 search_results 事件"
+    assert event["search_failed"] is False
+    assert len(event["sources"]) == 2
+    assert event["sources"][0]["title"] == "OSPF 详解"
+    assert event["sources"][0]["url"] == "https://x.com/ospf"
 
 
 @pytest.mark.asyncio
 async def test_chat_without_enable_search_does_not_call_brave() -> None:
-    """enable_search=false → 不调 brave，无 system 注入。"""
+    """enable_search=false → 不调 brave，无 system 注入，无 search_results 事件。"""
     ai_manager = _make_ai_manager()
     brave = _make_brave_client(enabled=True, results=[])
     service = AIApplicationService(ai_manager, brave_client=brave)
@@ -102,17 +131,16 @@ async def test_chat_without_enable_search_does_not_call_brave() -> None:
         messages=[Message(role="user", content="今天天气")],
         enable_search=False,
     )
-    response = await service.chat(request)
+    chunks = await _consume_stream(service.chat_stream(request))
 
     brave.search.assert_not_called()
     assert request.messages[0].role == "user"
-    assert response.sources == []
-    assert response.search_failed is False
+    assert _extract_search_event(chunks) is None
 
 
 @pytest.mark.asyncio
 async def test_chat_with_search_brave_disabled_marks_failed() -> None:
-    """enable_search=true 但 brave.is_enabled()=false → sources=[], search_failed=True。"""
+    """enable_search=true 但 brave.is_enabled()=false → search_results 事件 sources=[], search_failed=True。"""
     ai_manager = _make_ai_manager()
     brave = _make_brave_client(enabled=False, results=[])
     service = AIApplicationService(ai_manager, brave_client=brave)
@@ -122,16 +150,18 @@ async def test_chat_with_search_brave_disabled_marks_failed() -> None:
         messages=[Message(role="user", content="anything")],
         enable_search=True,
     )
-    response = await service.chat(request)
+    chunks = await _consume_stream(service.chat_stream(request))
 
     brave.search.assert_not_called()
-    assert response.sources == []
-    assert response.search_failed is True
+    event = _extract_search_event(chunks)
+    assert event is not None
+    assert event["sources"] == []
+    assert event["search_failed"] is True
 
 
 @pytest.mark.asyncio
 async def test_chat_with_search_empty_results_marks_failed() -> None:
-    """enable_search=true + brave 返回 [] → sources=[], search_failed=True，不注入 system。"""
+    """enable_search=true + brave 返回 [] → search_results 事件 sources=[], search_failed=True，不注入 system。"""
     ai_manager = _make_ai_manager()
     brave = _make_brave_client(enabled=True, results=[])
     service = AIApplicationService(ai_manager, brave_client=brave)
@@ -141,12 +171,14 @@ async def test_chat_with_search_empty_results_marks_failed() -> None:
         messages=[Message(role="user", content="anything")],
         enable_search=True,
     )
-    response = await service.chat(request)
+    chunks = await _consume_stream(service.chat_stream(request))
 
     brave.search.assert_awaited_once()
     assert request.messages[0].role == "user"  # 没有 system 注入
-    assert response.sources == []
-    assert response.search_failed is True
+    event = _extract_search_event(chunks)
+    assert event is not None
+    assert event["sources"] == []
+    assert event["search_failed"] is True
 
 
 @pytest.mark.asyncio
@@ -160,10 +192,12 @@ async def test_chat_with_search_no_brave_client_is_safe() -> None:
         messages=[Message(role="user", content="hi")],
         enable_search=True,
     )
-    response = await service.chat(request)
+    chunks = await _consume_stream(service.chat_stream(request))
 
-    assert response.sources == []
-    assert response.search_failed is True
+    event = _extract_search_event(chunks)
+    assert event is not None
+    assert event["sources"] == []
+    assert event["search_failed"] is True
 
 
 @pytest.mark.asyncio
@@ -241,7 +275,7 @@ async def test_extract_query_takes_last_user_message() -> None:
         ],
         enable_search=True,
     )
-    await service.chat(request)
+    await _consume_stream(service.chat_stream(request))
 
     call_args = brave.search.await_args
     query_arg = call_args.args[0] if call_args.args else call_args.kwargs.get("query")

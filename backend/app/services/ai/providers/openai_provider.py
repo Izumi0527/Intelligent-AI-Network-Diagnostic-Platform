@@ -4,12 +4,11 @@ OpenAI服务提供商实现
 """
 
 import json
-import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 
 from app.config.settings import settings
-from app.models.ai import AIModel, ChatRequest, ChatResponse, Message, StreamEvent
+from app.models.ai import AIModel, ChatRequest, Message, StreamEvent
 from app.services.ai.base import AIProviderBase, ProviderType, safe_ai_client_message
 from app.utils.logger import get_logger
 from app.utils.model_config import ModelConfigParser
@@ -75,33 +74,6 @@ class OpenAIProvider(AIProviderBase):
             logger.error(error_msg)
             return False, safe_ai_client_message(error_msg)
 
-    async def chat(self, request: ChatRequest) -> ChatResponse:
-        """非流式对话"""
-        try:
-            await self.initialize()
-
-            payload = self._build_chat_payload(request, stream=False)
-            headers = self._create_headers({
-                "Authorization": f"Bearer {self.api_key}"
-            })
-
-            async with self.session.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload
-            ) as response:
-
-                if response.status == 200:
-                    result = await response.json()
-                    return self._parse_chat_response(result)
-                else:
-                    error_msg = self._handle_api_error(response.status, await response.text())
-                    return self._error_chat_response(request, error_msg)
-
-        except Exception as e:
-            error_msg = f"OpenAI对话请求异常: {str(e)}"
-            return self._error_chat_response(request, error_msg, "provider_exception")
-
     async def chat_stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]:
         """流式对话"""
         try:
@@ -163,25 +135,6 @@ class OpenAIProvider(AIProviderBase):
         }
 
         return payload
-
-    def _parse_chat_response(self, response_data: dict[str, Any]) -> ChatResponse:
-        """解析OpenAI聊天响应"""
-        choice = response_data.get('choices', [{}])[0]
-        message_data = choice.get('message', {})
-
-        message = Message(
-            role=message_data.get('role', 'assistant'),
-            content=message_data.get('content', '')
-        )
-
-        usage = response_data.get('usage', {})
-
-        return ChatResponse(
-            id=response_data.get('id', str(uuid.uuid4())),
-            model=response_data.get('model', ''),
-            message=message,
-            usage=usage
-        )
 
     def _parse_stream_chunk(self, chunk_data: dict[str, Any]) -> StreamEvent:
         """解析OpenAI流式响应块"""

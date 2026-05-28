@@ -11,15 +11,12 @@ from app.api.deps import (
 )
 from app.models.ai import (
     ChatRequest,
-    ChatResponse,
-    DeepseekGenerateRequest,
     ModelConnectionStatus,
     ModelsResponse,
 )
 from app.services.ai.application_service import (
     AIApplicationError,
     AIApplicationService,
-    AIStreamingResult,
     AIValidationError,
 )
 from app.services.deepseek_service import DeepseekService
@@ -67,24 +64,12 @@ async def check_model_status(
     return await ai_service.check_model_status(model_id)
 
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat(
-    request: ChatRequest,
-    ai_service: AIApplicationService = Depends(get_ai_application_service),
-):
-    """AI聊天API（非流式）"""
-    try:
-        return await ai_service.chat(request)
-    except AIApplicationError as error:
-        return _ai_error_response(error)
-
-
 @router.post("/chat/stream")
 async def chat_stream(
     request: ChatRequest,
     ai_service: AIApplicationService = Depends(get_ai_application_service),
 ):
-    """AI聊天API（流式响应）"""
+    """AI 聊天 API（SSE 流式响应，唯一对外对话入口）"""
     try:
         result = ai_service.chat_stream(request)
         return StreamingResponse(result.chunks, media_type="text/event-stream")
@@ -108,22 +93,6 @@ async def check_deepseek_connection(
 ):
     """检查Deepseek API连接状态"""
     return await ai_service.check_deepseek_connection()
-
-
-@router.post("/deepseek/generate")
-async def generate_text(
-    payload: DeepseekGenerateRequest,
-    ai_service: AIApplicationService = Depends(get_ai_application_service),
-    _auth: None = Depends(require_internal_api_token),
-):
-    """使用AI Manager调用Deepseek生成文本"""
-    try:
-        result = await ai_service.generate_text(payload)
-        if isinstance(result, AIStreamingResult):
-            return StreamingResponse(result.chunks, media_type="text/event-stream")
-        return result
-    except AIApplicationError as error:
-        return _ai_error_response(error)
 
 
 @router.post("/deepseek/analyze-network-log")

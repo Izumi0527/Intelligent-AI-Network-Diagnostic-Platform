@@ -11,7 +11,7 @@ from typing import Optional
 
 import aiohttp
 
-from app.models.ai import AIModel, ChatRequest, ChatResponse, Message, StreamEvent
+from app.models.ai import AIModel, ChatRequest, StreamEvent
 from app.utils.logger import get_logger, redact_sensitive_text
 
 logger = get_logger(__name__)
@@ -88,11 +88,6 @@ class AIProviderBase(ABC):
         pass
 
     @abstractmethod
-    async def chat(self, request: ChatRequest) -> ChatResponse:
-        """非流式对话"""
-        pass
-
-    @abstractmethod
     async def chat_stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]:
         """流式对话"""
         pass
@@ -163,31 +158,6 @@ class AIProviderBase(ABC):
             pass
 
         return base_message
-
-    def _error_chat_response(
-        self,
-        request: ChatRequest,
-        error_detail: str,
-        error_code: str = "upstream_error",
-    ) -> ChatResponse:
-        """构造面向客户端的安全错误响应，避免透传上游原文。"""
-        logger.error(
-            "%s 服务调用失败: %s",
-            self.provider_type.value,
-            redact_sensitive_text(error_detail, max_length=300),
-        )
-        request_id = str(uuid.uuid4())
-        return ChatResponse(
-            id=request_id,
-            model=request.model,
-            message=Message(role="assistant", content=AI_CLIENT_SAFE_ERROR_MESSAGE),
-            usage={
-                "error": True,
-                "error_code": error_code,
-                "provider": self.provider_type.value,
-                "request_id": request_id,
-            },
-        )
 
     def _error_stream_event(
         self,

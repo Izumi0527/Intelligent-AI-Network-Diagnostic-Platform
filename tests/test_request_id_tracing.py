@@ -48,7 +48,7 @@ def test_error_payload_uses_same_request_id_as_response_header():
     """错误响应体和响应头必须使用同一个 request_id。"""
     with TestClient(create_app(), raise_server_exceptions=False) as client:
         response = client.post(
-            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
             headers={"X-Request-ID": "trace-error-456"},
             json={"model": "", "messages": []},
         )

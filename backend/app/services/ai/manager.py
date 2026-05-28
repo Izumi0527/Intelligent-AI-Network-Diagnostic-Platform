@@ -12,8 +12,6 @@ from app.config.settings import settings
 from app.models.ai import (
     AIModel,
     ChatRequest,
-    ChatResponse,
-    Message,
     ModelConnectionStatus,
     ModelsResponse,
     StreamEvent,
@@ -25,6 +23,12 @@ from app.services.ai.providers.openai_provider import OpenAIProvider
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# 单一超时常量：/ai/models 与 /ai/models/{id}/status 两个端点统一使用。
+# 8 秒覆盖 Windows 冷启动 DNS+TCP+TLS 首请求场景（实测 2-5 s），同时保留快速失败语义。
+# 历史问题：曾仅 get_models_response 使用 3.0 s，而 check_model_status 走 httpx 自身 30 s，
+# 冷启动时前者超时、后者成功，导致前端"已连接 + 未配置"矛盾态。
+CONNECTION_CHECK_TIMEOUT_SECONDS = 8.0
 
 
 class AIServiceManager:
@@ -73,38 +77,35 @@ class AIServiceManager:
         logger.info(f"总共获取到 {len(models)} 个可用模型")
         return models
 
+    async def _check_connection_with_timeout(
+        self,
+        provider: AIProviderBase,
+        timeout: float = CONNECTION_CHECK_TIMEOUT_SECONDS,
+    ) -> tuple[bool, str]:
+        """统一封装的"带超时连接检查"：两个端点共用同一超时阈值，
+        避免冷启动时不同端点对同一 provider 给出矛盾结论。"""
+        try:
+            return await asyncio.wait_for(provider.check_connection(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return False, f"连接检查超时（{timeout:.0f}秒），状态未知"
+        except Exception as e:
+            return False, safe_ai_client_message(f"检查失败: {str(e)}")
+
     async def get_models_response(self) -> ModelsResponse:
         """获取模型列表响应"""
         logger.info("开始获取模型列表响应")
         models = self.get_available_models()
         logger.info(f"get_models_response: 获取到 {len(models)} 个模型")
 
-        # 获取每个提供商的连接状态（使用快速检查或缓存状态）
+        # 获取每个提供商的连接状态（使用统一超时的连接检查）
         connection_status = {}
         for provider_type, provider in self.providers.items():
-            try:
-                # 使用快速超时的连接检查
-                is_connected, message = await asyncio.wait_for(
-                    provider.check_connection(),
-                    timeout=3.0  # 3秒超时
-                )
-                connection_status[provider_type.value] = ModelConnectionStatus(
-                    connected=is_connected,
-                    message=message if is_connected else safe_ai_client_message(message),
-                    last_check=datetime.now().isoformat()
-                )
-            except asyncio.TimeoutError:
-                connection_status[provider_type.value] = ModelConnectionStatus(
-                    connected=False,
-                    message="连接检查超时（3秒），状态未知",
-                    last_check=datetime.now().isoformat()
-                )
-            except Exception as e:
-                connection_status[provider_type.value] = ModelConnectionStatus(
-                    connected=False,
-                    message=safe_ai_client_message(f"检查失败: {str(e)}"),
-                    last_check=datetime.now().isoformat()
-                )
+            is_connected, message = await self._check_connection_with_timeout(provider)
+            connection_status[provider_type.value] = ModelConnectionStatus(
+                connected=is_connected,
+                message=message if is_connected else safe_ai_client_message(message),
+                last_check=datetime.now().isoformat()
+            )
 
         return ModelsResponse(
             models=models,
@@ -117,21 +118,8 @@ class AIServiceManager:
         if not provider:
             return False, f"未找到模型 {model_id} 的服务提供商"
 
-        return await provider.check_connection()
-
-    async def chat(self, request: ChatRequest) -> ChatResponse:
-        """非流式对话"""
-        provider = self._get_provider_for_model(request.model)
-        if not provider:
-            return ChatResponse(
-                id="error",
-                model=request.model,
-                message=Message(role="assistant", content=f"不支持的模型: {request.model}"),
-                usage={"error": True}
-            )
-
-        logger.info(f"使用模型 {request.model} 进行非流式对话")
-        return await provider.chat(request)
+        # 与 get_models_response 共用同一超时阈值，保证两个端点判定一致
+        return await self._check_connection_with_timeout(provider)
 
     async def chat_stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]:
         """流式对话"""

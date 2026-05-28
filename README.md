@@ -209,8 +209,7 @@ logs/
 - **自适应模型选择**：根据可用性自动选择最优AI模型
 
 ### 流式响应与交互体验
-- **实时流式对话**：AI回复实时流式显示，支持Server-Sent Events
-- **流式模式切换**：支持流式/非流式模式灵活切换
+- **实时流式对话**：AI 回复实时 SSE 流式显示（Server-Sent Events），唯一对话接口
 - **实时响应状态**：显示打字动画和响应进度指示
 - **消息历史管理**：支持本地存储和聊天记录管理
 
@@ -633,17 +632,19 @@ npm run typecheck
 #### AI助手
 - `GET /api/v1/ai/models`: 获取可用AI模型列表
 - `GET /api/v1/ai/models/{model_id}/status`: 检查模型连接状态
-- `POST /api/v1/ai/chat`: 非流式AI对话接口
-- `POST /api/v1/ai/chat/stream`: 流式AI对话接口
+- `POST /api/v1/ai/chat/stream`: AI 对话接口（SSE 流式响应，唯一对话入口）
 - `POST /api/v1/ai/deepseek/analyze-network-log`: 网络日志深度分析
 - `GET /api/v1/ai/deepseek/status`: 检查Deepseek连接状态
-- `POST /api/v1/ai/deepseek/generate`: 使用Deepseek生成文本
+
+> ⚠️ **BREAKING CHANGE（2026-05-28）**：
+> `POST /api/v1/ai/chat` 与 `POST /api/v1/ai/deepseek/generate` 非流式 / 双模式接口已于本版本移除。
+> AI 对话请统一使用 `POST /api/v1/ai/chat/stream`（SSE 流式响应）。
 
 ## 组件分析
 
 ### 前端主要组件
 
-- **AIAssistant.vue**: 实现了AI对话界面，支持流式响应，多种模型切换，历史记录管理等
+- **AIAssistant.vue**: 实现了AI对话界面，使用 SSE 流式响应，多种模型切换，历史记录管理等
 - **NetworkTerminal.vue**: 实现了网络设备连接终端，支持SSH/Telnet协议，命令执行和显示，历史命令等
 - **状态管理**: 使用Pinia实现了AI助手、终端会话和应用全局状态的管理
 - **响应式设计**: 全部组件支持响应式布局，适配多种设备尺寸
@@ -671,7 +672,7 @@ npm run typecheck
 
 前端使用Vue 3的组合式API和基于TypeScript的类型系统。主要包括：
 - `stores/`: Pinia状态管理，分离AI助手、终端和应用全局状态
-- `components/ai-assistant/AIAssistant.vue`: AI对话界面，支持多模型选择和流式响应
+- `components/ai-assistant/AIAssistant.vue`: AI对话界面，支持多模型选择，使用 SSE 流式响应
 - `components/terminal/NetworkTerminal.vue`: 网络终端界面，支持SSH/Telnet连接和命令执行
 - 响应式布局设计，支持多种设备尺寸
 - 组件化结构，便于维护和扩展

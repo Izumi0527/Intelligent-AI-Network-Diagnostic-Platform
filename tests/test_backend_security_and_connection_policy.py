@@ -24,7 +24,6 @@ os.environ.setdefault("AI_ENABLED", "false")
 from app import main as main_module
 from app.api import deps as deps_module
 from app.api.deps import (
-    get_ai_application_service,
     get_ai_service_manager,
     get_terminal_service,
 )
@@ -33,8 +32,6 @@ from app.core.rate_limit import RateLimitResult
 from app.main import app, create_app
 from app.models.ai import (
     ChatRequest,
-    ChatResponse,
-    DeepseekGenerateRequest,
     Message,
     ModelsResponse,
 )
@@ -82,13 +79,6 @@ class BrokenTerminalManager:
 
 
 class FakeAIManager:
-    async def chat(self, request):
-        return ChatResponse(
-            message=Message(role="assistant", content="ok"),
-            model=request.model,
-            content="ok",
-        )
-
     async def chat_stream(self, _request):
         yield type("Event", (), {"type": "content", "data": {"content": "ok"}})()
         yield type("Event", (), {"type": "done", "data": {}})()
@@ -114,33 +104,6 @@ class ErrorStreamAIManager(FakeAIManager):
         )()
 
 
-class FakeAIApplicationService:
-    def __init__(self):
-        self.chat_calls = 0
-        self.generate_calls = 0
-        self.chat_request = None
-        self.generate_payload = None
-
-    async def chat(self, request):
-        self.chat_calls += 1
-        self.chat_request = request
-        return ChatResponse(
-            message=Message(role="assistant", content="delegated"),
-            model=request.model,
-            content="delegated",
-        )
-
-    async def generate_text(self, payload):
-        self.generate_calls += 1
-        self.generate_payload = payload
-        return {
-            "content": "generated",
-            "model": payload.model,
-            "usage": {"delegated": True},
-            "id": "fake-generation",
-        }
-
-
 class FakeLifecycleTerminalService:
     def __init__(self):
         self.cleanup_calls = 0
@@ -161,6 +124,7 @@ class FakeLifecycleTerminalService:
 class FakeLifecycleService:
     def __init__(self):
         self.closed = False
+        self.providers = {}
 
     async def cleanup(self):
         self.closed = True
@@ -235,7 +199,7 @@ def test_ai_routes_return_429_with_rate_limit_headers():
     with TestClient(limited_app) as client:
         limited_app.state.rate_limiter = limiter
         response = client.post(
-            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
             json={
                 "model": "deepseek-v4-pro",
                 "messages": [{"role": "user", "content": "hello"}],
@@ -374,33 +338,14 @@ def test_terminal_connect_accepts_valid_internal_token(monkeypatch):
     assert fake_service.connect_calls == 1
 
 
-def test_ai_chat_requires_internal_token(monkeypatch):
-    """AI 对话接口会消耗外部模型能力，缺少内部 Token 时必须拒绝。"""
-    _enable_internal_auth(monkeypatch)
-    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
-
-    try:
-        response = TestClient(app).post(
-            "/api/v1/ai/chat",
-            json={
-                "model": "deepseek-v4-pro",
-                "messages": [{"role": "user", "content": "ping"}],
-            },
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 401
-
-
 def test_ai_chat_accepts_valid_internal_token(monkeypatch):
-    """携带正确内部 Token 时，AI 对话接口应保持原有业务路径。"""
+    """携带正确内部 Token 时，AI 流式对话接口应保持原有业务路径。"""
     _enable_internal_auth(monkeypatch)
     app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
 
     try:
         response = TestClient(app).post(
-            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
             json={
                 "model": "deepseek-v4-pro",
                 "messages": [{"role": "user", "content": "ping"}],
@@ -411,7 +356,9 @@ def test_ai_chat_accepts_valid_internal_token(monkeypatch):
         app.dependency_overrides.clear()
 
     assert response.status_code == 200
-    assert response.json()["content"] == "ok"
+    # 流式响应：SSE 事件文本中应包含 content 事件
+    assert "event: content" in response.text
+    assert '"content": "ok"' in response.text
 
 
 def test_ai_stream_requires_internal_token(monkeypatch):
@@ -671,54 +618,6 @@ def test_ai_route_no_longer_orchestrates_manager_directly():
     assert "safe_ai_client_message" not in route_source
 
 
-def test_ai_chat_route_delegates_to_application_service(monkeypatch):
-    """AI chat 路由应通过应用服务完成业务处理。"""
-    _enable_internal_auth(monkeypatch)
-    fake_service = FakeAIApplicationService()
-    app.dependency_overrides[get_ai_application_service] = lambda: fake_service
-
-    try:
-        response = TestClient(app).post(
-            "/api/v1/ai/chat",
-            json={
-                "model": "deepseek-v4-pro",
-                "messages": [{"role": "user", "content": "ping"}],
-            },
-            headers=_auth_headers(),
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 200
-    assert response.json()["content"] == "delegated"
-    assert fake_service.chat_calls == 1
-    assert fake_service.chat_request.model == "deepseek-v4-pro"
-
-
-def test_deepseek_generate_route_delegates_to_application_service(monkeypatch):
-    """DeepSeek 兼容生成入口也应下沉到应用服务。"""
-    _enable_internal_auth(monkeypatch)
-    fake_service = FakeAIApplicationService()
-    app.dependency_overrides[get_ai_application_service] = lambda: fake_service
-
-    try:
-        response = TestClient(app).post(
-            "/api/v1/ai/deepseek/generate",
-            json={
-                "model": "deepseek-v4-pro",
-                "messages": [{"role": "user", "content": "ping"}],
-            },
-            headers=_auth_headers(),
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 200
-    assert response.json()["content"] == "generated"
-    assert fake_service.generate_calls == 1
-    assert fake_service.generate_payload.model == "deepseek-v4-pro"
-
-
 @pytest.mark.asyncio
 async def test_ai_chat_stream_uses_consistent_sse_events():
     """AI 聊天流不能混合裸文本和 SSE 事件。"""
@@ -752,26 +651,6 @@ async def test_ai_chat_stream_error_uses_sse_and_redacts_detail():
     assert body.startswith("event: error\n")
     assert '"error": "AI 服务暂时不可用，请稍后重试"' in body
     assert "secret-token" not in body
-
-
-@pytest.mark.asyncio
-async def test_deepseek_generate_stream_uses_same_sse_contract():
-    """DeepSeek 兼容流式生成也应输出同一 SSE 事件契约。"""
-    service = AIApplicationService(FakeAIManager())
-
-    result = await service.generate_text(
-        DeepseekGenerateRequest(
-            model="deepseek-v4-pro",
-            messages=[Message(role="user", content="ping")],
-            stream=True,
-        )
-    )
-
-    assert isinstance(result, AIStreamingResult)
-    body = await _collect_stream(result.chunks)
-    assert body.startswith("event: content\n")
-    assert "event: done\n" in body
-    assert '"content": "ok"' in body
 
 
 def test_terminal_service_module_does_not_import_fastapi():
@@ -831,18 +710,6 @@ def test_terminal_route_maps_missing_session_to_404(monkeypatch):
     assert response.json()["error"]["message"] == "会话不存在: missing-session"
 
 
-def test_deepseek_generate_requires_internal_token(monkeypatch):
-    """Deepseek 生成接口属于受保护能力，缺少 Token 应直接返回 401。"""
-    _enable_internal_auth(monkeypatch)
-
-    response = TestClient(app, raise_server_exceptions=False).post(
-        "/api/v1/ai/deepseek/generate",
-        json={"messages": [{"role": "user", "content": "ping"}]},
-    )
-
-    assert response.status_code == 401
-
-
 def test_ai_chat_rejects_oversized_message_content(monkeypatch):
     """AI 对话必须拒绝超长单条消息，避免成本放大和请求体滥用。"""
     _enable_internal_auth(monkeypatch)
@@ -850,7 +717,7 @@ def test_ai_chat_rejects_oversized_message_content(monkeypatch):
 
     try:
         response = TestClient(app, raise_server_exceptions=False).post(
-            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
             json={
                 "model": "deepseek-v4-pro",
                 "messages": [{"role": "user", "content": "x" * 8001}],
@@ -870,7 +737,7 @@ def test_ai_chat_rejects_invalid_sampling_parameters(monkeypatch):
 
     try:
         response = TestClient(app, raise_server_exceptions=False).post(
-            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
             json={
                 "model": "deepseek-v4-pro",
                 "messages": [{"role": "user", "content": "ping"}],
@@ -893,7 +760,7 @@ def test_ai_chat_rejects_too_many_messages(monkeypatch):
 
     try:
         response = TestClient(app, raise_server_exceptions=False).post(
-            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
             json={
                 "model": "deepseek-v4-pro",
                 "messages": [
@@ -915,52 +782,10 @@ def test_ai_chat_rejects_total_message_content_over_limit(monkeypatch):
 
     try:
         response = TestClient(app, raise_server_exceptions=False).post(
-            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
             json={
                 "model": "deepseek-v4-pro",
                 "messages": [{"role": "user", "content": "x" * 8000} for _ in range(5)],
-            },
-            headers=_auth_headers(),
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 422
-
-
-def test_deepseek_generate_rejects_oversized_message(monkeypatch):
-    """Deepseek 兼容生成接口应复用 AI 请求边界约束。"""
-    _enable_internal_auth(monkeypatch)
-    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
-
-    try:
-        response = TestClient(app, raise_server_exceptions=False).post(
-            "/api/v1/ai/deepseek/generate",
-            json={
-                "messages": [{"role": "user", "content": "x" * 8001}],
-                "max_tokens": 2048,
-            },
-            headers=_auth_headers(),
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 422
-
-
-def test_deepseek_generate_rejects_invalid_sampling_parameters(monkeypatch):
-    """Deepseek 兼容生成接口应限制采样参数和 max_tokens。"""
-    _enable_internal_auth(monkeypatch)
-    app.dependency_overrides[get_ai_service_manager] = lambda: FakeAIManager()
-
-    try:
-        response = TestClient(app, raise_server_exceptions=False).post(
-            "/api/v1/ai/deepseek/generate",
-            json={
-                "messages": [{"role": "user", "content": "ping"}],
-                "max_tokens": 100000,
-                "temperature": 3,
-                "top_p": 2,
             },
             headers=_auth_headers(),
         )
@@ -1018,24 +843,8 @@ def test_ai_provider_payload_uses_safe_defaults_and_top_p():
 
 
 def test_ai_provider_error_response_does_not_expose_upstream_detail():
-    """AI provider 返回给客户端的错误不能包含上游原文敏感信息。"""
+    """AI provider 流式错误事件不能包含上游原文敏感信息。"""
     provider = OpenAIProvider("test-key")
-    request = ChatRequest(
-        model="gpt-test",
-        messages=[Message(role="user", content="ping")],
-    )
-
-    response = provider._error_chat_response(
-        request,
-        "upstream failed token=secret-token https://proxy.example.com/account",
-    )
-
-    assert response.usage["error"] is True
-    assert response.usage["provider"] == ProviderType.OPENAI.value
-    assert response.id == response.usage["request_id"]
-    assert response.message.content == "AI 服务暂时不可用，请稍后重试"
-    assert "secret-token" not in response.message.content
-    assert "proxy.example.com" not in response.message.content
 
     event = provider._error_stream_event(
         "upstream failed token=secret-token https://proxy.example.com/account",
@@ -1044,6 +853,8 @@ def test_ai_provider_error_response_does_not_expose_upstream_detail():
     assert event.data["request_id"]
     assert event.data["error"] == "AI 服务暂时不可用，请稍后重试"
     assert "secret-token" not in event.data["error"]
+    assert "proxy.example.com" not in event.data["error"]
+    assert event.data["provider"] == ProviderType.OPENAI.value
 
 
 @pytest.mark.asyncio

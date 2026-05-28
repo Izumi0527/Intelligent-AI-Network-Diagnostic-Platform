@@ -174,45 +174,6 @@ class SearchSource(BaseModel):
     description: Optional[str] = Field(default="", description="结果摘要")
 
 
-class ChatResponse(BaseModel):
-    """聊天响应"""
-
-    model_config = ConfigDict(
-        extra="ignore",
-        json_schema_extra={
-            "example": {
-                "message": {
-                    "role": "assistant",
-                    "content": "我是DeepSeek-V4-Flash大语言模型。",
-                },
-                "model": "deepseek-v4-flash",
-                "content": "我是DeepSeek-V4-Flash大语言模型。",
-                "finish_reason": "stop",
-                "usage": {
-                    "prompt_tokens": 10,
-                    "completion_tokens": 12,
-                    "total_tokens": 22,
-                },
-            }
-        },
-    )
-
-    id: Optional[str] = Field(None, description="响应或请求追踪ID")
-    message: Message
-    model: str = Field(..., description="使用的AI模型")
-    finish_reason: Optional[str] = Field(None, description="结束原因")
-    usage: dict[str, Any] = Field(default_factory=dict, description="使用情况统计")
-    content: Optional[str] = Field(None, description="响应内容，方便前端直接获取")
-    sources: list[SearchSource] = Field(
-        default_factory=list,
-        description="联网搜索引用的来源列表（enable_search 启用时）",
-    )
-    search_failed: bool = Field(
-        False,
-        description="联网搜索是否失败（启用但未取到结果或异常时为 true）",
-    )
-
-
 class ModelConnectionStatus(BaseModel):
     """模型连接状态"""
 
@@ -228,35 +189,6 @@ class ModelsResponse(BaseModel):
         default_factory=dict,
         description="各提供商连接状态",
     )
-
-
-class DeepseekGenerateRequest(BaseModel):
-    """Deepseek 兼容生成请求"""
-
-    messages: list[Message] = Field(
-        ...,
-        description="消息列表",
-        min_length=1,
-        max_length=AI_MAX_MESSAGES,
-    )
-    max_tokens: int = Field(2048, description="最大生成令牌数", ge=1, le=AI_MAX_TOKENS)
-    temperature: float = Field(0.7, description="生成文本的随机性", ge=0, le=2)
-    stream: bool = Field(False, description="是否使用流式响应")
-    model: str = Field(
-        "deepseek-v4-flash",
-        description="使用的模型名称",
-        min_length=1,
-        max_length=100,
-    )
-    top_p: Optional[float] = Field(None, description="top p值", ge=0, le=1)
-
-    @field_validator("messages")
-    @classmethod
-    def message_total_length_within_limit(cls, value: list[Message]) -> list[Message]:
-        total_content_length = sum(len(message.content) for message in value)
-        if total_content_length > AI_MAX_TOTAL_MESSAGE_CONTENT_LENGTH:
-            raise ValueError("消息总长度超出限制")
-        return value
 
 
 class StreamEvent(BaseModel):

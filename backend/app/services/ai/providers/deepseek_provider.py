@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from app.config.settings import settings
-from app.models.ai import AIModel, ChatRequest, ChatResponse, Message, StreamEvent
+from app.models.ai import AIModel, ChatRequest, Message, StreamEvent
 from app.services.ai.base import AIProviderBase, ProviderType, safe_ai_client_message
 from app.utils.logger import get_logger
 
@@ -106,29 +106,6 @@ class DeepseekProvider(AIProviderBase):
             logger.error(error_msg)
             return False, safe_ai_client_message(error_msg)
 
-    async def chat(self, request: ChatRequest) -> ChatResponse:
-        """非流式对话"""
-        try:
-            await self.initialize()
-
-            payload = self._build_deepseek_payload(request, stream=False)
-
-            response = await self.client.post(
-                f"{self.base_url}/chat/completions",
-                json=payload
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                return self._parse_deepseek_response(result)
-            else:
-                error_msg = self._handle_api_error(response.status_code, response.text)
-                return self._error_chat_response(request, error_msg)
-
-        except Exception as e:
-            error_msg = f"Deepseek对话请求异常: {str(e)}"
-            return self._error_chat_response(request, error_msg, "provider_exception")
-
     async def chat_stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]:
         """流式对话"""
         try:
@@ -202,32 +179,6 @@ class DeepseekProvider(AIProviderBase):
             stream,
         )
         return payload
-
-    def _parse_deepseek_response(self, response_data: dict[str, Any]) -> ChatResponse:
-        """解析Deepseek响应"""
-        choices = response_data.get('choices', [])
-        if not choices:
-            return ChatResponse(
-                id=str(uuid.uuid4()),
-                model=response_data.get('model', ''),
-                message=Message(role="assistant", content="响应格式错误"),
-                usage={"error": True}
-            )
-
-        message_data = choices[0].get('message', {})
-        message = Message(
-            role=message_data.get('role', 'assistant'),
-            content=message_data.get('content', '')
-        )
-
-        usage = response_data.get('usage', {})
-
-        return ChatResponse(
-            id=response_data.get('id', str(uuid.uuid4())),
-            model=response_data.get('model', ''),
-            message=message,
-            usage=usage
-        )
 
     def _parse_deepseek_stream_chunk(self, chunk_data: dict[str, Any]) -> StreamEvent:
         """解析Deepseek流式响应块"""

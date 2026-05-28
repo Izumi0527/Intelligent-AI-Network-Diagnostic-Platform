@@ -101,6 +101,19 @@ async def cleanup_idle_sessions(terminal_service):
         await asyncio.sleep(300)
 
 
+async def _warmup_ai_providers(ai_service_manager: AIServiceManager) -> None:
+    """启动后异步预热 AI provider。
+    冷启动时首次请求会叠加 DNS 解析、TCP 三次握手、TLS 协商，
+    在用户访问页面前先暖好，避免 /api/ai/models 的连接检查因网络冷启动而误报"未配置"。
+    Best-effort：失败仅记 warning，不影响服务可用性。"""
+    for provider_type, provider in ai_service_manager.providers.items():
+        try:
+            await provider.check_connection()
+            logger.info(f"AI provider {provider_type.value} 预热完成")
+        except Exception as e:
+            logger.warning(f"AI provider {provider_type.value} 预热失败（不影响服务）: {e}")
+
+
 def _initialize_application_services(application: FastAPI) -> None:
     """在应用实例范围内统一创建服务，避免模块级全局单例。"""
     application.state.terminal_service = TerminalService()
@@ -135,6 +148,12 @@ async def lifespan(application: FastAPI):
     )
     logger.info("已启动定期会话清理任务")
 
+    # AI provider 预热：用户访问页面前暖好 DNS/TCP/TLS，避免冷启动误报"未配置"
+    application.state.ai_warmup_task = asyncio.create_task(
+        _warmup_ai_providers(application.state.ai_service_manager)
+    )
+    logger.info("已启动 AI provider 预热任务")
+
     try:
         yield
     finally:
@@ -144,6 +163,13 @@ async def lifespan(application: FastAPI):
                 await application.state.cleanup_task
             except asyncio.CancelledError:
                 logger.info("已取消定期会话清理任务")
+
+        if hasattr(application.state, "ai_warmup_task"):
+            application.state.ai_warmup_task.cancel()
+            try:
+                await application.state.ai_warmup_task
+            except asyncio.CancelledError:
+                logger.info("已取消 AI provider 预热任务")
 
         for service_name in (
             "terminal_service",

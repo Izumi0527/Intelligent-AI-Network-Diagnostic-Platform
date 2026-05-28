@@ -4,12 +4,11 @@ Anthropic Claude服务提供商实现
 """
 
 import json
-import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 
 from app.config.settings import settings
-from app.models.ai import AIModel, ChatRequest, ChatResponse, Message, StreamEvent
+from app.models.ai import AIModel, ChatRequest, Message, StreamEvent
 from app.services.ai.base import AIProviderBase, ProviderType, safe_ai_client_message
 from app.utils.logger import get_logger
 from app.utils.model_config import ModelConfigParser
@@ -78,34 +77,6 @@ class ClaudeProvider(AIProviderBase):
             logger.error(error_msg)
             return False, safe_ai_client_message(error_msg)
 
-    async def chat(self, request: ChatRequest) -> ChatResponse:
-        """非流式对话"""
-        try:
-            await self.initialize()
-
-            payload = self._build_claude_payload(request, stream=False)
-            headers = self._create_headers({
-                "x-api-key": self.api_key,
-                "anthropic-version": "2023-06-01"
-            })
-
-            async with self.session.post(
-                f"{self.base_url}/messages",
-                headers=headers,
-                json=payload
-            ) as response:
-
-                if response.status == 200:
-                    result = await response.json()
-                    return self._parse_claude_response(result)
-                else:
-                    error_msg = self._handle_api_error(response.status, await response.text())
-                    return self._error_chat_response(request, error_msg)
-
-        except Exception as e:
-            error_msg = f"Claude对话请求异常: {str(e)}"
-            return self._error_chat_response(request, error_msg, "provider_exception")
-
     async def chat_stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]:
         """流式对话"""
         try:
@@ -169,30 +140,6 @@ class ClaudeProvider(AIProviderBase):
         }
 
         return payload
-
-    def _parse_claude_response(self, response_data: dict[str, Any]) -> ChatResponse:
-        """解析Claude响应"""
-        content = response_data.get('content', [])
-
-        # Claude的响应格式中，content是一个数组
-        message_content = ""
-        for block in content:
-            if block.get('type') == 'text':
-                message_content += block.get('text', '')
-
-        message = Message(
-            role="assistant",
-            content=message_content
-        )
-
-        usage = response_data.get('usage', {})
-
-        return ChatResponse(
-            id=response_data.get('id', str(uuid.uuid4())),
-            model=response_data.get('model', ''),
-            message=message,
-            usage=usage
-        )
 
     def _parse_claude_stream_chunk(self, chunk_data: dict[str, Any]) -> StreamEvent:
         """解析Claude流式响应块"""

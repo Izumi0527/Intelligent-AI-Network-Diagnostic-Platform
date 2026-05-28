@@ -5,7 +5,7 @@ Deepseek客户端包装器
 
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from app.config.settings import settings
 from app.models.ai import AIModel, ChatRequest, Message
@@ -66,7 +66,11 @@ class DeepseekClient:
                               model: str = "deepseek-v4-pro",
                               stream: bool = False,
                               **kwargs) -> Union[dict[str, Any], AsyncGenerator[dict[str, Any], None]]:
-        """生成响应（兼容原接口）"""
+        """生成响应（兼容原接口）。
+
+        2026-05-28 清理后：上游 provider 仅保留流式实现，本方法 stream=False 时
+        在内部消费流式生成器并把 content 拼接为一次性 dict 返回，保持原接口兼容。
+        """
         if not self.is_available():
             if stream:
                 async def error_generator():
@@ -86,14 +90,25 @@ class DeepseekClient:
 
             if stream:
                 return self._stream_response_generator(request)
-            else:
-                response = await self.provider.chat(request)
-                return {
-                    "id": response.id,
-                    "content": response.message.content,
-                    "model": response.model,
-                    "usage": response.usage
-                }
+
+            # 非流式兼容路径：消费流式生成器后拼接 content 返回 dict
+            content_parts: list[str] = []
+            error_msg: Optional[str] = None
+            async for event in self.provider.chat_stream(request):
+                if event.type == "content":
+                    content_parts.append(event.data.get("content", ""))
+                elif event.type == "error":
+                    error_msg = event.data.get("error", "未知错误")
+                    break
+                elif event.type == "done":
+                    break
+            if error_msg is not None:
+                return {"error": error_msg}
+            return {
+                "content": "".join(content_parts),
+                "model": model,
+                "usage": {},
+            }
 
         except Exception as e:
             error_message = str(e)

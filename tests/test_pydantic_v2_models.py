@@ -16,7 +16,7 @@ def test_ai_and_terminal_models_do_not_emit_pydantic_v1_deprecation_warnings():
 
         warnings.simplefilter("error", PydanticDeprecatedSince20)
 
-        from app.models.ai import ChatRequest, DeepseekGenerateRequest, Message
+        from app.models.ai import ChatRequest, Message
         from app.models.terminal import (
             CommandResponse,
             SessionInfo,
@@ -26,7 +26,6 @@ def test_ai_and_terminal_models_do_not_emit_pydantic_v1_deprecation_warnings():
         message = Message(role="user", content=" ping ")
         assert message.content == "ping"
         ChatRequest(model="deepseek-v4-pro", messages=[message])
-        DeepseekGenerateRequest(messages=[message])
         TerminalCredentials(
             connection_type="ssh",
             device_address="192.0.2.10",

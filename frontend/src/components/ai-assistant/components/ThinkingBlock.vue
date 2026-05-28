@@ -95,7 +95,7 @@ let checkmarkTimer: ReturnType<typeof setTimeout> | null = null;
 
 watch(() => props.isStreaming, (newStreaming, oldStreaming) => {
   if (oldStreaming === true && newStreaming === false) {
-    isExpanded.value = props.defaultExpanded;
+    isExpanded.value = false;
     showCheckmark.value = true;
     if (checkmarkTimer !== null) { clearTimeout(checkmarkTimer); }
     checkmarkTimer = setTimeout(() => { showCheckmark.value = false; }, 1500);

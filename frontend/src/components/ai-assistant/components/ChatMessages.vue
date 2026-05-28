@@ -71,8 +71,20 @@ const emit = defineEmits<{
 
 const store = useAiAssistantStore();
 
+const streamUpdateKey = (): string => {
+  const lastMessage = props.messages[props.messages.length - 1];
+  if (lastMessage === undefined) { return ''; }
+  return [
+    lastMessage.id ?? '',
+    lastMessage.content.length,
+    lastMessage.thinking?.content.length ?? 0,
+    lastMessage.thinking?.isComplete === true ? 'done' : 'thinking'
+  ].join(':');
+};
+
 const { containerRef, scrollToBottom, isAtBottom } = useChatScroll({
   messageCount: () => props.messages.length,
+  streamUpdateKey,
   isTyping: () => props.streamState.isTyping,
   isStreamingContent: () => props.streamState.isStreamingContent
 });

@@ -229,8 +229,6 @@ AI 端点位于 `backend/app/api/api_v1/endpoints/ai.py`。
   - 返回请求格式诊断信息。
 - `GET /api/v1/ai/deepseek/status`
   - DeepSeek 服务状态。
-- `POST /api/v1/ai/deepseek/generate`
-  - DeepSeek 文本生成。
 - `POST /api/v1/ai/deepseek/analyze-network-log`
   - DeepSeek 网络日志分析。
 

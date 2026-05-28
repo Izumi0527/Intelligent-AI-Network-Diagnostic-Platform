@@ -1,6 +1,6 @@
 # 非流式 AI 响应残留清理设计文档
 
-> **状态**：已设计 / 待执行
+> **状态**：已完成 / 已验证（实际合并提交 `1e91e80`）
 > **创建日期**：2026-05-28
 > **作者**：架构清理任务
 > **关联**：前端 AI 助手已于 commit `00fa82c feat(ai-assistant): 默认使用流式响应` 移除流式/非流式切换按钮
@@ -331,10 +331,11 @@ Select-String -Path README.md, docs\*.md -Pattern "/api/v1/ai/chat\b" -NotMatch 
 ## 9. 后续追踪（执行后补充）
 
 > 执行完毕后在此区域补充：
-> - [ ] 阶段 1 commit SHA：
-> - [ ] 阶段 2 commit SHA：
-> - [ ] 阶段 3 commit SHA：
-> - [ ] 阶段 4 commit SHA：
-> - [ ] 阶段 5 commit SHA：
-> - [ ] 真实环境验证记录：
-> - [ ] 实测删除行数（vs 预估 360 行）：
+> - [x] 阶段 1 commit SHA：`1e91e80`（实际与阶段 2-5 合并为单次重构提交）
+> - [x] 阶段 2 commit SHA：`1e91e80`（实际与阶段 1、3-5 合并为单次重构提交）
+> - [x] 阶段 3 commit SHA：`1e91e80`（实际与阶段 1-2、4-5 合并为单次重构提交）
+> - [x] 阶段 4 commit SHA：`1e91e80`（实际与阶段 1-3、5 合并为单次重构提交）
+> - [x] 阶段 5 commit SHA：`1e91e80`（实际与阶段 1-4 合并为单次重构提交）
+> - [x] 真实环境验证记录：2026-05-28 通过 `./scripts/backend-check.ps1`；`POST http://127.0.0.1:8000/api/v1/ai/chat` 返回 404；Chrome 打开 `http://127.0.0.1:5180`，发起“用一句话解释 OSPF 的作用”，网络请求为 `POST /api/ai/chat/stream` 200，页面显示 thinking 与 content。
+> - [x] 实测删除行数（vs 预估 360 行）：`git diff --stat HEAD~1..HEAD` 显示 559 insertions(+)、702 deletions(-)。
+> - [x] 执行偏差记录：实际提交 `1e91e80` 除计划内非流式清理外，还包含连接状态一致性与少量前端资源/布局调整；因此原计划中的“前端代码 0 行改动”未按字面达成，后续审计应以该提交 diff 为准。

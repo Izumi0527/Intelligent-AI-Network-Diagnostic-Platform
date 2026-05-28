@@ -3,6 +3,8 @@ import { ref, watch, nextTick, onMounted, onBeforeUnmount, type Ref } from 'vue'
 interface UseChatScrollOptions {
   /** 返回当前消息总数的 getter，用于在新消息到达时滚动 */
   messageCount: () => number
+  /** 返回流式消息内容变化标记，用于逐字渲染期间持续粘底 */
+  streamUpdateKey: () => string
   /** 返回 "正在输入" 状态的 getter，用于在打字态出现/消失时滚动 */
   isTyping: () => boolean
   /** 返回 "正在接收流式内容" 状态的 getter，用于流式时持续粘底 */
@@ -69,6 +71,11 @@ export function useChatScroll(options: UseChatScrollOptions): UseChatScrollRetur
   watch(options.messageCount, scrollToBottom);
   watch(options.isTyping, scrollToBottom);
   watch(options.isStreamingContent, scrollToBottom);
+  watch(options.streamUpdateKey, () => {
+    if (options.isTyping() || options.isStreamingContent()) {
+      void scrollToBottom();
+    }
+  });
 
   return { containerRef, scrollToBottom, isAtBottom };
 }

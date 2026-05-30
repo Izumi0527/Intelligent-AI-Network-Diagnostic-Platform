@@ -16,6 +16,7 @@
       v-if="hasThinking && message.thinking"
       :thinking="message.thinking"
       :is-streaming="isThinkingStreaming"
+      :default-expanded="isLastAssistant ?? false"
     />
 
     <div
@@ -80,11 +81,13 @@ interface Props {
   message: ChatMessage
   compactMeta?: boolean
   isResponding?: boolean
+  isLastAssistant?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   compactMeta: false,
-  isResponding: false
+  isResponding: false,
+  isLastAssistant: false
 });
 
 const emit = defineEmits<{
@@ -175,6 +178,7 @@ const onRetry = (): void => { emit('retry'); };
   background: var(--bubble-assistant-bg);
   color: var(--bubble-assistant-fg);
   border: 1px solid var(--border);
+  border-left: 2px solid color-mix(in oklch, var(--primary) 55%, transparent);
   margin-left: 28px;
   border-bottom-left-radius: var(--radius);
 }

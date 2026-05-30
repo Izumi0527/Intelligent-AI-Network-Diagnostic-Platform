@@ -122,6 +122,12 @@ const handleModelChange = (event: Event): void => {
   color: var(--success);
 }
 
+/* A2: Light 下 --success 作徽标文字落在 success14% 浅芯片上仅 ~4.4:1，压暗到 >=4.5
+   (实测 6.14:1)。Dark 已达 7.51:1，仅在非 dark (html.light) 下覆盖。 */
+html:not(.dark) .model-selector__status[data-state='connected'] {
+  color: color-mix(in oklch, var(--success), black 18%);
+}
+
 .model-selector__status[data-state='disconnected'] {
   background-color: color-mix(in oklch, var(--destructive) 14%, transparent);
   color: var(--destructive);

@@ -61,9 +61,13 @@
     </div>
 
     <div class="chat-input__hints">
-      <span :class="counterColorClass">{{ message.length }}/{{ maxLength }}</span>
+      <span
+        :class="counterColorClass"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ message.length }}/{{ maxLength }}</span>
       <span v-if="disabled" class="chat-input__status">{{ statusText }}</span>
-      <span class="chat-input__sep">·</span>
       <span class="chat-input__shortcut">
         <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行
       </span>
@@ -203,6 +207,44 @@ defineExpose({ focus, clear, fillText });
   min-width: 0;
 }
 
+/* L 角标：左上 + 右下两角标记可交互输入区，:focus-within 点亮 */
+.chat-input__textarea-wrap::before,
+.chat-input__textarea-wrap::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 0 solid var(--hud-bracket);
+  pointer-events: none;
+  transition: border-color var(--dur-enter) var(--ease-hud);
+}
+
+.chat-input__textarea-wrap::before {
+  top: -2px;
+  left: -2px;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.chat-input__textarea-wrap::after {
+  bottom: -2px;
+  right: -2px;
+  border-bottom-width: 1px;
+  border-right-width: 1px;
+}
+
+.chat-input__textarea-wrap:focus-within::before,
+.chat-input__textarea-wrap:focus-within::after {
+  border-color: var(--hud-bracket-active);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-input__textarea-wrap::before,
+  .chat-input__textarea-wrap::after {
+    transition: none !important;
+  }
+}
+
 .chat-input__textarea {
   width: 100%;
   resize: none;
@@ -302,10 +344,6 @@ defineExpose({ focus, clear, fillText });
   font-size: 11px;
 }
 
-.chat-input__sep {
-  opacity: 0.4;
-}
-
 .chat-input__shortcut {
   display: inline-flex;
   align-items: center;
@@ -324,9 +362,6 @@ defineExpose({ focus, clear, fillText });
 
 @media (max-width: 640px) {
   .chat-input__shortcut {
-    display: none;
-  }
-  .chat-input__sep {
     display: none;
   }
 }

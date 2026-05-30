@@ -31,6 +31,7 @@
         :message="message"
         :compact-meta="isCompactMeta(index)"
         :is-responding="isResponding"
+        :is-last-assistant="index === lastAssistantIndex"
         @copy="onCopy"
         @retry="onRetry"
       />
@@ -117,6 +118,16 @@ const isCompactMeta = (index: number): boolean => {
 const isResponding = computed<boolean>(() =>
   store.isAIResponding || store.isStreamingContent
 );
+
+const lastAssistantIndex = computed<number>(() => {
+  for (let i = props.messages.length - 1; i >= 0; i--) {
+    const m = props.messages[i];
+    if (m !== undefined && m.role === 'assistant') {
+      return i;
+    }
+  }
+  return -1;
+});
 
 const canStop = computed<boolean>(() =>
   props.streamState.isThinking

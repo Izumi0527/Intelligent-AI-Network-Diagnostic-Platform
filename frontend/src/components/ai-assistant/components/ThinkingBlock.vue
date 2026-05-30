@@ -16,12 +16,12 @@
       @click="toggleExpanded"
     >
       <template v-if="isStreaming">
-        <packet-signal mode="sending" />
+        <scanline-sweep mode="scanning" />
         <span class="thinking-title">AI 助手正在思考</span>
         <span class="thinking-meta">正在分析…</span>
       </template>
       <template v-else>
-        <span class="thinking-icon" aria-hidden="true" v-html="radioIconSvg" />
+        <scanline-sweep mode="done" />
         <span class="thinking-title">思考过程</span>
         <span
           v-if="!thinking.isComplete"
@@ -72,7 +72,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ThinkingContent } from '@/types/chat';
 import { ChevronDownIcon } from '@/components/common/icons';
-import PacketSignal from '@/components/decoration/PacketSignal.vue';
+import ScanlineSweep from '@/components/decoration/ScanlineSweep.vue';
 
 interface Props {
   thinking: ThinkingContent
@@ -82,10 +82,8 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   isStreaming: false,
-  defaultExpanded: true
+  defaultExpanded: false
 });
-
-const radioIconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>';
 
 // eslint-disable-next-line vue/no-setup-props-destructure
 const isExpanded = ref<boolean>(props.defaultExpanded);
@@ -99,6 +97,12 @@ watch(() => props.isStreaming, (newStreaming, oldStreaming) => {
     showCheckmark.value = true;
     if (checkmarkTimer !== null) { clearTimeout(checkmarkTimer); }
     checkmarkTimer = setTimeout(() => { showCheckmark.value = false; }, 1500);
+  }
+});
+
+watch(() => props.defaultExpanded, (next) => {
+  if (next === false && !props.isStreaming) {
+    isExpanded.value = false;
   }
 });
 
@@ -219,12 +223,6 @@ const onCollapseLeave = (el: Element): void => {
 
 .thinking-header--locked {
   cursor: default;
-}
-
-.thinking-icon {
-  color: var(--primary);
-  display: inline-flex;
-  align-items: center;
 }
 
 .thinking-title {

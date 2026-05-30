@@ -183,4 +183,10 @@ const onBackdropClick = (event: MouseEvent): void => {
     transform: translateY(0) scale(1);
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-dialog[open] {
+    animation: none;
+  }
+}
 </style>

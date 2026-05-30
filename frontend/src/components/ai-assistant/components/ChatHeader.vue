@@ -2,6 +2,7 @@
   <div class="chat-header">
     <div class="chat-header__top">
       <div class="chat-header__title-group">
+        <span class="chat-header__sigil" aria-hidden="true" />
         <span class="chat-header__title">AI 助手</span>
         <span class="chat-header__badge">BETA</span>
       </div>
@@ -11,7 +12,7 @@
           class="chat-header__clear-btn"
           title="清空当前对话 (⌘⇧K)"
           aria-label="清空当前对话"
-          @click="openConfirm"
+          @click="onClearClick"
         >
           <clear-icon class="w-3.5 h-3.5" aria-hidden="true" />
           <span class="hidden sm:inline">清空</span>
@@ -20,41 +21,18 @@
     </div>
 
     <slot />
-
-    <confirm-dialog
-      :open="confirmOpen"
-      title="清空当前对话"
-      message="将清除当前模型下的全部聊天记录与缓存，且无法恢复。确定继续吗？"
-      confirm-text="清空"
-      cancel-text="取消"
-      @confirm="onConfirm"
-      @cancel="onCancel"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
 import { ClearIcon } from '@/components/common/icons';
-import ConfirmDialog from './ConfirmDialog.vue';
 
 const emit = defineEmits<{
-  clear: []
+  'request-clear': []
 }>();
 
-const confirmOpen = ref(false);
-
-const openConfirm = (): void => {
-  confirmOpen.value = true;
-};
-
-const onConfirm = (): void => {
-  confirmOpen.value = false;
-  emit('clear');
-};
-
-const onCancel = (): void => {
-  confirmOpen.value = false;
+const onClearClick = (): void => {
+  emit('request-clear');
 };
 </script>
 
@@ -80,6 +58,15 @@ const onCancel = (): void => {
   gap: 8px;
 }
 
+/* 琥珀点缀方块：HUD 主灯标记面板身份 */
+.chat-header__sigil {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  background: var(--primary);
+  border-radius: 1px;
+}
+
 .chat-header__title {
   font-size: 12px;
   font-weight: 500;
@@ -95,9 +82,9 @@ const onCancel = (): void => {
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 3px;
-  background-color: color-mix(in oklch, var(--primary) 16%, transparent);
-  color: var(--primary);
-  letter-spacing: 0.08em;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
   text-transform: uppercase;
 }
 

@@ -213,4 +213,26 @@ const onFaviconError = (event: Event): void => {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+@media (max-width: 640px) {
+  .search-sources {
+    margin-left: 24px;
+  }
+  .search-card__link {
+    padding: 6px 8px;
+    gap: 8px;
+  }
+  .search-card__favicon {
+    width: 14px;
+    height: 14px;
+    margin-top: 1px;
+  }
+  .search-card__title {
+    font-size: 11.5px;
+  }
+  .search-card__desc {
+    font-size: 10.5px;
+    -webkit-line-clamp: 1;
+  }
+}
 </style>

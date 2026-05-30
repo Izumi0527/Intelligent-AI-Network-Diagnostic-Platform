@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col h-full w-full ai-assistant-panel">
-    <chat-header @clear="handleClear">
+    <chat-header @request-clear="handleRequestClear">
       <div class="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <model-selector
           :selected-model="store.selectedModel"
@@ -74,12 +74,12 @@ const inputStatusText = computed<string>(() => {
   return '';
 });
 
-const handleClear = async (): Promise<void> => {
-  try {
-    await store.clearConversation();
-  } catch (error) {
-    logger.error('清空对话失败:', error);
-  }
+const emit = defineEmits<{
+  'request-clear': []
+}>();
+
+const handleRequestClear = (): void => {
+  emit('request-clear');
 };
 
 const handleModelChange = async (value: string): Promise<void> => {

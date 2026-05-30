@@ -1,5 +1,5 @@
 {
-  "app_url": "http://127.0.0.1:5173",
+  "app_url": "http://127.0.0.1:5180",
   "viewports": [
     {
       "name": "mobile-375-light",
@@ -8,25 +8,40 @@
         667
       ],
       "dark": false,
-      "violation_count": 0,
-      "violations": [],
+      "violation_count": 1,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".model-selector__status-text"
+              ],
+              "html": "<span data-v-54b7cdea=\"\" class=\"model-selector__status-text\">已连接</span>"
+            }
+          ]
+        }
+      ],
       "incomplete": [
         {
           "id": "color-contrast",
           "help": "Elements must meet minimum color contrast ratio thresholds",
-          "nodes": 2
+          "nodes": 16
         }
       ],
       "passes": 26,
       "inapplicable": 35,
       "static": {
-        "iconCount": 3,
-        "iconHiddenCount": 3,
-        "logRoles": 2,
+        "iconCount": 10,
+        "iconHiddenCount": 6,
+        "logRoles": 1,
         "alertRoles": 0,
         "statusRoles": 2,
-        "ariaLive": 4,
-        "particlesAriaHidden": true,
+        "ariaLive": 3,
+        "particlesAriaHidden": false,
         "messageListHasLogRole": true,
         "messageListAriaLive": "polite",
         "messageActionsCopyLabelOk": false,
@@ -50,19 +65,19 @@
         {
           "id": "color-contrast",
           "help": "Elements must meet minimum color contrast ratio thresholds",
-          "nodes": 2
+          "nodes": 16
         }
       ],
       "passes": 26,
       "inapplicable": 35,
       "static": {
-        "iconCount": 3,
-        "iconHiddenCount": 3,
-        "logRoles": 2,
+        "iconCount": 10,
+        "iconHiddenCount": 6,
+        "logRoles": 1,
         "alertRoles": 0,
         "statusRoles": 2,
-        "ariaLive": 4,
-        "particlesAriaHidden": true,
+        "ariaLive": 3,
+        "particlesAriaHidden": false,
         "messageListHasLogRole": true,
         "messageListAriaLive": "polite",
         "messageActionsCopyLabelOk": false,
@@ -82,23 +97,17 @@
       "dark": false,
       "violation_count": 0,
       "violations": [],
-      "incomplete": [
-        {
-          "id": "color-contrast",
-          "help": "Elements must meet minimum color contrast ratio thresholds",
-          "nodes": 2
-        }
-      ],
+      "incomplete": [],
       "passes": 25,
       "inapplicable": 36,
       "static": {
-        "iconCount": 3,
-        "iconHiddenCount": 3,
+        "iconCount": 10,
+        "iconHiddenCount": 6,
         "logRoles": 2,
         "alertRoles": 0,
-        "statusRoles": 2,
-        "ariaLive": 4,
-        "particlesAriaHidden": true,
+        "statusRoles": 3,
+        "ariaLive": 5,
+        "particlesAriaHidden": false,
         "messageListHasLogRole": true,
         "messageListAriaLive": "polite",
         "messageActionsCopyLabelOk": false,
@@ -116,25 +125,40 @@
         800
       ],
       "dark": true,
-      "violation_count": 0,
-      "violations": [],
+      "violation_count": 1,
+      "violations": [
+        {
+          "id": "button-name",
+          "impact": "critical",
+          "help": "Buttons must have discernible text",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/button-name?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".drag-handle"
+              ],
+              "html": "<button data-v-e955bfee=\"\" data-v-22686b16=\"\" type=\"button\" class=\"drag-handle\" role=\"separator\" aria-orientation=\"vertical\" aria-valuenow=\"66\" aria-valuemin=\"25\" aria-valuemax=\"75\"><span data-v-e955b"
+            }
+          ]
+        }
+      ],
       "incomplete": [
         {
           "id": "color-contrast",
           "help": "Elements must meet minimum color contrast ratio thresholds",
-          "nodes": 5
+          "nodes": 18
         }
       ],
       "passes": 25,
       "inapplicable": 36,
       "static": {
-        "iconCount": 3,
-        "iconHiddenCount": 3,
+        "iconCount": 10,
+        "iconHiddenCount": 6,
         "logRoles": 2,
         "alertRoles": 0,
-        "statusRoles": 2,
-        "ariaLive": 4,
-        "particlesAriaHidden": true,
+        "statusRoles": 3,
+        "ariaLive": 5,
+        "particlesAriaHidden": false,
         "messageListHasLogRole": true,
         "messageListAriaLive": "polite",
         "messageActionsCopyLabelOk": false,
@@ -146,27 +170,27 @@
       }
     }
   ],
-  "total_violation_count": 0,
-  "icon_a11y_maintained": true,
+  "total_violation_count": 2,
+  "icon_a11y_maintained": false,
   "screenshots": [
     {
       "file": "p6-mobile-375.png",
-      "bytes": 46196,
+      "bytes": 54614,
       "exists": true
     },
     {
       "file": "p6-mobile-dark.png",
-      "bytes": 44566,
+      "bytes": 54629,
       "exists": true
     },
     {
       "file": "p6-tablet-768.png",
-      "bytes": 75201,
+      "bytes": 37867,
       "exists": true
     },
     {
       "file": "p6-dark-full.png",
-      "bytes": 92996,
+      "bytes": 89505,
       "exists": true
     }
   ],

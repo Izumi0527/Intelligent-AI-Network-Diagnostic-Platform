@@ -57,3 +57,7 @@ Thumbs.db
 
 # Playwright MCP session artifacts (console logs / page snapshots)
 .playwright-mcp/
+
+# discuss 目录下的验证产物（截图 / axe 审计数据），不进版本控制（.md 报告保留）
+discuss/**/*.png
+discuss/**/*.json

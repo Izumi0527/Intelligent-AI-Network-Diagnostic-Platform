@@ -1,5 +1,5 @@
 /* ============================================================
-   Terminal：工程师审美 — mono 字体 / 暗色面板 / 简洁状态色
+   Terminal：Industrial HUD - mono 字体 / 深空面板 / 琥珀状态色
    与 AI 区共用同一 token 体系, 但终端区永远使用暗底
    ============================================================ */
 
@@ -76,11 +76,13 @@
   cursor: pointer;
   transition:
     background-color var(--dur-enter) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
     transform var(--dur-enter) var(--ease-standard);
 }
 
 .terminal-config-button:hover:not(:disabled) {
   background-color: color-mix(in oklch, var(--primary), white 6%);
+  box-shadow: 0 0 12px -2px var(--hud-glow);
 }
 
 .terminal-config-button:active:not(:disabled) {
@@ -131,12 +133,14 @@
   cursor: pointer;
   transition:
     background-color var(--dur-enter) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
     transform var(--dur-enter) var(--ease-standard),
     opacity var(--dur-enter) var(--ease-standard);
 }
 
 .terminal-send-button:hover:not(:disabled) {
   background-color: color-mix(in oklch, var(--primary), white 6%);
+  box-shadow: 0 0 12px -2px var(--hud-glow);
 }
 
 .terminal-send-button:active:not(:disabled) {

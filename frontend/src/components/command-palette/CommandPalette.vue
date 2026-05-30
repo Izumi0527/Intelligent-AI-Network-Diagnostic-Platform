@@ -57,11 +57,9 @@
 
           <div class="cmdk-footer">
             <span class="cmdk-footer__hint">
-              <kbd>↑</kbd><kbd>↓</kbd> 导航
-              <span class="cmdk-footer__sep">·</span>
-              <kbd>↵</kbd> 执行
-              <span class="cmdk-footer__sep">·</span>
-              <kbd>Esc</kbd> 关闭
+              <span class="cmdk-footer__hint-item"><kbd>↑</kbd><kbd>↓</kbd> 导航</span>
+              <span class="cmdk-footer__hint-item"><kbd>↵</kbd> 执行</span>
+              <span class="cmdk-footer__hint-item"><kbd>Esc</kbd> 关闭</span>
             </span>
           </div>
         </div>
@@ -214,18 +212,50 @@ watch(filtered, (list) => {
   flex-direction: column;
   background-color: var(--popover);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: calc(var(--radius) + 2px);
   box-shadow: var(--shadow-popover);
   overflow: hidden;
   color: var(--popover-foreground);
 }
 
 .cmdk-search {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
+}
+
+/* L 角标 bracket：标记"当前输入活动区"，聚焦时点亮 */
+.cmdk-search::before,
+.cmdk-search::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+  border: 1px solid var(--hud-bracket);
+  transition: border-color var(--dur-enter) var(--ease-hud);
+}
+
+.cmdk-search::before {
+  top: 6px;
+  left: 6px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.cmdk-search::after {
+  right: 6px;
+  bottom: 6px;
+  border-left: none;
+  border-top: none;
+}
+
+.cmdk-search:focus-within::before,
+.cmdk-search:focus-within::after {
+  border-color: var(--hud-bracket-active);
 }
 
 .cmdk-search__icon {
@@ -253,7 +283,7 @@ watch(filtered, (list) => {
   font-family: var(--app-font-mono);
   font-size: 10px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background-color: var(--muted);
   color: var(--muted-foreground);
   border: 1px solid var(--border);
@@ -277,18 +307,25 @@ watch(filtered, (list) => {
   color: var(--muted-foreground);
 }
 
+.cmdk-group-label:not(:first-child) {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 .cmdk-item {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: background-color var(--dur-enter) var(--ease-standard);
 }
 
 .cmdk-item--active {
   background-color: var(--muted);
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .cmdk-item__icon {
@@ -347,11 +384,13 @@ watch(filtered, (list) => {
 .cmdk-footer__hint {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
 }
 
-.cmdk-footer__sep {
-  opacity: 0.4;
+.cmdk-footer__hint-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Transition: 极简 fade + scale */

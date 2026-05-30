@@ -1,8 +1,8 @@
 <template>
   <div class="flex items-center gap-2" role="status" aria-live="polite">
     <div
-      class="w-2 h-2 rounded-full transition-[background-color] duration-[var(--dur-base)] ease-[var(--ease-out)]"
-      :class="appStore.isServerConnected ? 'bg-green-500' : 'bg-red-500'"
+      class="server-dot"
+      :class="appStore.isServerConnected ? 'server-dot--ok' : 'server-dot--down'"
       aria-hidden="true"
     ></div>
     <span class="text-sm">{{ statusText }}</span>
@@ -24,3 +24,31 @@ useIntervalFn(() => {
   appStore.checkServerConnection();
 }, 30000, { immediateCallback: true });
 </script>
+
+<style scoped>
+.server-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: background-color var(--dur-base) var(--ease-standard);
+}
+
+.server-dot--ok {
+  background-color: var(--hud-ok);
+  animation: server-pulse 2.4s var(--ease-standard) infinite;
+}
+
+.server-dot--down {
+  background-color: var(--hud-alert);
+}
+
+/* 在线呼吸：绿色 glow 脉冲，表达"系统在线" */
+@keyframes server-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--hud-ok) 40%, transparent); }
+  50% { box-shadow: 0 0 6px 1px color-mix(in oklch, var(--hud-ok) 40%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-dot--ok { animation: none; }
+}
+</style>

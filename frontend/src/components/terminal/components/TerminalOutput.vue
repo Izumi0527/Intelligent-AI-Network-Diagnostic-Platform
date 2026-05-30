@@ -59,4 +59,10 @@ watch(
     opacity: 0;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-cursor {
+    animation: none;
+  }
+}
 </style>

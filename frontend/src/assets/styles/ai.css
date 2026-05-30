@@ -1,5 +1,5 @@
 /* ============================================================
-   AI Assistant：现代极简语言 — 1px border / 无阴影 / 无渐变
+   AI Assistant：Industrial HUD - 1px hairline / 琥珀焦点 / 深空面板
    ============================================================ */
 
 /* ─── 主面板 ────────────────────────────────────────────── */
@@ -12,7 +12,7 @@
 }
 
 .ai-assistant-panel:hover {
-  border-color: color-mix(in oklch, var(--foreground) 14%, transparent);
+  border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
 }
 
 /* ─── 标题与 Beta 徽章 ─────────────────────────────────── */
@@ -54,9 +54,7 @@
 }
 
 /* ─── 对话区背景 (纯色, 不再渐变) ────────────────────────── */
-.ai-chat-gradient,
-.ai-chat-gradient-soft,
-.ai-surface-gradient {
+.ai-chat-gradient {
   background: var(--background);
   min-height: 0;
 }

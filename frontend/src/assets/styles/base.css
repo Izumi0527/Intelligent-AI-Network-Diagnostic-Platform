@@ -31,7 +31,7 @@
     font-family: var(--app-font-mono);
   }
 
-  /* 键盘焦点可见环 — WCAG AA */
+  /* 键盘焦点可见环 - WCAG AA */
   :focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;

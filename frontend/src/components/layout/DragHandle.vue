@@ -4,6 +4,7 @@
     class="drag-handle"
     :class="{ 'drag-handle--dragging': isDragging }"
     role="separator"
+    aria-label="调整面板宽度"
     aria-orientation="vertical"
     :aria-valuenow="ratio"
     aria-valuemin="25"
@@ -84,6 +85,7 @@ const onKeyDown = (event: KeyboardEvent): void => {
   background-color: var(--border);
   transition:
     background-color var(--dur-base) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
     width var(--dur-base) var(--ease-standard);
 }
 
@@ -92,6 +94,7 @@ const onKeyDown = (event: KeyboardEvent): void => {
 .drag-handle--dragging .drag-handle__bar {
   width: 2px;
   background-color: var(--primary);
+  box-shadow: 0 0 8px var(--hud-glow);
 }
 
 .drag-handle--dragging {

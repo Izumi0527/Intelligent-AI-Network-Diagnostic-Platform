@@ -1,14 +1,14 @@
 <template>
   <div class="flex flex-col h-full w-full ai-assistant-panel">
     <chat-header @request-clear="handleRequestClear">
-      <div class="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div class="ai-header-bar">
         <model-selector
           :selected-model="store.selectedModel"
           :available-models="modelsForSelector"
           :is-connected="store.isModelConnected"
           @model-change="handleModelChange"
         />
-        <div class="flex flex-col gap-2 sm:gap-4 sm:flex-row sm:items-center">
+        <div class="ai-header-tools">
           <search-toggle :enabled="store.searchEnabled" @toggle="handleSearchToggle" />
         </div>
       </div>

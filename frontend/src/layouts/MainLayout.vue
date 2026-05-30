@@ -150,10 +150,13 @@ const aiAssistantRef = ref<InstanceType<typeof AIAssistant> | null>(null);
 
 const isDarkMode = computed(() => appStore.isDarkMode);
 
-const isMobile = ref(window.innerWidth < 768);
+// 断点 <=768 视为移动端，与所有 CSS @media (max-width: 768px) 严格对齐。
+// 旧值 < 768 让 768 整点落入"JS 桌面双面板 + CSS 移动样式"的裂缝：
+// 两个 pane 被 CSS 强制 width:100% 横排却仍渲染双面板 → AI 面板整体溢出被裁 (V2)。
+const isMobile = ref(window.innerWidth <= 768);
 
 const onResize = (): void => {
-  isMobile.value = window.innerWidth < 768;
+  isMobile.value = window.innerWidth <= 768;
 };
 
 /* 任务时钟：mono 实时时钟，运维场景定位事件发生时间 */
@@ -178,7 +181,10 @@ const paneStyle = (which: 'terminal' | 'ai'): CSSProperties => {
     return { flex: '1 1 auto', width: '100%' };
   }
   const flex = which === 'terminal' ? ui.terminalFlex : ui.aiFlex;
-  return { flexBasis: `${flex}%`, flexGrow: 0, flexShrink: 0 };
+  // 两 pane 之间夹着 6px 拖拽条 (DragHandle: flex 0 0 6px)。
+  // terminalFlex% + aiFlex% 恒为 100%，再加 6px 必然超出容器 → overflow:hidden 裁掉 AI 面板右缘 (V2)。
+  // 两侧各让出 3px (合计 6px = handle 宽)，正好填满，不溢出。拖拽 ratio 基于指针几何计算，不读 flexBasis，故无副作用。
+  return { flexBasis: `calc(${flex}% - 3px)`, flexGrow: 0, flexShrink: 0 };
 };
 
 const confirmClearOpen = ref(false);

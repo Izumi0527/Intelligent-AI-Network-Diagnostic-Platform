@@ -9,10 +9,44 @@
   border-radius: calc(var(--radius) + 4px);
   color: var(--foreground);
   transition: border-color var(--dur-base) var(--ease-standard);
+  /* 作为容器查询锚点：header 工具条按面板自身宽度(而非视口)决定横/竖排 (V1)。
+     已核查面板内所有 absolute 元素均锚定就近 relative 祖先，container 不改变其定位。 */
+  container-type: inline-size;
 }
 
 .ai-assistant-panel:hover {
   border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
+}
+
+/* ─── Header 工具条：基于面板宽度的容器查询 (V1) ─────────── */
+/* 旧实现用 Tailwind sm:(视口 640px) 判断横排，但双面板下 AI 面板仅占视口 34%(~261px)，
+   视口宽 ≠ 面板宽 → 横排被挤爆（"联网搜索"竖排折行、模型名截断为"De…"）。
+   改用容器查询：仅当面板自身 >=384px 才横排，更窄时自动竖排，彻底解耦视口宽度。 */
+.ai-header-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-header-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@container (min-width: 384px) {
+  .ai-header-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .ai-header-tools {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
 }
 
 /* ─── 标题与 Beta 徽章 ─────────────────────────────────── */

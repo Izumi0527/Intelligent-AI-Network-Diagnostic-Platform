@@ -1,47 +1,26 @@
 <template>
-  <svg
-    class="topology-bg"
-    :class="{ 'topology-bg--subtle': subtle }"
+  <div
+    class="hud-bg"
+    :class="{ 'hud-bg--subtle': subtle }"
     aria-hidden="true"
-    xmlns="http://www.w3.org/2000/svg"
   >
-    <defs>
-      <!--
-        SVG pattern: 节点 + 连线网格.
-        每个 64x64 单元格包含 1 个节点 (圆点) 和 4 条连线 (上下左右半段),
-        平铺即形成连续的网络拓扑视觉.
-      -->
-      <pattern
-        id="topology-grid"
-        x="0"
-        y="0"
-        width="64"
-        height="64"
-        patternUnits="userSpaceOnUse"
-      >
-        <!-- 节点 -->
-        <circle cx="32" cy="32" r="1.5" fill="currentColor" />
-        <!-- 横向连线 -->
-        <line x1="32" y1="32" x2="64" y2="32" stroke="currentColor" stroke-width="0.5" />
-        <line x1="0" y1="32" x2="32" y2="32" stroke="currentColor" stroke-width="0.5" />
-        <!-- 纵向连线 -->
-        <line x1="32" y1="32" x2="32" y2="64" stroke="currentColor" stroke-width="0.5" />
-        <line x1="32" y1="0" x2="32" y2="32" stroke="currentColor" stroke-width="0.5" />
-      </pattern>
-    </defs>
-
-    <rect width="100%" height="100%" fill="url(#topology-grid)" />
-  </svg>
+    <div class="hud-bg__grid" />
+    <div class="hud-bg__scanline" />
+    <span class="hud-bg__corner hud-bg__corner--tl" />
+    <span class="hud-bg__corner hud-bg__corner--tr" />
+    <span class="hud-bg__corner hud-bg__corner--bl" />
+    <span class="hud-bg__corner hud-bg__corner--br" />
+  </div>
 </template>
 
 <script setup lang="ts">
 /**
- * 网络拓扑底纹：absolute fill 的 SVG pattern，1.5% 不透明度。
- * 用于 MainLayout 主区域作"网络运维"主题视觉锚点。
- * pointer-events:none 不阻挡交互。
+ * HUD 网格背景：双层网格 (粗 96px + 细 16px) + 慢扫描线 + viewport 四角 L 角标。
+ * Industrial HUD 视觉锚点，标记整个工作区边界。
+ * absolute fill + pointer-events:none，不阻挡交互。
  */
 interface Props {
-  /** 是否更微弱 (用于明色背景上避免过亮，默认 false 用 1.5%；true 用 1%) */
+  /** 更弱网格 (用于内容密集区) */
   subtle?: boolean
 }
 
@@ -49,26 +28,69 @@ withDefaults(defineProps<Props>(), { subtle: false });
 </script>
 
 <style scoped>
-.topology-bg {
+.hud-bg {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
   pointer-events: none;
   z-index: 0;
-  color: var(--foreground);
-  opacity: 0.018;
+  overflow: hidden;
 }
 
-.topology-bg--subtle {
-  opacity: 0.012;
+/* 双层网格：粗线定区域 + 细线给精度 */
+.hud-bg__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--hud-grid-coarse) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hud-grid-coarse) 1px, transparent 1px),
+    linear-gradient(var(--hud-grid-fine) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hud-grid-fine) 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px, 16px 16px, 16px 16px;
+  background-position: -1px -1px;
 }
 
-.dark .topology-bg {
-  opacity: 0.04;
+.hud-bg--subtle .hud-bg__grid {
+  opacity: 0.5;
 }
 
-.dark .topology-bg--subtle {
-  opacity: 0.025;
+/* 慢扫描线：从顶部缓慢下扫，表达"系统在线" */
+.hud-bg__scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 42%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--hud-scanline) 60%,
+    transparent
+  );
+  animation: hud-scan var(--dur-scan) var(--ease-standard) infinite;
+  will-change: transform;
+}
+
+@keyframes hud-scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(340%); }
+}
+
+/* viewport 四角 L 角标：标记工作区边界 */
+.hud-bg__corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 0 solid var(--hud-bracket);
+}
+.hud-bg__corner--tl { top: 10px; left: 10px; border-top-width: 2px; border-left-width: 2px; }
+.hud-bg__corner--tr { top: 10px; right: 10px; border-top-width: 2px; border-right-width: 2px; }
+.hud-bg__corner--bl { bottom: 10px; left: 10px; border-bottom-width: 2px; border-left-width: 2px; }
+.hud-bg__corner--br { bottom: 10px; right: 10px; border-bottom-width: 2px; border-right-width: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-bg__scanline {
+    animation: none;
+    opacity: 0;
+  }
 }
 </style>

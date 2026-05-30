@@ -1,6 +1,6 @@
 /* ============================================================
    Surfaces：通用面板 / 按钮 / 边框 / 阴影 / 通用动画
-   设计语言：Linear/Vercel 系 — 1px border + 极少阴影 + 极简过渡
+   设计语言：Industrial HUD - 1px hairline + 琥珀主灯 + 仪表过渡
    ============================================================ */
 
 /* ─── 表面层级 ──────────────────────────────────────────── */
@@ -38,12 +38,14 @@
   cursor: pointer;
   transition:
     background-color var(--dur-enter) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
     transform var(--dur-enter) var(--ease-standard),
     opacity var(--dur-enter) var(--ease-standard);
 }
 
 .btn-primary:hover:not(:disabled) {
   background-color: color-mix(in oklch, var(--primary), white 6%);
+  box-shadow: 0 0 12px -2px var(--hud-glow);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -130,14 +132,17 @@
   }
 }
 
-/* ─── 数据包信号灯关键帧 (PacketSignal 组件复用) ──────── */
-@keyframes packetPulse {
-  0%, 100% {
-    background-color: var(--zinc-400);
-    transform: scale(1);
-  }
-  50% {
-    background-color: var(--primary);
-    transform: scale(1.15);
-  }
+/* ─── HUD 关键帧 ─────────────────────────────────────────── */
+/* 数字闪烁：数值更新时的瞬时跳动，模拟仪表刷新 */
+@keyframes digit-flicker {
+  0%, 100% { opacity: 1; }
+  48% { opacity: 1; }
+  50% { opacity: 0.45; }
+  52% { opacity: 1; }
+}
+
+/* 琥珀脉冲：状态心跳，辉光呼吸 */
+@keyframes amber-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--hud-glow); }
+  50% { box-shadow: 0 0 8px 1px var(--hud-glow); }
 }

@@ -1,14 +1,14 @@
 /* ============================================================
    设计 Token：色彩 / 间距 / 圆角 / 阴影 / 动效 / 字体 / Z 轴
    ------------------------------------------------------------
-   设计语言：Linear/Vercel 系现代极简 + 网络运维工程驾驶舱指纹
-   - 色彩 OKLCH 空间，明暗映射感知一致
-   - Zinc 12 级中性灰阶作为骨架，光纤蓝 (cyan-teal 之间) 作唯一强调色
-   - 不使用紫色、玻璃态、发光阴影
+   设计语言：Industrial HUD (Mission Control 1969 / 飞行器 HUD)
+   - 双模式：Light = 暖纸印刷 (深墨 + 暗琥珀)，Dark = 深空辉光 (骨白 + 琥珀主灯)
+   - 单一琥珀主灯 + 1px 网格 + L 角标 + 等宽坐标式数据
+   - 色彩 OKLCH 空间，明暗均为感知一致的工程仪表配色
    ============================================================ */
 
 :root {
-  /* ─── 中性骨架：Zinc 12 级 (OKLCH) ───────────────────────── */
+  /* ─── 中性骨架：Zinc 12 级 (OKLCH，底层调色板保留) ────────── */
   --zinc-50: oklch(0.985 0 0);
   --zinc-100: oklch(0.97 0 0);
   --zinc-200: oklch(0.922 0 0);
@@ -22,71 +22,87 @@
   --zinc-900: oklch(0.165 0 0);
   --zinc-950: oklch(0.105 0 0);
 
-  /* ─── 基础语义色 (light) ─────────────────────────────────── */
-  --background: oklch(0.99 0 0);
-  --foreground: oklch(0.145 0.005 240);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0.005 240);
-  --card-hovered: var(--zinc-100);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0.005 240);
+  /* ─── Light HUD (Paper): 暖纸底 + 深墨字 + 暗琥珀线条 ─────── */
+  --background: oklch(0.96 0.008 85);
+  --foreground: oklch(0.22 0.02 75);
+  --card: oklch(0.985 0.006 85);
+  --card-foreground: oklch(0.22 0.02 75);
+  --card-hovered: oklch(0.93 0.012 85);
+  --popover: oklch(0.99 0.006 85);
+  --popover-foreground: oklch(0.22 0.02 75);
 
-  /* 光纤蓝主色 — 强调用 */
-  --primary: oklch(0.72 0.16 195);
-  --primary-foreground: oklch(0.13 0 0);
+  /* 琥珀主灯 (light: 压暗保证实心按钮白字 >= 4.5:1) */
+  --primary: oklch(0.5 0.16 65);
+  --primary-foreground: oklch(0.99 0.008 85);
 
-  /* user 气泡专用：亮度降到 0.55 保证白字 ≥ 4.5:1 (WCAG AA) */
-  --primary-bubble: oklch(0.55 0.18 230);
-  --primary-bubble-foreground: oklch(0.99 0 0);
+  /* user 气泡专用 */
+  --primary-bubble: oklch(0.48 0.16 60);
+  --primary-bubble-foreground: oklch(0.99 0.008 85);
 
-  --secondary: var(--zinc-100);
-  --secondary-foreground: var(--zinc-900);
-  --muted: var(--zinc-100);
-  --muted-foreground: var(--zinc-500);
+  --secondary: oklch(0.92 0.012 85);
+  --secondary-foreground: oklch(0.25 0.02 75);
+  --muted: oklch(0.92 0.012 85);
+  --muted-foreground: oklch(0.44 0.03 75);
 
-  --accent: var(--zinc-100);
-  --accent-foreground: var(--zinc-900);
+  --accent: oklch(0.92 0.012 85);
+  --accent-foreground: oklch(0.25 0.02 75);
 
-  --destructive: oklch(0.6 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.76 0.15 75);
-  --warning-foreground: oklch(0.13 0 0);
-  --success: oklch(0.66 0.16 145);
-  --success-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.52 0.2 28);
+  --destructive-foreground: oklch(0.99 0.008 85);
+  /* warning 压暗一档 (L0.56→0.50) 保证作小字/线条时对暖纸底 >= 4.5:1 (实测 5.48:1)；
+     作实心填充时改配白字 (见 TerminalConnectionForm 取消按钮，6.0:1) */
+  --warning: oklch(0.5 0.14 70);
+  --warning-foreground: oklch(0.99 0.008 85);
+  --success: oklch(0.5 0.13 150);
+  --success-foreground: oklch(0.99 0.008 85);
 
-  /* 极薄边框 (alpha 0.08，几乎不可见) */
-  --border: oklch(0.13 0.005 240 / 0.08);
-  --input: oklch(0.13 0.005 240 / 0.12);
-  --ring: oklch(0.72 0.16 195);
+  /* 暗琥珀细线 (HUD hairline) */
+  --border: oklch(0.45 0.06 70 / 0.24);
+  --input: oklch(0.45 0.06 70 / 0.3);
+  --ring: oklch(0.5 0.16 65);
 
-  /* ─── 终端区色 (light/dark 共享 token, terminal 内永远暗底) ── */
-  --terminal-bg: oklch(0.165 0.006 240);
-  --terminal-fg: oklch(0.92 0.005 240);
-  --terminal-success: oklch(0.7 0.16 145);
-  --terminal-error: oklch(0.65 0.22 25);
-  --terminal-warning: oklch(0.78 0.13 75);
-  --terminal-command: oklch(0.92 0.005 240);
-  --terminal-prompt: oklch(0.78 0.13 95);
-  --terminal-border: oklch(0.99 0 0 / 0.08);
+  /* ─── HUD 专属 token (Light) ─────────────────────────────── */
+  --hud-grid-fine: oklch(0.45 0.05 75 / 0.08);
+  --hud-grid-coarse: oklch(0.45 0.07 70 / 0.16);
+  --hud-bracket: oklch(0.45 0.08 70 / 0.5);
+  --hud-bracket-active: var(--primary);
+  --hud-amber: oklch(0.5 0.16 65);
+  --hud-amber-soft: oklch(0.6 0.12 70);
+  --hud-glow: oklch(0.5 0.16 65 / 0.22);
+  --hud-scanline: oklch(0.45 0.1 70 / 0.09);
+  --hud-alert: oklch(0.52 0.2 28);
+  --hud-warn: oklch(0.56 0.14 70);
+  --hud-ok: oklch(0.5 0.13 150);
+
+  /* ─── 终端区色 (light/dark 共享, terminal 内永远暗底) ─────── */
+  --terminal-bg: oklch(0.13 0.014 230);
+  --terminal-fg: oklch(0.92 0.02 85);
+  --terminal-success: oklch(0.72 0.16 155);
+  --terminal-error: oklch(0.65 0.22 28);
+  --terminal-warning: oklch(0.8 0.14 75);
+  --terminal-command: oklch(0.92 0.02 85);
+  /* 暖白 prompt: 靠高明度 0.95 与琥珀主灯 (L0.82) 区分, 非靠色相 */
+  --terminal-prompt: oklch(0.95 0.05 80);
+  --terminal-border: oklch(0.82 0.14 80 / 0.2);
 
   /* ─── AI 面板 (light) ──────────────────────────────────── */
   --ai-panel-bg: var(--background);
   --ai-panel-border: var(--border);
-  --ai-input-bg: var(--background);
+  --ai-input-bg: var(--card);
 
   /* ─── 气泡 (light) ─────────────────────────────────────── */
   --bubble-user-bg: var(--primary-bubble);
   --bubble-user-fg: var(--primary-bubble-foreground);
-  --bubble-assistant-bg: var(--background);
+  --bubble-assistant-bg: var(--card);
   --bubble-assistant-fg: var(--foreground);
 
   /* ─── 思考块 (light) ───────────────────────────────────── */
   --thinking-bg: color-mix(in oklch, var(--primary) 6%, var(--background));
-  --thinking-fg: oklch(0.25 0.04 240);
-  --thinking-border: color-mix(in oklch, var(--primary) 22%, transparent);
+  --thinking-fg: oklch(0.3 0.03 75);
+  --thinking-border: color-mix(in oklch, var(--primary) 28%, transparent);
 
-  /* ─── 尺寸 / 圆角 ───────────────────────────────────────── */
-  --radius: 0.5rem;
+  /* ─── 尺寸 / 圆角 (HUD 锐利, 0.25rem) ───────────────────── */
+  --radius: 0.25rem;
 
   /* ─── 间距 ──────────────────────────────────────────────── */
   --space-1: 0.25rem;
@@ -97,22 +113,24 @@
   --space-8: 2rem;
   --space-12: 3rem;
 
-  /* ─── 动效曲线 (Linear 系标准) ───────────────────────────── */
+  /* ─── 动效曲线 ──────────────────────────────────────────── */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-hud: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-enter: 120ms;
   --dur-base: 160ms;
   --dur-exit: 100ms;
   --dur-slow: 240ms;
-  /* 兼容旧引用（保留以免大规模回归） */
+  --dur-scan: 4s;
+  /* 兼容旧引用 (保留以免大规模回归) */
   --ease-out: var(--ease-standard);
   --dur-fast: var(--dur-enter);
 
-  /* ─── 阴影 (极简, 几乎不用阴影) ──────────────────────────── */
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
-  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.05), 0 0 0 1px oklch(0 0 0 / 0.02);
-  --shadow-popover: 0 4px 16px oklch(0 0 0 / 0.08), 0 0 0 1px oklch(0 0 0 / 0.04);
+  /* ─── 阴影 (light: 暗琥珀微影 + hairline) ────────────────── */
+  --shadow-sm: 0 1px 2px oklch(0.45 0.05 70 / 0.08);
+  --shadow-card: 0 1px 3px oklch(0.45 0.05 70 / 0.1), 0 0 0 1px var(--border);
+  --shadow-popover: 0 8px 24px oklch(0.3 0.03 70 / 0.16), 0 0 0 1px var(--border);
 
   /* ─── 字体 (内部命名, 避免 @theme inline 自引用歧义) ────── */
   --app-font-sans: 'Geist Variable', 'HarmonyOS Sans SC', 'PingFang SC',
@@ -128,58 +146,75 @@
   --z-tooltip: 60;
 }
 
-/* ─── Dark mode overrides ─────────────────────────────────── */
+/* ─── Dark HUD (Mission Control): 深空底 + 琥珀辉光 + 骨白字 ── */
 .dark {
-  /* 炭黑底 (非纯黑, 眼睛更舒服) */
-  --background: oklch(0.135 0.006 240);
-  --foreground: oklch(0.97 0 0);
-  --card: oklch(0.165 0.006 240);
-  --card-foreground: oklch(0.97 0 0);
-  --card-hovered: oklch(0.2 0.006 240);
-  --popover: oklch(0.165 0.006 240);
-  --popover-foreground: oklch(0.97 0 0);
+  --background: oklch(0.09 0.012 230);
+  --foreground: oklch(0.94 0.03 85);
+  --card: oklch(0.13 0.015 230);
+  --card-foreground: oklch(0.94 0.03 85);
+  --card-hovered: oklch(0.17 0.018 230);
+  --popover: oklch(0.13 0.015 230);
+  --popover-foreground: oklch(0.94 0.03 85);
 
-  --primary: oklch(0.78 0.15 195);
-  --primary-foreground: oklch(0.13 0 0);
+  /* 琥珀主灯 (dark: 高亮发光, 深底配深字) */
+  --primary: oklch(0.82 0.16 80);
+  --primary-foreground: oklch(0.13 0.02 230);
 
-  --primary-bubble: oklch(0.62 0.16 230);
-  --primary-bubble-foreground: oklch(0.99 0 0);
+  --primary-bubble: oklch(0.7 0.15 75);
+  --primary-bubble-foreground: oklch(0.1 0.01 230);
 
-  --secondary: var(--zinc-850);
-  --secondary-foreground: var(--zinc-100);
-  --muted: var(--zinc-850);
-  --muted-foreground: var(--zinc-400);
+  --secondary: oklch(0.18 0.018 230);
+  --secondary-foreground: oklch(0.92 0.03 85);
+  --muted: oklch(0.18 0.018 230);
+  --muted-foreground: oklch(0.68 0.04 85);
 
-  --accent: var(--zinc-850);
-  --accent-foreground: var(--zinc-100);
+  --accent: oklch(0.18 0.018 230);
+  --accent-foreground: oklch(0.92 0.03 85);
 
-  --destructive: oklch(0.66 0.2 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.8 0.14 75);
-  --success: oklch(0.7 0.15 145);
+  --destructive: oklch(0.65 0.22 28);
+  --destructive-foreground: oklch(0.99 0.01 85);
+  --warning: oklch(0.8 0.15 75);
+  /* Dark 下 warning/success 为亮琥珀/亮绿实心，前景须深色 (warn 10.5:1 / success 8.7:1) */
+  --warning-foreground: oklch(0.13 0.02 230);
+  --success: oklch(0.72 0.16 155);
+  --success-foreground: oklch(0.13 0.02 230);
 
-  --border: oklch(0.99 0 0 / 0.09);
-  --input: oklch(0.99 0 0 / 0.12);
-  --ring: oklch(0.78 0.15 195);
+  /* 琥珀 hairline */
+  --border: oklch(0.6 0.1 80 / 0.22);
+  --input: oklch(0.6 0.1 80 / 0.28);
+  --ring: oklch(0.82 0.16 80);
+
+  /* ─── HUD 专属 token (Dark) ──────────────────────────────── */
+  --hud-grid-fine: oklch(0.55 0.06 80 / 0.07);
+  --hud-grid-coarse: oklch(0.65 0.1 80 / 0.14);
+  --hud-bracket: oklch(0.6 0.1 80 / 0.45);
+  --hud-bracket-active: var(--primary);
+  --hud-amber: oklch(0.82 0.16 80);
+  --hud-amber-soft: oklch(0.7 0.13 78);
+  --hud-glow: oklch(0.82 0.16 80 / 0.35);
+  --hud-scanline: oklch(0.82 0.14 80 / 0.06);
+  --hud-alert: oklch(0.65 0.22 28);
+  --hud-warn: oklch(0.8 0.15 75);
+  --hud-ok: oklch(0.72 0.16 155);
 
   /* AI 面板 dark */
   --ai-panel-bg: var(--background);
   --ai-panel-border: var(--border);
-  --ai-input-bg: oklch(0.165 0.006 240);
+  --ai-input-bg: oklch(0.12 0.015 230);
 
   /* 气泡 dark */
-  --bubble-assistant-bg: oklch(0.18 0.006 240);
+  --bubble-assistant-bg: oklch(0.15 0.015 230);
   --bubble-assistant-fg: var(--foreground);
 
   /* 思考块 dark */
-  --thinking-bg: color-mix(in oklch, var(--primary) 10%, var(--background));
-  --thinking-fg: oklch(0.92 0.02 240);
-  --thinking-border: color-mix(in oklch, var(--primary) 28%, transparent);
+  --thinking-bg: color-mix(in oklch, var(--primary) 8%, var(--card));
+  --thinking-fg: oklch(0.88 0.03 85);
+  --thinking-border: color-mix(in oklch, var(--primary) 30%, transparent);
 
-  /* 阴影 dark (低强度, 几乎只剩 border) */
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
-  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(0.99 0 0 / 0.04);
-  --shadow-popover: 0 8px 24px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(0.99 0 0 / 0.06);
+  /* 阴影 dark (深空辉光感) */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.5), 0 0 0 1px var(--border);
+  --shadow-popover: 0 8px 32px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border);
 }
 
 /* ─── @theme inline：把 CSS 变量映射给 Tailwind v4 ────────── */
@@ -227,7 +262,15 @@
   --color-terminal-command: var(--terminal-command);
   --color-terminal-prompt: var(--terminal-prompt);
 
-  --radius-sm: calc(var(--radius) - 2px);
+  /* HUD 专属映射 (供 Tailwind utility 使用) */
+  --color-hud-amber: var(--hud-amber);
+  --color-hud-amber-soft: var(--hud-amber-soft);
+  --color-hud-bracket: var(--hud-bracket);
+  --color-hud-alert: var(--hud-alert);
+  --color-hud-warn: var(--hud-warn);
+  --color-hud-ok: var(--hud-ok);
+
+  --radius-sm: calc(var(--radius) - 1px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
   --radius-xl: calc(var(--radius) + 6px);

@@ -50,8 +50,8 @@ is not assignable to parameter ... with 'exactOptionalPropertyTypes: true'.
 > 总体观感：HUD 改造完成度高，双模式翻转干净，工业 HUD 语言（深空琥珀辉光 / 暖纸暗琥珀印刷 + 1px 双层网格 + 四角 L 角标 + scanline + 等宽坐标数据）落地到位。以下按阶段列出确认项与少量问题。
 
 ### H0 品牌名 + meta —— ✅ 通过
-- 顶栏品牌「NETOPS」+ 副标题「AI 网络故障智能分析平台」（`light-topbar.png` / `dark-topbar.png`）。
-- 命令面板「关于本平台」副标题「NetOps · AI 网络故障智能分析平台」（`dark-command-palette.png`）。
+- 顶栏品牌「NETOPS」+ 副标题「AI 智能网络故障分析平台」（`light-topbar.png` / `dark-topbar.png`）。
+- 命令面板「关于本平台」副标题「NetOps · AI 智能网络故障分析平台」（`dark-command-palette.png`）。
 - 全仓 grep `驾驶舱` / `PacketSignal` **零结果**，确认旧名与旧组件引用已清除。
 
 ### H1 tokens.css 双模式 —— ✅ 通过

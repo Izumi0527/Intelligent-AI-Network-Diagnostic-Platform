@@ -126,13 +126,13 @@ export function createCommands(stores: Stores, hooks: { onClearChat: () => void;
     {
       id: 'bot.greet',
       label: '关于本平台',
-      hint: 'NetOps · AI 网络故障智能分析平台',
+      hint: 'NetOps · AI 智能网络故障分析平台',
       group: '设置',
       icon: icon.bot,
       keywords: ['about', 'help', '关于', '帮助'],
       action: (): void => {
         // 简单 about 实现：弹 alert (后续可改为模态)
-        window.alert('NetOps · AI 网络故障智能分析平台\n\n基于 Vue 3 + Vite + Tailwind v4 构建\n设计语言：Industrial HUD');
+        window.alert('NetOps · AI 智能网络故障分析平台\n\n基于 Vue 3 + Vite + Tailwind v4 构建\n设计语言：Industrial HUD');
       },
     },
   ];

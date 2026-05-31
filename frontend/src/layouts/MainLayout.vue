@@ -9,7 +9,7 @@
         <span class="netops-header__logo" v-html="logoSvg" />
         <span class="netops-header__title">NetOps</span>
         <span class="netops-header__divider" />
-        <span class="netops-header__subtitle">AI 网络故障智能分析平台</span>
+        <span class="netops-header__subtitle">AI 智能网络故障分析平台</span>
       </div>
 
       <div class="netops-header__actions">

@@ -2,6 +2,8 @@
 
 > 面向网络运维与网络安全场景的一体化 AI 故障诊断工作台：连接设备、执行命令、分析日志、流式问答。
 
+**语言 / Language**：简体中文 | [English](./README.en.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-0.2.1-blue.svg)](#)
 [![Vue](https://img.shields.io/badge/Vue-3.5-42b883.svg)](https://vuejs.org/)

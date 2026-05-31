@@ -16,6 +16,7 @@ from app.models.ai import (
 )
 from app.services.ai.base import safe_ai_client_message
 from app.services.ai.manager import AIServiceManager
+from app.services.ai.prompts import NETWORK_SECURITY_ARCHITECT_PERSONA
 from app.services.search.brave_search import BraveSearchClient, SearchResult
 from app.utils.logger import get_logger
 
@@ -89,6 +90,9 @@ class AIApplicationService:
                             "search_failed": search_failed,
                         },
                     )
+                # 注入角色 persona：排在搜索注入之后，使 persona 位于 messages[0]、
+                # 搜索上下文顺延其后——稳定人设须优先于临时检索上下文。
+                self._inject_persona(request)
                 async for event in self.ai_manager.chat_stream(request):
                     if event.type == "content":
                         content = event.data.get("content", "")
@@ -205,6 +209,25 @@ class AIApplicationService:
             )
 
         return AIValidationError(detail)
+
+    def _inject_persona(self, request: ChatRequest) -> None:
+        """在消息最前注入「高级网络安全架构师」角色 system，定义 AI 助手稳定人格。
+
+        无条件注入（与 enable_search 无关），并刻意在 _maybe_inject_search 之后调用，
+        使最终顺序为 [persona, 搜索上下文?, ...用户消息]——稳定人设须优先于临时检索上下文，
+        否则模型容易被后插入的大段搜索文本"盖过"角色设定。
+        幂等保护：messages[0] 已是同一 persona 时跳过，避免重复注入。
+        """
+        if (
+            request.messages
+            and request.messages[0].role == "system"
+            and request.messages[0].content == NETWORK_SECURITY_ARCHITECT_PERSONA
+        ):
+            return
+        request.messages.insert(
+            0,
+            Message(role="system", content=NETWORK_SECURITY_ARCHITECT_PERSONA),
+        )
 
     async def _maybe_inject_search(
         self,

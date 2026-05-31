@@ -10,6 +10,7 @@ import httpx
 from datetime import datetime
 
 from app.config.settings import settings
+from app.services.ai.prompts import NETWORK_LOG_ANALYST_SYSTEM
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -99,7 +100,7 @@ class NetworkLogAnalyzer:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "你是一名资深的网络工程师，专门分析网络设备日志和诊断网络问题。"
+                        "content": NETWORK_LOG_ANALYST_SYSTEM
                     },
                     {
                         "role": "user", 
@@ -159,7 +160,7 @@ class NetworkLogAnalyzer:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "你是一名资深的网络工程师，专门分析网络设备日志和诊断网络问题。"
+                        "content": NETWORK_LOG_ANALYST_SYSTEM
                     },
                     {
                         "role": "user",

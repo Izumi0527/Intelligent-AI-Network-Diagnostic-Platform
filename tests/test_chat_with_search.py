@@ -23,6 +23,7 @@ import pytest
 
 from app.models.ai import ChatRequest, Message, StreamEvent
 from app.services.ai.application_service import AIApplicationService, AIStreamingResult
+from app.services.ai.prompts import NETWORK_SECURITY_ARCHITECT_PERSONA
 from app.services.search.brave_search import SearchResult
 
 
@@ -105,10 +106,11 @@ async def test_chat_with_search_injects_system_and_returns_sources() -> None:
     call_kwargs = brave.search.await_args
     assert "OSPF" in call_kwargs.args[0] or "OSPF" in str(call_kwargs.kwargs)
 
-    # request.messages 已被前置注入 system
-    assert request.messages[0].role == "system"
-    assert "OSPF 详解" in request.messages[0].content
-    assert "https://x.com/ospf" in request.messages[0].content
+    # messages[0] 恒为角色 persona；搜索 block 顺延注入为 messages[1]
+    assert request.messages[0].content == NETWORK_SECURITY_ARCHITECT_PERSONA
+    assert request.messages[1].role == "system"
+    assert "OSPF 详解" in request.messages[1].content
+    assert "https://x.com/ospf" in request.messages[1].content
 
     # SSE 事件携带 sources + search_failed=False
     event = _extract_search_event(chunks)
@@ -134,8 +136,30 @@ async def test_chat_without_enable_search_does_not_call_brave() -> None:
     chunks = await _consume_stream(service.chat_stream(request))
 
     brave.search.assert_not_called()
-    assert request.messages[0].role == "user"
+    # persona 注入到 messages[0]，原用户消息顺延；未启用搜索故无搜索 block
+    assert request.messages[0].content == NETWORK_SECURITY_ARCHITECT_PERSONA
+    assert request.messages[1].role == "user"
     assert _extract_search_event(chunks) is None
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_always_injects_persona_first() -> None:
+    """无论是否启用搜索，chat_stream 都应把角色 persona 注入为 messages[0]。"""
+    ai_manager = _make_ai_manager()
+    service = AIApplicationService(ai_manager, brave_client=None)
+
+    request = ChatRequest(
+        model="deepseek-v4-flash",
+        messages=[Message(role="user", content="hi")],
+        enable_search=False,
+    )
+    await _consume_stream(service.chat_stream(request))
+
+    assert request.messages[0].role == "system"
+    assert request.messages[0].content == NETWORK_SECURITY_ARCHITECT_PERSONA
+    # 原用户消息完整保留在 persona 之后
+    assert request.messages[1].role == "user"
+    assert request.messages[1].content == "hi"
 
 
 @pytest.mark.asyncio
@@ -174,7 +198,9 @@ async def test_chat_with_search_empty_results_marks_failed() -> None:
     chunks = await _consume_stream(service.chat_stream(request))
 
     brave.search.assert_awaited_once()
-    assert request.messages[0].role == "user"  # 没有 system 注入
+    # 搜索无结果 → 不注入搜索 block；仅有 persona 一条 system，原用户消息顺延其后
+    assert request.messages[0].content == NETWORK_SECURITY_ARCHITECT_PERSONA
+    assert request.messages[1].role == "user"
     event = _extract_search_event(chunks)
     assert event is not None
     assert event["sources"] == []

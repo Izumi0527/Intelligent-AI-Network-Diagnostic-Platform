@@ -1,1098 +1,715 @@
-# AI智能网络故障分析平台架构与系统信息总览
+# AI 智能网络故障分析平台架构与系统信息总览
 
-## 文档生成边界
-
-本文档基于项目代码、配置文件、依赖清单、启动脚本与测试文件扫描生成，未读取项目内任何既有 Markdown 文档内容。
-
-本文档覆盖范围：
-
-- 项目定位与核心能力
-- 前后端技术栈
-- 目录结构与模块职责
-- 后端启动链路、API、服务层、模型层、网络连接层、日志与安全
-- 前端启动链路、布局、状态管理、接口客户端与关键组件
-- AI 大模型接入架构
-- SSH、Telnet、Netmiko 三类网络交互路径
-- 配置项、环境变量、脚本、测试与质量保障
-- 当前代码中可见的风险、疑点与后续演进建议
+> 更新时间：2026-05-31
+> 当前版本：0.2.1
+> 覆盖范围：当前仓库代码、配置、脚本与测试。本文档是系统架构说明，不替代根目录 `README.md` 的快速开始。
 
 ## 1. 项目定位
 
-本项目是一个前后端分离的 AI 智能网络故障分析平台。平台面向网络运维场景，核心目标是把网络设备终端操作与 AI 辅助分析放在同一工作台中，使用户可以连接交换机、路由器、防火墙等网络设备，执行排障命令，并将日志、配置片段或故障现象交给大模型分析。
+本项目是一个前后端分离的 AI 智能网络故障分析平台，面向网络运维、网络故障诊断和网络安全治理场景。平台将网络设备终端、AI 辅助分析、联网搜索与多模型流式对话整合在同一工作台中。
 
-当前系统具备以下核心能力：
+核心目标：
 
-- 网络设备终端连接：支持 SSH 与 Telnet。
-- 终端命令执行：支持会话保持、命令历史、输出清洗、基础分页处理。
-- AI 对话助手：支持模型列表加载、模型连通性检查、流式响应。
-- 多模型厂商接入：OpenAI、Anthropic Claude、DeepSeek。
-- DeepSeek 专项网络日志分析：提供日志类型识别、错误分析、性能分析、安全分析等封装。
-- 服务健康检查：提供后端健康状态、AI 服务状态、网络服务状态与连接统计。
-- 日志系统：控制台彩色日志、文件轮转日志、访问日志、错误日志。
-- 脚本化启动：提供 Windows PowerShell 与类 Unix Shell 的开发、生产统一启动脚本。
+- 让用户通过浏览器连接 SSH / Telnet 网络设备；
+- 在同一界面执行排障命令、查看终端输出；
+- 将日志、配置片段或故障现象交给 AI 助手分析；
+- 通过「高级网络安全架构师」角色提示词，让 AI 回复兼顾网络架构、协议、性能、排障、安全风险与合规边界。
+
+当前核心能力：
+
+- SSH / Telnet 终端会话；
+- 通用 NetworkService + Netmiko 连接路径；
+- AI SSE 流式对话；
+- OpenAI / Anthropic Claude / DeepSeek 多 provider 接入；
+- Brave Search 联网搜索增强；
+- DeepSeek 网络日志分析器；
+- 工业 HUD 前端 UI，支持浅色 / 深色主题；
+- 后端内部鉴权、终端连接策略、日志与错误脱敏；
+- 跨平台脚本化启动、构建、lint 与后端质量门禁。
 
 ## 2. 总体架构
-
-系统采用典型的前后端分离架构：
 
 ```text
 浏览器
   |
-  | Vue 3 + Pinia + Axios
+  | Vue 3 + Pinia + TypeScript
+  | fetch / axios 请求 /api/*
   v
-前端开发服务器 Vite
+Vite 开发服务器
   |
-  | /api 代理重写为 /api/v1
+  | proxy: /api -> http://localhost:8000/api/v1
   v
 FastAPI 后端
   |
-  |-- AI 服务管理器
-  |     |-- OpenAI Provider
-  |     |-- Claude Provider
-  |     |-- DeepSeek Provider
-  |     `-- DeepSeek 网络日志分析封装
+  |-- API 路由层
+  |     |-- /ai
+  |     |-- /terminal
+  |     |-- /network
+  |     `-- /health
   |
-  |-- 网络连接服务
-  |     `-- Netmiko 通用 SSH/Telnet 连接
+  |-- AIApplicationService
+  |     |-- Brave Search 注入搜索上下文
+  |     |-- 注入高级网络安全架构师 persona
+  |     `-- AIServiceManager
+  |           |-- OpenAIProvider
+  |           |-- ClaudeProvider
+  |           `-- DeepseekProvider
   |
-  |-- 终端会话服务
-  |     |-- Paramiko SSH 持久 Shell
-  |     `-- Telnetlib Telnet 连接
+  |-- DeepSeek 网络日志分析器
   |
-  `-- 日志、安全、配置、健康检查
+  |-- TerminalService
+  |     |-- TerminalManager
+  |     |-- SSHManager / Paramiko
+  |     `-- TelnetManager / telnetlib
+  |
+  |-- NetworkService / Netmiko
+  |
+  `-- settings / logger / security / terminal_policy
 ```
 
-后端真实 API 前缀为 `/api/v1`。前端在开发期通过 Vite 代理使用 `/api` 作为浏览器侧统一入口，并将其改写到后端 `/api/v1`。
+开发期浏览器侧统一使用 `/api`，Vite 将其重写到后端 `/api/v1`。生产部署时需要由网关或反向代理提供等价路径映射。
 
 ## 3. 技术栈
 
-### 3.1 后端技术栈
+### 3.1 前端
 
-后端位于 `backend/`，主要技术栈如下：
+- Vue 3.5
+- TypeScript 5.8（strict）
+- Pinia 2.3
+- Vite 6
+- Tailwind CSS v4 + `@tailwindcss/postcss`
+- marked + DOMPurify
+- Axios：普通 HTTP 请求
+- fetch + `ReadableStream`：AI SSE 流式响应
+- ESLint 9 flat config
+- vue-tsc
 
-- Python：要求 Python 3.9 及以上。
-- Web 框架：FastAPI。
-- ASGI 服务：Uvicorn。
-- 数据校验：Pydantic 与 pydantic-settings。
-- 配置加载：python-dotenv。
-- AI HTTP 客户端：aiohttp、httpx、requests。
-- 网络设备连接：
-  - Netmiko：通用网络设备连接路径。
-  - Paramiko：SSH 终端会话路径。
-  - telnetlib：Telnet 终端会话路径。
-- 认证与安全工具：
-  - python-jose：JWT。
-  - passlib、bcrypt：密码哈希。
-- 测试工具：pytest、pytest-asyncio、pytest-cov。
-- 代码质量工具：black、ruff、mypy。
+### 3.2 后端
 
-### 3.2 前端技术栈
+- Python `>=3.9,<3.13`
+- FastAPI 0.115
+- Uvicorn 0.34
+- Pydantic 2.11 + pydantic-settings 2.9
+- Netmiko 4.5
+- Paramiko 3.5
+- telnetlib（需要关注 Python 后续版本兼容性）
+- aiohttp / httpx / requests
+- python-jose / passlib / bcrypt
+- pytest / pytest-asyncio / pytest-cov
+- Ruff / Black / MyPy
+- uv
 
-前端位于 `frontend/`，主要技术栈如下：
-
-- Vue 3。
-- TypeScript。
-- Pinia 状态管理。
-- Vite 构建与开发服务器。
-- Axios HTTP 客户端。
-- marked：AI Markdown 内容渲染。
-- Tailwind CSS 相关工具链。
-- Vue TSC 与 ESLint：类型检查和静态检查。
-
-## 4. 顶层目录结构
-
-项目当前主要目录职责如下：
+## 4. 顶层目录职责
 
 ```text
 Project3/
-  backend/        后端 FastAPI 应用、服务、模型、配置和运行入口
-  frontend/       前端 Vue 应用、组件、状态管理和接口客户端
-  scripts/        开发、生产启动脚本和维护脚本
+  backend/        FastAPI 后端、AI provider、网络连接、配置和运行入口
+  frontend/       Vue 前端应用、组件、状态管理、类型和接口客户端
+  docs/           长期文档、截图、实现计划
+  discuss/        讨论、验证报告、临时草案
+  scripts/        跨平台运行、构建、lint、测试和维护脚本
   tests/          根目录测试集
-  docs/           项目文档
-  logs/           运行日志目录
-  discuss/        讨论或规划资料目录
+  logs/           运行日志（被 .gitignore 排除）
 ```
 
-当前测试目录已经位于项目根目录 `tests/`，后端 `pyproject.toml` 的 pytest 配置使用 `../tests` 作为测试发现目录。
+文档归属：
+
+- 根 `README.md`：项目总入口、快速开始、核心能力和 API 摘要；
+- `docs/project-architecture-and-system-overview.md`：系统架构、模块边界、数据流与风险说明；
+- `docs/plans/`：设计计划与实现记录；
+- `discuss/`：临时讨论与验证报告。
+
+前端说明集中维护在根 README 与本文档，避免同类信息分散在多个入口中重复漂移。
 
 ## 5. 后端架构
 
-### 5.1 后端启动链路
+### 5.1 启动链路
 
-后端主入口为 `backend/run.py`。
+入口：`backend/run.py`
 
-启动链路如下：
+主要流程：
 
-1. 计算后端目录。
-2. 加载 `backend/.env`。
-3. 导入全局 `settings`。
-4. 初始化日志管理器。
-5. 解析命令行参数：
-   - `--host`
-   - `--port`
-   - `--reload`
-6. 调用 Uvicorn 启动 `app.main:app`。
+1. 计算后端目录；
+2. 加载 `backend/.env`；
+3. 导入 `settings`；
+4. 初始化日志系统；
+5. 解析 `--host`、`--port`、`--reload`；
+6. 使用 Uvicorn 启动 `app.main:app`。
 
-需要注意：`run.py` 中存在 `check_environment()` 函数，用于检查 AI API Key 和日志目录，但当前主流程没有调用该函数。
+项目常规启动不直接调用底层命令，而是通过根目录脚本：
+
+- `scripts/dev.ps1` / `scripts/dev.sh`
+- `scripts/prod.ps1` / `scripts/prod.sh`
+
+开发脚本会先启动后端，等待 `/api/v1/health` 通过后再启动前端。
 
 ### 5.2 FastAPI 应用入口
 
-FastAPI 应用入口为 `backend/app/main.py`。
+入口：`backend/app/main.py`
 
-应用初始化内容：
+职责：
 
-- 设置应用标题、版本、描述。
-- 配置文档地址：
-  - Swagger UI：`${API_V1_STR}/docs`
-  - OpenAPI JSON：`${API_V1_STR}/openapi.json`
-- 配置 CORS。
-- 注册请求日志中间件。
-- 挂载 `/api/v1` 路由。
-- 注册启动与关闭事件。
-
-启动事件中会创建后台任务，定期清理空闲终端会话。默认每 300 秒执行一次清理检查。
+- 创建 FastAPI 应用；
+- 配置文档地址；
+- 配置 CORS；
+- 注册请求日志中间件；
+- 挂载 `/api/v1` 路由；
+- 注册启动 / 关闭生命周期；
+- 创建空闲终端会话清理任务。
 
 ### 5.3 配置系统
 
-主要配置类位于 `backend/app/config/settings.py`。
+配置类：`backend/app/config/settings.py`
 
 配置来源：
 
-- 环境变量。
-- `backend/.env`。
-- `backend/.env.example` 提供示例变量。
+- 环境变量；
+- `backend/.env`；
+- `backend/.env.example`。
 
 关键配置分组：
 
-- 应用基础配置：
-  - `APP_ENV`
-  - `DEBUG`
-  - `API_PREFIX`
-  - `APP_NAME`
-  - `APP_VERSION`
-- 服务监听配置：
-  - `HOST`
-  - `PORT`
-- 跨域配置：
-  - `CORS_ORIGINS`
-- 安全配置：
-  - `SECRET_KEY`
-  - `JWT_ALGORITHM`
-  - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`
-- AI 服务配置：
-  - `AI_ENABLED`
-  - `OPENAI_API_KEY`
-  - `OPENAI_API_BASE`
-  - `ANTHROPIC_API_KEY`
-  - `ANTHROPIC_API_BASE`
-  - `DEEPSEEK_API_KEY`
-  - `DEEPSEEK_API_URL`
-  - `OPENAI_MODELS`
-  - `CLAUDE_MODELS`
-  - `DEEPSEEK_MODELS`
-  - 对应模型名称、描述、最大 token 配置
-- 终端会话配置：
-  - `SESSION_IDLE_TIMEOUT`
-  - `MAX_TERMINAL_SESSIONS`
-- 日志配置：
-  - `LOG_LEVEL`
-  - `LOG_FORMAT`
+- 基础：`APP_ENV`、`DEBUG`、`API_PREFIX`、`API_V1_STR`、`HOST`、`PORT`；
+- 安全：`SECRET_KEY`、`API_AUTH_ENABLED`、`INTERNAL_API_TOKEN`、JWT 配置；
+- AI：`AI_ENABLED`、OpenAI / Anthropic / DeepSeek API Key、Base URL、模型列表；
+- Brave Search：联网搜索 API Key 与开关；
+- 终端策略：允许主机、CIDR、SSH/Telnet 端口、命令长度、高危命令正则；
+- 日志：`LOG_LEVEL`、日志格式与文件输出。
 
-配置校验逻辑在 `model_post_init()` 中执行，会检查基础配置、API 前缀格式、AI 配置完整性，并规范化 `API_V1_STR`。
+### 5.4 API 路由
 
-### 5.4 后端 API 路由
+统一入口：`backend/app/api/api_v1/api.py`
 
-后端统一路由入口为 `backend/app/api/api_v1/api.py`。
-
-当前挂载模块：
+挂载模块：
 
 - `/ai`
-- `/network`
 - `/terminal`
+- `/network`
 - `/health`
 
-### 5.5 AI API
+主要端点：
 
-AI 端点位于 `backend/app/api/api_v1/endpoints/ai.py`。
+| 模块 | 端点 |
+|------|------|
+| Health | `GET /api/v1/health`、`GET /api/v1/health/ready` |
+| AI | `GET /ai/models`、`GET /ai/models/{model_id}/status`、`POST /ai/chat/stream`、`POST /ai/debug/request-format`、`GET /ai/deepseek/status`、`POST /ai/deepseek/analyze-network-log` |
+| Terminal | `POST /terminal/connect`、`POST /terminal/cancel-connect`、`POST /terminal/execute`、`POST /terminal/disconnect`、`GET /terminal/sessions`、`GET /terminal/sessions/{session_id}`、`POST /terminal/cleanup` |
+| Network | `POST /network/connect`、`POST /network/command`、`POST /network/disconnect`、`GET /network/connections`、`GET /network/connections/{connection_id}` |
 
-主要接口：
+所有路径均在 `/api/v1` 前缀下。
 
-- `GET /api/v1/ai/models`
-  - 获取所有可用模型。
-  - 会检查各 Provider 连通性。
-- `GET /api/v1/ai/models/{model_id}/status`
-  - 检查指定模型状态。
-- `POST /api/v1/ai/chat/stream`
-  - AI 对话接口（SSE 流式响应，唯一对话入口）。
-- `POST /api/v1/ai/debug/request-format`
-  - 返回请求格式诊断信息。
-- `GET /api/v1/ai/deepseek/status`
-  - DeepSeek 服务状态。
-- `POST /api/v1/ai/deepseek/analyze-network-log`
-  - DeepSeek 网络日志分析。
+## 6. AI 子系统
 
-AI Chat 请求模型主要由 `ChatRequest` 承载，包含模型、消息、最大 token、temperature、top_p、stream 等字段。
+### 6.1 AIApplicationService
 
-### 5.6 Network API
-
-Network 端点位于 `backend/app/api/api_v1/endpoints/network.py`。
-
-主要接口：
-
-- `POST /api/v1/network/connect`
-  - 使用 Netmiko 建立网络设备连接。
-- `POST /api/v1/network/command`
-  - 在指定连接上执行命令。
-- `POST /api/v1/network/disconnect`
-  - 断开指定连接。
-- `GET /api/v1/network/connections`
-  - 获取连接列表。
-- `GET /api/v1/network/connections/{connection_id}`
-  - 获取连接详情。
-
-该模块面向更通用的网络设备连接管理，内部使用 `NetworkService` 与 Netmiko。
-
-### 5.7 Terminal API
-
-Terminal 端点位于 `backend/app/api/api_v1/endpoints/terminal.py`。
-
-主要接口：
-
-- `POST /api/v1/terminal/connect`
-  - 建立 SSH 或 Telnet 终端会话。
-- `POST /api/v1/terminal/cancel-connect`
-  - 返回取消连接成功信息。
-- `POST /api/v1/terminal/execute`
-  - 在终端会话中执行命令。
-- `POST /api/v1/terminal/disconnect`
-  - 断开终端会话。
-- `GET /api/v1/terminal/sessions`
-  - 获取终端会话列表。
-- `GET /api/v1/terminal/sessions/{session_id}`
-  - 获取单个会话状态。
-- `POST /api/v1/terminal/cleanup`
-  - 清理空闲会话。
-
-该模块面向前端虚拟终端体验，内部使用 `TerminalService`、`TerminalManager`、`SSHManager`、`TelnetManager`。
-
-### 5.8 Health API
-
-Health 端点位于 `backend/app/api/api_v1/endpoints/health.py`。
-
-主要接口：
-
-- `GET /api/v1/health`
-
-返回信息包括：
-
-- 服务状态。
-- AI 服务状态。
-- 网络服务状态。
-- 当前网络连接数量。
-- 可用模型数量。
-- 版本信息。
-
-## 6. 后端服务层
-
-### 6.1 依赖注入
-
-依赖注入位于 `backend/app/api/deps.py`。
-
-当前使用模块级单例：
-
-- `AIServiceManager`
-- `NetworkService`
-- `TerminalService`
-- `DeepseekService`
-
-这些服务均为进程内状态。若后续使用多 worker 部署，连接会话、终端会话与单例状态不会自动跨进程共享。
-
-### 6.2 AIServiceManager
-
-AI 服务管理器位于 `backend/app/services/ai/manager.py`。
+文件：`backend/app/services/ai/application_service.py`
 
 职责：
 
-- 根据 API Key 初始化 Provider。
-- 聚合可用模型。
-- 检查模型状态。
-- 根据模型前缀路由到对应 Provider。
-- 提供统一 `chat()` 与 `chat_stream()` 能力。
+- 承载路由之外的 AI 对话编排；
+- 统一处理模型检查、请求日志、SSE 编码和客户端安全错误文案；
+- 在 `enable_search=true` 时调用 Brave Search；
+- 将搜索结果作为 system message 注入；
+- 无条件注入「高级网络安全架构师」persona；
+- 调用 `AIServiceManager.chat_stream()` 获取 provider 事件；
+- 将 provider 事件统一转换为 SSE：`search_results`、`thinking`、`content`、`error`、`done`。
 
-模型路由规则：
+消息顺序：
 
-- `gpt-` 前缀路由到 OpenAI Provider。
-- `claude-` 前缀路由到 Claude Provider。
-- `deepseek-` 前缀路由到 DeepSeek Provider。
-- 若前缀未命中，则遍历 Provider 的模型列表尝试匹配。
+```text
+[persona(system), search_context(system)?, ...user/assistant history]
+```
 
-### 6.3 Provider 抽象
+这样保证稳定角色设定优先于临时搜索上下文。
 
-Provider 抽象位于 `backend/app/services/ai/base.py`。
+### 6.2 角色提示词
 
-核心抽象：
+文件：`backend/app/services/ai/prompts.py`
 
-- `AIProviderBase`
-- `ProviderType`
-- 统一请求头构造。
-- 统一 aiohttp 会话管理。
-- HTTP 错误映射。
+常量：
 
-当前 Provider：
+- `NETWORK_SECURITY_ARCHITECT_PERSONA`：主聊天助手 persona；
+- `NETWORK_LOG_ANALYST_SYSTEM`：DeepSeek 日志分析器 system；
+- `_ARCHITECT_IDENTITY`：共享角色称谓。
 
-- `OpenAIProvider`
-- `ClaudeProvider`
-- `DeepseekProvider`
+角色定位：高级网络安全架构师，兼具资深网络工程师的体系化排障功底与安全架构师的纵深防御视角。网络架构、协议、故障诊断与性能是主体，安全风险与加固建议是并列增强维度。
 
-### 6.4 OpenAI Provider
+### 6.3 AIServiceManager 与 Provider
 
-OpenAI Provider 位于 `backend/app/services/ai/providers/openai_provider.py`。
+文件：`backend/app/services/ai/manager.py`
 
 职责：
 
-- 使用 `OPENAI_API_BASE` 与 `OPENAI_API_KEY`。
-- 调用 `/chat/completions`。
-- 支持普通响应。
-- 支持流式响应。
-- 将 OpenAI 格式 chunk 转为内部字符串流。
+- 根据 API Key 初始化 provider；
+- 聚合可用模型；
+- 检查模型连接状态；
+- 根据模型 ID 前缀路由：
+  - `gpt-` → OpenAIProvider；
+  - `claude-` → ClaudeProvider；
+  - `deepseek-` → DeepseekProvider；
+- 暴露统一 `chat_stream()`。
 
-### 6.5 Claude Provider
+Provider 文件：
 
-Claude Provider 位于 `backend/app/services/ai/providers/claude_provider.py`。
+- `backend/app/services/ai/providers/openai_provider.py`
+- `backend/app/services/ai/providers/claude_provider.py`
+- `backend/app/services/ai/providers/deepseek_provider.py`
 
-职责：
+Provider 只负责把已编排好的 `request.messages` 转发到上游模型，并把上游流式响应转换为内部 `StreamEvent`。
 
-- 使用 `ANTHROPIC_API_BASE` 与 `ANTHROPIC_API_KEY`。
-- 普通对话使用 Claude `/messages` 风格接口。
-- 支持 Claude 原生流式事件解析。
+### 6.4 Brave Search 增强
 
-当前可见疑点：
+Brave Search client 位于 `backend/app/services/search/brave_search.py`。
 
-- 普通 chat 路径使用 Claude `/messages` 与 `x-api-key`。
-- 连通性检查路径使用 `/chat/completions` 与 Bearer Authorization。
-- 这两种协议风格不一致，可能导致状态检查与真实对话结果不一致。
+当 `ChatRequest.enable_search=true` 且 Brave 已启用：
 
-### 6.6 DeepSeek Provider
+1. 后端取最后一条 user message 作为 query；
+2. 调用 Brave Search；
+3. 构造 `SearchSource[]` 返回给前端；
+4. 注入包含当前真实时间、搜索结果标题、URL、摘要的 system block；
+5. 前端收到 `search_results` SSE 事件并展示来源卡片。
 
-DeepSeek Provider 位于 `backend/app/services/ai/providers/deepseek_provider.py`。
+搜索失败或未配置时不会中断 AI 对话，而是返回 `search_failed=true`。
 
-职责：
+### 6.5 DeepSeek 网络日志分析器
 
-- 使用 `DEEPSEEK_API_URL` 与 `DEEPSEEK_API_KEY`。
-- 调用 `/chat/completions`。
-- 使用 httpx AsyncClient。
-- 支持普通响应。
-- 支持流式响应。
-- 支持识别 `reasoning_content` 并转为内部思考事件。
-- 连接检查使用当前配置的第一个 DeepSeek 模型。
+文件：`backend/app/services/ai/deepseek/analyzer.py`
 
-当前模型配置包括：
+能力：
 
-- `deepseek-v4-pro`
-- `deepseek-v4-flash`
+- `error_analysis`
+- `performance_analysis`
+- `security_analysis`
+- 自动日志类型分类；
+- IP、时间戳、错误码、接口、协议等模式提取；
+- 非流式与流式日志分析均使用 `NETWORK_LOG_ANALYST_SYSTEM`。
 
-### 6.7 模型配置解析
+## 7. 前端架构
 
-模型配置解析位于 `backend/app/utils/model_config.py`。
+### 7.1 启动链路
 
-职责：
+入口：
 
-- 解析 `OPENAI_MODELS`、`CLAUDE_MODELS`、`DEEPSEEK_MODELS`。
-- 解析对应模型名称、描述、最大 token。
-- 在环境变量缺失或异常时使用内置默认值。
-- 根据模型 ID 推导特性标签。
+- `frontend/src/main.ts`
+- `frontend/src/App.vue`
+- `frontend/src/layouts/MainLayout.vue`
 
-当前内置默认模型包括：
+启动流程：
 
-- OpenAI：
-  - `gpt-5.5`
-  - `gpt-5.4-mini`
-- Claude：
-  - `claude-opus-4-7`
-  - `claude-sonnet-4-6`
-  - `claude-haiku-4-5`
-- DeepSeek：
-  - `deepseek-v4-pro`
-  - `deepseek-v4-flash`
+1. 创建 Vue 应用；
+2. 注册 Pinia；
+3. 加载 `main.css`；
+4. 渲染 `MainLayout`；
+5. 加载终端区与 AI 助手区。
 
-### 6.8 DeepSeek 专项服务
+开发服务默认：`http://localhost:5180`。
 
-DeepSeek 专项服务包括：
+### 7.2 布局与主题
 
-- `backend/app/services/deepseek_service.py`
-- `backend/app/services/ai/deepseek/client.py`
-- `backend/app/services/ai/deepseek/analyzer.py`
+主布局：`frontend/src/layouts/MainLayout.vue`
 
-职责：
+布局区域：
 
-- 提供兼容旧接口的 DeepSeek 服务封装。
-- 复用 `AIServiceManager` 中已有 DeepSeek Provider，避免重复初始化。
-- 提供普通生成、流式生成、服务状态查询。
-- 提供网络日志分析能力。
+- 顶栏：NETOPS 品牌、副标题、时间、后端状态、命令面板、主题切换；
+- 左侧：网络终端；
+- 右侧：AI 助手；
+- 响应式：桌面双栏，移动端通过 tab / 折叠状态适配。
 
-网络日志分析器支持的分析类型包括：
+主题状态：`frontend/src/stores/app.ts`
 
-- 错误日志分析。
-- 性能日志分析。
-- 安全日志分析。
-- 通用网络日志分析。
+- 默认浅色；
+- 用户切换后写入 `localStorage.theme`；
+- 深色模式通过 `document.documentElement.classList.add('dark')` 生效。
 
-## 7. 网络连接与终端会话架构
+### 7.3 状态管理
 
-### 7.1 两条连接路径
+Pinia store：
 
-后端存在两套网络设备交互路径，需要明确区分：
+- `stores/app.ts`：服务器连接状态与主题；
+- `stores/terminal.ts`：终端连接、会话、命令、输出与历史；
+- `stores/ai-assistant/`：AI 助手状态、模型、流式响应、搜索开关、消息与错误。
 
-- `NetworkService + Netmiko`
-  - 对应 `/network/*` API。
-  - 适合通用连接、命令执行、连接列表管理。
-- `TerminalService + TerminalManager + SSH/Telnet Manager`
-  - 对应 `/terminal/*` API。
-  - 适合前端虚拟终端体验、命令历史、会话保持、输出清洗。
+AI 助手默认选中模型：`deepseek-v4-flash`。
 
-这两条路径都能连接网络设备，但状态、连接 ID、会话 ID 与底层库不同。
+### 7.4 API 客户端
 
-### 7.2 NetworkService
+AI 客户端：`frontend/src/utils/aiService.ts`
 
-`NetworkService` 位于 `backend/app/services/network_service.py`。
+- Axios：模型列表与状态检查；
+- fetch：`POST /api/ai/chat/stream` 真流式响应；
+- SSE 状态机解析 `event:` / `data:`；
+- 将后端事件转换为前端统一 JSON 行：`thinking`、`content`、`error`、`search_results`。
 
-职责：
+终端客户端：`frontend/src/utils/terminalService.ts`
 
-- 使用 Netmiko `ConnectHandler` 建立 SSH/Telnet 连接。
-- 维护进程内连接字典。
-- 使用 `asyncio.Lock` 控制连接表并发访问。
-- 使用 `asyncio.to_thread()` 包装阻塞连接与命令执行。
-- 存储连接信息时会对密码做脱敏处理。
+- 使用 Axios；
+- 连接、执行命令、断开、查询会话；
+- 连接接口超时更长，以适配网络设备首次连接慢的问题。
 
-连接 ID 格式类似 `conn-xxxx`。
+### 7.5 组件结构
 
-### 7.3 TerminalService
+主要组件：
 
-`TerminalService` 位于 `backend/app/services/terminal_service.py`。
+- `components/terminal/NetworkTerminal.vue`：终端壳组件；
+- `components/terminal/components/*`：连接表单、输出、命令输入、状态栏；
+- `components/ai-assistant/AIAssistant.vue`：AI 助手壳组件；
+- `components/ai-assistant/components/*`：头部、消息区、输入框、模型选择、搜索/流式控件等；
+- `components/common/ServerStatusIndicator.vue`：后端状态指示；
+- `components/ui/*`：HUD / 视觉增强组件。
 
-职责：
+## 8. 网络设备连接架构
 
-- 封装终端连接、命令执行、断开连接、会话查询。
-- 限制最大终端会话数量。
-- 调用 `TerminalManager` 完成实际连接。
-- 提供空闲会话清理。
+后端存在两条网络设备交互路径：
 
-### 7.4 TerminalManager
+### 8.1 Terminal 路径
 
-`TerminalManager` 位于 `backend/app/core/terminal.py`。
+对应前端虚拟终端体验。
 
-职责：
+```text
+前端 Terminal UI
+  -> terminalService
+  -> /api/v1/terminal/*
+  -> TerminalService
+  -> TerminalManager
+  -> SSHManager / TelnetManager
+  -> 网络设备
+```
 
-- 统一管理 SSH 与 Telnet 会话。
-- 根据连接类型分发到 `SSHManager` 或 `TelnetManager`。
-- 维护会话元数据。
-- 定期检查会话活跃状态。
-- 清理过期会话。
+特点：
 
-### 7.5 SSHManager
+- 持久会话；
+- 命令历史；
+- 输出清洗；
+- 会话超时与空闲清理；
+- 更贴近用户在页面中操作终端的体验。
 
-`SSHManager` 位于 `backend/app/core/ssh.py`。
+### 8.2 Network 路径
 
-职责：
+对应通用连接与命令执行 API。
 
-- 使用 Paramiko 建立 SSH 连接。
-- 使用 `invoke_shell()` 建立持久交互式 Shell。
-- 连接前尝试检测常见错误协议，例如 Telnet 或 HTTP。
-- 尝试执行 `display version` 获取设备信息。
-- 支持命令执行、分页处理、输出清洗。
-- 支持 Shell 失效后的重连尝试。
-- 会对会话中的设备密码进行内存级加密封装。
+```text
+外部/内部调用 /api/v1/network/*
+  -> NetworkService
+  -> Netmiko ConnectHandler
+  -> 网络设备
+```
 
-SSH 分页能力已统一由 `backend/app/core/ssh.py` 提供，不再保留独立的历史分页实现文件。
+特点：
 
-### 7.6 TelnetManager
+- 使用 Netmiko；
+- 维护连接字典；
+- `asyncio.to_thread()` 包装阻塞连接与命令执行；
+- 适合结构化 API 调用。
 
-Telnet 实现主要位于：
+这两条路径的连接 ID、会话状态与底层库不同，不能混用。
 
-- `backend/app/core/telnet.py`
-- `backend/app/core/network/telnet/manager.py`
-- `backend/app/core/network/telnet/connection.py`
-- `backend/app/core/network/telnet/devices/huawei.py`
-- `backend/app/core/network/telnet/protocols.py`
+## 9. 数据模型
 
-职责：
+### 9.1 AI 模型
 
-- 使用 telnetlib 建立 Telnet 连接。
-- 提供通用 Telnet 连接实现。
-- 提供 Huawei 设备专用实现。
-- 根据设备类型选择连接类。
-- 支持登录提示识别、命令执行、分页处理、ANSI 控制符清理。
-- 定期清理过期会话。
-
-需要注意：`telnetlib` 在较新的 Python 版本中属于逐步淘汰方向，后续升级 Python 时要关注替代方案。
-
-## 8. 后端模型层
-
-### 8.1 AI 模型
-
-AI 模型定义位于 `backend/app/models/ai.py`。
+文件：`backend/app/models/ai.py`
 
 核心模型：
 
 - `AIModel`
-  - `value`
-  - `label`
-  - `description`
-  - `features`
-  - `max_tokens`
 - `Message`
-  - `role`
-  - `content`
-  - `timestamp`
 - `ChatRequest`
-  - `model`
-  - `messages`
-  - `max_tokens`
-  - `temperature`
-  - `top_p`
-  - `stream`
-- `ChatResponse`
-  - `message`
-  - `model`
-  - `finish_reason`
-  - `usage`
-  - `content`
+- `SearchSource`
+- `ModelsResponse`
+- `ModelConnectionStatus`
 - `StreamEvent`
-  - `type`
-  - `content`
-  - `error`
-  - `done`
-  - `finish_reason`
-  - `thinking`
 
-### 8.2 Network 模型
+`ChatRequest` 关键字段：
 
-Network 模型定义位于 `backend/app/models/network.py`。
+- `model`
+- `messages`
+- `max_tokens`
+- `temperature`
+- `top_p`
+- `stream`
+- `enable_search`
 
-核心模型：
+约束：
 
-- `Connection`
-- `ConnectionRequest`
-- `ConnectionResponse`
-- `CommandRequest`
-- `CommandResponse`
-- `DisconnectRequest`
-- `DisconnectResponse`
-- `ConnectionsList`
-- `NetworkEvent`
+- 单条消息最大 8000 字符；
+- 消息总长度最大 32000 字符；
+- 最多 50 条消息；
+- `max_tokens` 最大 8192。
 
-### 8.3 Terminal 模型
+### 9.2 Terminal / Network 模型
 
-Terminal 模型定义位于 `backend/app/models/terminal.py`。
+- `backend/app/models/terminal.py`：终端凭证、命令请求、响应、会话信息；
+- `backend/app/models/network.py`：连接请求、连接响应、命令请求、连接列表等。
 
-核心模型：
+## 10. 日志与安全
 
-- `TerminalCredentials`
-- `CommandRequest`
-- `CommandResponse`
-- `SessionInfo`
-- `SessionList`
-- `ConnectionResponse`
+### 10.1 日志
 
-## 9. 日志与可观测性
+工具：`backend/app/utils/logger.py`
 
-日志工具位于 `backend/app/utils/logger.py`。
+能力：
 
-日志能力：
+- 控制台日志；
+- 文件日志；
+- 访问日志；
+- 错误日志；
+- 日志目录自动创建；
+- 日志敏感字段脱敏；
+- 客户端安全错误文案。
 
-- 控制台日志。
-- 文件日志。
-- 访问日志。
-- 错误日志。
-- JSON 格式或标准格式。
-- 日志轮转。
-- 日志目录自动创建。
-- 旧日志清理。
-- 标准控制台日志可对重要级别加颜色。
+日志输出目录：`logs/`。该目录被 `.gitignore` 排除，不进入版本控制。
 
-日志目录结构：
+### 10.2 安全边界
 
-```text
-logs/
-  app/
-  access/
-  error/
-  backend/
-  frontend/
+安全相关模块：
+
+- `backend/app/utils/security.py`
+- `backend/app/utils/terminal_policy.py`
+- `backend/app/services/ai/base.py`
+- `backend/app/core/rate_limit.py`
+
+主要机制：
+
+- 内部 API Token；
+- JWT 工具；
+- 终端目标主机 / CIDR / 端口限制；
+- 命令长度限制；
+- 高风险命令正则拦截；
+- AI 上游错误脱敏；
+- 日志脱敏；
+- 设备密码不写入代码或版本库。
+
+注意：设备密码的进程内封装更偏向避免明文直接暴露，不应视为强加密或 secret manager。
+
+## 11. 安装、运行与脚本
+
+本项目约定所有 Run / Debug / Test / Build 操作优先通过根目录 `scripts/` 封装脚本执行，避免不同环境直接调用底层 `npm`、`uv`、`python` 等命令导致行为漂移。
+
+### 11.1 环境要求
+
+- Python 3.9–3.12；
+- Node.js 20+；
+- uv；
+- npm；
+- Windows PowerShell 7+（Windows 推荐）或 Bash / Git Bash。
+
+### 11.2 环境变量
+
+后端：
+
+```powershell
+Copy-Item backend/.env.example backend/.env
 ```
 
-当前测试已覆盖：
+前端：
 
-- 控制台重要日志级别应带 ANSI 颜色。
-- 文件日志不应写入 ANSI 转义序列。
-
-## 10. 安全机制
-
-安全工具位于 `backend/app/utils/security.py`。
-
-当前能力：
-
-- bcrypt 密码哈希。
-- JWT Token 创建与解析。
-- 设备密码内存级封装。
-
-需要注意：
-
-- 设备密码封装使用随机 key 与 XOR 方式，且密文与 key 均保存在内存对象中。
-- 该机制更接近防止明文直接暴露的弱混淆，不应视为强加密方案。
-- API Key 与设备密码必须继续通过环境变量和请求体传递，不应写入代码或文档。
-
-## 11. 前端架构
-
-### 11.1 前端启动链路
-
-前端入口为 `frontend/src/main.ts`。
-
-开发模式默认由 Vite 监听 `http://localhost:5180`。如需临时更换端口，
-优先通过根目录启动脚本的前端端口参数或 `FRONTEND_PORT` 环境变量覆盖。
-
-启动链路：
-
-1. 创建 Vue 应用。
-2. 注册 Pinia。
-3. 挂载 `App.vue`。
-4. `App.vue` 渲染 `MainLayout`。
-
-### 11.2 页面布局
-
-主布局位于 `frontend/src/layouts/MainLayout.vue`。
-
-布局结构：
-
-- 顶部栏：
-  - 平台标题。
-  - 后端服务状态指示器。
-  - 主题切换控制。
-- 主体区域：
-  - 左侧：网络终端，占主要宽度。
-  - 右侧：AI 智能助手，占辅助宽度。
-
-当前布局默认强制亮色主题，挂载时会移除 `dark` class 并清理本地主题缓存。
-
-### 11.3 Vite 代理
-
-Vite 配置位于 `frontend/vite.config.ts`。
-
-开发代理配置：
-
-- 前端开发地址：`http://localhost:5180`
-- 浏览器请求前缀：`/api`
-- 后端目标：`http://localhost:8000`
-- 重写规则：`/api` -> `/api/v1`
-
-因此前端代码中 Axios 或 fetch 使用 `/api/health`、`/api/ai/models` 等路径，在开发环境会被代理为后端真实 `/api/v1/health`、`/api/v1/ai/models`。
-
-生产环境如果没有反向代理提供相同重写规则，需要额外配置网关或后端路径映射。
-
-### 11.4 全局应用状态
-
-全局应用状态位于 `frontend/src/stores/app.ts`。
-
-职责：
-
-- 维护服务器连接状态。
-- 维护亮色或暗色主题状态。
-- 通过 `/api/health` 检查服务器连接。
-- 设置 HTML 根节点主题 class。
-
-### 11.5 AI 助手状态
-
-AI 助手状态位于：
-
-- `frontend/src/stores/aiAssistant.ts`
-- `frontend/src/stores/ai-assistant/index.ts`
-- `frontend/src/stores/ai-assistant/state.ts`
-- `frontend/src/stores/ai-assistant/actions/*`
-- `frontend/src/stores/ai-assistant/types/index.ts`
-
-职责：
-
-- 当前模型选择。
-- 可用模型列表。
-- 模型连接状态。
-- AI 回复状态。
-- DeepSeek 思考内容状态。
-- 对话消息列表。
-- 本地会话 ID。
-- 模型列表缓存。
-- 对话历史保存和加载。
-
-默认选中模型为 `deepseek-v4-pro`。
-
-### 11.6 终端状态
-
-终端状态位于 `frontend/src/stores/terminal.ts`。
-
-职责：
-
-- 连接状态：
-  - `disconnected`
-  - `connecting`
-  - `connected`
-  - `error`
-- 连接类型：
-  - `ssh`
-  - `telnet`
-- 设备地址、端口、用户名、密码。
-- 终端输出。
-- 命令历史。
-- 当前会话 ID。
-- 连接等待计时。
-- 取消连接按钮状态。
-
-终端连接等待期间，前端会向终端输出区域持续追加等待提示。
-
-### 11.7 前端 API 客户端
-
-#### AI 客户端
-
-AI 客户端位于 `frontend/src/utils/aiService.ts`。
-
-职责：
-
-- 使用 Axios baseURL `/api`。
-- 获取模型列表。
-- 检查模型状态。
-- 发送普通聊天请求。
-- 发送流式聊天请求。
-- 解析服务端流式响应。
-- 兼容 OpenAI、DeepSeek、Claude 风格的流式片段。
-- 将思考内容转换为前端可展示的状态。
-
-#### 终端客户端
-
-终端客户端位于 `frontend/src/utils/terminalService.ts`。
-
-职责：
-
-- 使用 Axios baseURL `/api`。
-- 连接终端。
-- 执行命令。
-- 断开连接。
-- 查询连接状态。
-- 取消连接。
-
-终端连接接口超时时间为 240 秒，以适配网络设备首次连接较慢的情况。
-
-### 11.8 前端关键组件
-
-#### NetworkTerminal
-
-位置：`frontend/src/components/terminal/NetworkTerminal.vue`
-
-职责：
-
-- 提供 SSH/Telnet 连接表单。
-- 输入设备地址、端口、用户名、密码。
-- 展示连接状态诊断。
-- 展示终端输出。
-- 执行命令。
-- 支持上下键浏览历史命令。
-- 支持取消连接。
-- 对错误、成功、警告、命令行输出做不同样式展示。
-
-#### AIAssistant
-
-位置：`frontend/src/components/ai-assistant/AIAssistant.vue`
-
-职责：
-
-- 加载模型列表。
-- 检查模型连接。
-- 切换模型。
-- 发送消息。
-- 清空对话。
-- 展示 AI 消息和用户消息。
-- 处理快捷键。
-
-#### ChatMessages
-
-位置：`frontend/src/components/ai-assistant/components/ChatMessages.vue`
-
-职责：
-
-- 展示用户消息与 AI 消息。
-- 使用 marked 渲染 AI Markdown 内容。
-- 展示 DeepSeek 思考过程。
-- 展示 AI 正在输入、正在思考、正在接收流式内容等状态。
-- 自动滚动到底部。
-
-#### ServerStatusIndicator
-
-位置：`frontend/src/components/common/ServerStatusIndicator.vue`
-
-职责：
-
-- 每 30 秒检查一次后端连接。
-- 展示服务器已连接或未连接状态。
-
-## 12. 关键业务数据流
-
-### 12.1 AI 模型列表加载
-
-```text
-AIAssistant onMounted
-  -> aiAssistantStore.loadAvailableModels()
-  -> aiService.getAvailableModels()
-  -> GET /api/ai/models
-  -> Vite 代理重写为 /api/v1/ai/models
-  -> AIServiceManager.get_models_response()
-  -> 聚合 Provider 模型与状态
-  -> 前端写入 availableModels
-  -> localStorage 缓存 ai_available_models
+```powershell
+Copy-Item frontend/.env.example frontend/.env.local
 ```
 
-### 12.2 AI 流式对话
+后端常用配置：
+
+| 变量 | 说明 |
+|------|------|
+| `INTERNAL_API_TOKEN` | 内部接口 Bearer Token；前端 `VITE_INTERNAL_API_TOKEN` 需与它一致 |
+| `API_AUTH_ENABLED` | 是否启用内部 API 鉴权，生产环境应启用 |
+| `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | 按实际启用 provider 配置 |
+| `BRAVE_SEARCH_ENABLED` / `BRAVE_SEARCH_API_KEY` | Brave Search 联网搜索增强 |
+| `TERMINAL_ALLOWED_HOSTS` / `TERMINAL_ALLOWED_CIDRS` | 限制可连接网络设备范围 |
+| `TERMINAL_ALLOWED_SSH_PORTS` / `TERMINAL_ALLOWED_TELNET_PORTS` | 限制 SSH / Telnet 端口 |
+| `TERMINAL_COMMAND_MAX_LENGTH` | 终端命令最大长度 |
+| `TERMINAL_BLOCKED_COMMAND_PATTERNS` | 高风险命令拦截正则 |
+| `LOG_LEVEL` | 日志级别 |
+
+前端当前实际消费：
+
+| 变量 | 说明 |
+|------|------|
+| `VITE_INTERNAL_API_TOKEN` | 内部接口访问 Token，需与后端 `INTERNAL_API_TOKEN` 一致 |
+
+### 11.3 启动脚本
+
+脚本目录：`scripts/`
+
+| 脚本 | 作用 |
+|------|------|
+| `dev.ps1` / `dev.sh` | 开发环境：后端热重载 + 前端 Vite |
+| `prod.ps1` / `prod.sh` | 生产预览：后端 production + 前端 preview |
+| `build.ps1` / `build.sh` | 前端生产构建与 dist 统计 |
+| `lint.ps1` / `lint.sh` | 前端 vue-tsc + ESLint |
+| `backend-check.ps1` / `backend-check.sh` | 后端依赖、ruff、pytest、脚本契约门禁 |
+| `clean-python-cache.ps1` / `clean-python-cache.sh` | 清理 Python 缓存 |
+| `p3_axe_audit.py` / `p6_axe_audit.py` | Playwright + axe 验证脚本 |
+
+Windows PowerShell：
+
+```powershell
+.\scripts\dev.ps1
+.\scripts\dev.ps1 -BackendPort 8080 -FrontendPort 5181
+.\scripts\prod.ps1
+.\scripts\build.ps1
+.\scripts\lint.ps1
+.\scripts\backend-check.ps1
+```
+
+Linux / macOS / Git Bash：
+
+```bash
+./scripts/dev.sh
+./scripts/prod.sh
+./scripts/build.sh
+./scripts/lint.sh
+./scripts/backend-check.sh
+```
+
+启动脚本共同约定：
+
+- 检查项目布局；
+- 检查 `backend/.env` 是否存在；
+- 检查必要命令：`uv`、`npm`，Shell 脚本额外检查 `curl`；
+- 自动创建日志目录；
+- 后端先启动，健康检查通过后再启动前端；
+- 设置 `PYTHONDONTWRITEBYTECODE=1`，减少运行时缓存污染。
+
+### 11.4 访问地址
+
+默认端口：
+
+- 前端：`http://localhost:5180`；
+- 后端健康检查：`http://localhost:8000/api/v1/health`；
+- 后端 readiness：`http://localhost:8000/api/v1/health/ready`；
+- API 文档：`http://localhost:8000/api/v1/docs`。
+
+开发模式下，前端浏览器侧统一请求 `/api/*`，由 Vite 代理重写到后端 `/api/v1/*`。
+
+### 11.5 日志与缓存
+
+- 运行日志输出到 `logs/`，目录已加入 `.gitignore`；
+- `backend/.env`、`frontend/.env.local`、`.venv`、`node_modules` 均不进入版本控制；
+- 启动脚本设置 `PYTHONDONTWRITEBYTECODE=1`；
+- Python 缓存可通过 `clean-python-cache.ps1` / `clean-python-cache.sh` 清理。
+
+## 12. 测试与质量保障
+
+根目录测试：`tests/`
+
+当前测试覆盖主题：
+
+- AI SSE 契约与错误脱敏；
+- AI persona 与 Brave Search 注入顺序；
+- Brave Search client；
+- Pydantic v2 模型；
+- 后端包元数据与运行依赖；
+- 启动脚本契约；
+- Python 字节码缓存策略；
+- 终端连接策略与 Telnet 登录策略；
+- Health readiness；
+- request id tracing；
+- logger 行为；
+- 架构边界。
+
+主要验证入口：
+
+```powershell
+.\scripts\lint.ps1
+.\scripts\build.ps1
+.\scripts\backend-check.ps1
+```
+
+## 13. 关键数据流
+
+### 13.1 AI 流式对话
 
 ```text
-用户输入消息
-  -> aiAssistantStore.sendMessage()
-  -> sendMessageStream()
+用户输入
+  -> ai-assistant store
   -> aiService.sendMessageStream()
-  -> POST /api/ai/chat/stream
-  -> Vite 代理重写为 /api/v1/ai/chat/stream
+  -> fetch('/api/ai/chat/stream')
+  -> Vite proxy 到 /api/v1/ai/chat/stream
+  -> AIApplicationService.chat_stream()
+  -> Brave Search? + persona 注入
   -> AIServiceManager.chat_stream()
-  -> Provider 流式请求外部模型接口
-  -> 后端 StreamingResponse 输出内容
-  -> 前端解析 chunk、SSE data 行与思考内容
-  -> ChatMessages 实时展示回复和思考过程
+  -> Provider 调用上游模型
+  -> 后端 SSE event
+  -> 前端 SSE 状态机解析
+  -> ChatMessages 渲染 thinking/content/search sources
 ```
 
-### 12.3 终端连接
+### 13.2 联网搜索增强
 
 ```text
-用户填写连接信息
+enable_search=true
+  -> 取最后一条 user message
+  -> BraveSearchClient.search(query)
+  -> 格式化搜索 system block（含当前真实时间）
+  -> request.messages 插入 search context
+  -> 前端先收到 search_results 事件
+  -> AI 回复末尾可引用来源
+```
+
+### 13.3 终端连接
+
+```text
+用户填写 SSH/Telnet 信息
   -> terminalStore.connectToDevice()
   -> terminalService.connect()
   -> POST /api/terminal/connect
-  -> Vite 代理重写为 /api/v1/terminal/connect
   -> TerminalService.connect()
   -> TerminalManager.connect()
-  -> SSHManager 或 TelnetManager 建立会话
-  -> 返回 session_id 与设备信息
+  -> SSHManager 或 TelnetManager
+  -> 返回 session_id
   -> 前端进入 connected 状态
 ```
 
-### 12.4 终端命令执行
+### 13.4 终端命令执行
 
 ```text
 用户输入命令
   -> terminalStore.executeCommand()
   -> terminalService.execute()
   -> POST /api/terminal/execute
-  -> Vite 代理重写为 /api/v1/terminal/execute
   -> TerminalService.execute_command()
   -> TerminalManager.execute_command()
-  -> SSH 或 Telnet 会话执行命令
+  -> SSH/Telnet 会话执行
   -> 清洗输出
   -> 前端追加终端输出
 ```
 
-### 12.5 Netmiko 通用网络命令
-
-```text
-外部调用 /network/connect
-  -> NetworkService.connect()
-  -> Netmiko ConnectHandler
-  -> 保存 connection_id
-  -> /network/command 使用 connection_id 执行 send_command
-  -> /network/disconnect 释放连接
-```
+## 14. 当前关注点与后续演进建议
 
-## 13. 脚本与运行方式
+以下是从当前代码结构可见的维护关注点，并非线上故障结论。
 
-脚本位于 `scripts/`。
+### 14.1 生产代理路径
 
-当前主要脚本：
+前端开发期依赖 Vite 将 `/api` 重写到 `/api/v1`。生产部署必须提供同等代理规则，或者同步调整前端 baseURL 与后端 API 前缀。
 
-- `dev.ps1`
-  - Windows 开发环境启动。
-  - 先启动后端。
-  - 等待 `/api/v1/health` 健康检查通过。
-  - 再启动前端 Vite。
-- `prod.ps1`
-  - Windows 生产预览启动。
-  - 后端使用 production 环境变量。
-  - 前端必要时安装依赖并构建。
-  - 使用 Vite preview。
-- `dev.sh`
-  - 类 Unix 开发环境启动。
-- `prod.sh`
-  - 类 Unix 生产预览启动。
-- `clean-python-cache.ps1`
-  - Windows 清理 Python 缓存。
-- `clean-python-cache.sh`
-  - 类 Unix 清理 Python 缓存。
+### 14.2 两套网络连接路径边界
 
-启动脚本共同特点：
+`/terminal/*` 与 `/network/*` 都能连接设备，但状态模型和底层库不同。后续应继续保持文档化边界，避免在业务层混用连接 ID / session ID。
 
-- 检查 `backend/` 与 `frontend/` 是否存在。
-- 检查 `backend/.env` 是否存在。
-- 确保日志目录存在。
-- 检查必要命令：
-  - `uv`
-  - `npm`
-  - Shell 版本额外检查 `curl`
-- 设置 `PYTHONDONTWRITEBYTECODE=1`，避免运行时生成 Python 字节码缓存。
-- 后端先启动，健康检查通过后再启动前端。
+### 14.3 终端取消连接
 
-## 14. 测试与质量保障
+`/terminal/cancel-connect` 当前更接近 API 层占位能力。若需要真正取消正在进行的底层连接，应继续完善任务取消机制。
 
-根目录测试位于 `tests/`。
+### 14.4 多实例部署
 
-当前 Python 测试：
+AI provider、终端会话、网络连接等状态目前主要在进程内。多 worker / 多实例部署需要共享状态、粘性会话或连接路由设计。
 
-- `tests/test_logger.py`
-  - 验证控制台日志颜色。
-  - 验证文件日志不包含 ANSI 转义序列。
-- `tests/test_latest_model_config.py`
-  - 验证示例环境变量中的模型配置。
-  - 验证内置默认模型。
-  - 验证 DeepSeek 连接检查使用第一个配置模型。
+### 14.5 Telnet 依赖演进
 
-脚本静态验证：
+Telnet 路径仍依赖 `telnetlib`。后续升级 Python 版本时应提前评估替代库或兼容层。
 
-- `tests/scripts/verify-launch-scripts.ps1`
-  - 验证脚本目录保留统一入口。
-  - 验证启动顺序、健康检查、Vite 调用方式和 Python 缓存设置。
-- `tests/scripts/verify-backend-runtime-dependencies.ps1`
-  - 验证后端运行时依赖声明在 `pyproject.toml` 的 `[project].dependencies`。
+### 14.6 凭证管理
 
-后端 pytest 配置位于 `backend/pyproject.toml`：
+当前设备密码和 API Key 依赖环境变量、请求体和进程内状态。生产环境应优先考虑 secret manager、审计日志和更强凭证生命周期管理。
 
-- 测试目录：`../tests`
-- 默认覆盖率目标：`app`
-- 默认输出：
-  - 终端缺失覆盖率。
-  - HTML 覆盖率报告。
+## 15. 文档维护规则
 
-## 15. 当前可见风险与疑点
+当修改以下内容时，应同步更新本文档和根 `README.md`：
 
-以下问题均来自代码、配置和脚本扫描，不代表线上已经发生故障，但建议纳入后续治理。
-
-### 15.1 API 前缀依赖代理重写
-
-前端代码使用 `/api`，后端真实前缀为 `/api/v1`。
-
-开发期由 Vite 代理完成 `/api` 到 `/api/v1` 的重写。生产环境如果直接部署静态资源，必须确保网关或反向代理也提供相同重写，否则接口会出现 404。
-
-### 15.2 Terminal 断开连接参数可能不一致
-
-前端 `terminalService.disconnect()` 通过 JSON Body 发送：
-
-```json
-{
-  "session_id": "..."
-}
-```
-
-后端 `POST /terminal/disconnect` 的函数参数是普通 `session_id: str`，未显式声明 Body 模型。FastAPI 默认更可能按 query 参数解析。该处存在前后端参数绑定不一致风险。
-
-### 15.3 取消连接接口当前更像占位实现
-
-前端提供取消连接按钮，并调用 `/terminal/cancel-connect`。
-
-后端当前接口返回成功信息，但没有看到与正在进行连接任务的实际取消逻辑绑定。对于长时间 SSH/Telnet 连接，用户界面可以切回断开状态，但后端阻塞连接任务未必被真正终止。
-
-### 15.4 Claude 连通性检查与真实请求协议不一致
-
-Claude 普通对话使用 `/messages` 与 `x-api-key`，但连接检查使用 `/chat/completions` 与 Bearer Authorization。该差异可能导致模型状态显示失败，而真实对话路径可用，或反过来。
-
-### 15.5 AI 流式前端实现可能不是真正增量
-
-前端 `aiService` 使用 Axios 发送流式请求，并把响应文本包装为 `ReadableStream`。浏览器 Axios 对流式下载的支持与 fetch 原生流不同，实际表现可能是先等完整响应结束，再一次性包装成流。
-
-如果需要真正 token 级增量体验，建议改为 fetch + ReadableStream 或标准 SSE 客户端。
-
-### 15.6 Provider 统计方法字段疑点
-
-`AIServiceManager.get_provider_stats()` 中存在使用 `model.id` 的逻辑，但 `AIModel` 当前字段为 `value`、`label` 等。该方法若被调用，可能触发属性错误。
-
-### 15.7 Settings 对 load_dotenv 时序敏感
-
-`Settings` 类中部分字段通过 `os.getenv()` 在类定义阶段给默认值。`run.py` 会先加载 `.env`，正常启动路径可用。但如果测试、脚本或交互环境直接导入配置模块且未先设置环境变量，可能触发配置缺失。
-
-### 15.8 示例 AI Base URL 需要人工复核
-
-示例环境配置中存在 Anthropic 与 OpenAI Base URL 看起来不符合常规厂商域名的情况。建议后续人工复核真实可用网关和目标协议，避免配置示例误导部署。
-
-### 15.9 CORS 配置需要与凭证策略一起复核
-
-后端 CORS 当前允许来源来自配置，并允许所有方法和所有请求头，同时启用 credentials。若来源配置包含通配符或过宽来源，生产环境存在跨域策略风险。
-
-### 15.10 日志可能包含敏感请求摘要
-
-AI、DeepSeek 和请求中间件会记录请求摘要、消息数量、模型名、部分 payload 信息。生产环境需要确认不会记录 API Key、设备密码、完整网络配置、敏感拓扑或客户数据。
-
-### 15.11 设备密码内存封装不是强加密
-
-当前设备密码封装更接近进程内弱混淆，不能抵御内存读取、调试器、dump 文件或代码级访问风险。后续如进入生产环境，应使用更严格的凭证管理方案。
-
-### 15.12 Telnet 底层依赖需要关注 Python 升级
-
-Telnet 连接使用 `telnetlib`。该库在新 Python 版本中的长期可用性需要关注，建议规划替代库或抽象兼容层。
-
-### 15.13 Telnet 命令完成判断存在死代码疑点
-
-`TelnetConnection._check_command_completion()` 中可见 return 之后仍有遗留代码块的迹象。虽然不一定影响当前执行路径，但会增加维护理解成本。
-
-### 15.14 会话状态均为进程内状态
-
-网络连接、终端会话和 Provider 实例均为进程内状态。若后续使用多进程、多实例或容器横向扩展，需要设计共享会话存储、连接路由或粘性会话策略。
-
-## 16. 建议演进路线
-
-### 16.1 短期优先级
-
-建议优先处理会直接影响用户体验的问题：
-
-- 修正 `/terminal/disconnect` 的请求体模型，确保前后端参数一致。
-- 将 `/terminal/cancel-connect` 接入真实取消机制。
-- 复核 Claude Provider 的连通性检查协议。
-- 复核 `.env.example` 中 OpenAI 与 Anthropic Base URL。
-- 为生产部署明确 `/api` 到 `/api/v1` 的代理规则。
-
-### 16.2 中期优先级
-
-建议提升可维护性和稳定性：
-
-- 将 Settings 改为更标准的 pydantic-settings 字段加载方式，减少 `os.getenv()` 类定义时序风险。
-- 将 AI 流式前端实现改为 fetch 原生流或 SSE。
-- 清理 Telnet 命令完成判断中的遗留代码。
-- 为 `AIServiceManager.get_provider_stats()` 增加测试并修复字段名。
-- 统一 Network 与 Terminal 两套连接路径的边界说明或抽象复用。
-
-### 16.3 长期优先级
-
-建议围绕生产化能力演进：
-
-- 引入集中凭证管理，避免设备凭证长时间留存在进程内。
-- 引入结构化审计日志与敏感字段脱敏策略。
-- 支持多实例部署下的会话管理策略。
-- 补充端到端测试，覆盖终端连接、AI 模型加载、流式响应和异常状态。
-- 规划 Telnet 替代实现或协议适配层。
-
-## 17. 运维关注点
-
-部署或联调时建议重点确认：
-
-- 后端 `.env` 是否存在且完整。
-- `AI_ENABLED` 与各厂商 API Key 是否符合预期。
-- 前端访问路径 `/api` 是否能正确转发到后端 `/api/v1`。
-- 日志目录是否可写。
-- SSH/Telnet 目标设备端口是否开放。
-- 防火墙是否允许后端访问网络设备。
-- 生产环境是否禁用过宽 CORS。
-- 生产日志是否脱敏。
-
-## 18. 变更影响说明
-
-本次文档整理同时移除了 `backend/README.md`，后续后端相关说明应集中维护在 `docs/` 下，避免同类信息分散在多个位置。
-
-新增架构文档建议作为后续维护入口。后续若修改 API、模型列表、启动脚本或终端连接机制，应同步更新本文档。
+- API 路径或请求 / 响应模型；
+- AI provider、模型列表、persona 或搜索注入逻辑；
+- 前端主题、布局、状态管理或运行端口；
+- 启动脚本和质量门禁；
+- 终端连接策略、安全策略或日志策略；
+- 测试目录和验证入口。

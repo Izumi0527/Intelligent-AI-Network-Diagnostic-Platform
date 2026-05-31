@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("API_PREFIX", "/api")
 os.environ.setdefault("APP_NAME", "AI智能网络故障分析平台")
-os.environ.setdefault("APP_VERSION", "0.1.0")
+os.environ.setdefault("APP_VERSION", "0.2.1")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 os.environ.setdefault("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30")
@@ -272,7 +272,7 @@ def _set_required_config(monkeypatch):
     required = {
         "API_PREFIX": "/api",
         "APP_NAME": "AI智能网络故障分析平台",
-        "APP_VERSION": "0.1.0",
+        "APP_VERSION": "0.2.1",
         "SECRET_KEY": "test-secret-key",
         "JWT_ALGORITHM": "HS256",
         "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": "30",

@@ -13,7 +13,7 @@ def test_run_help_bootstraps_development_internal_auth():
             "APP_ENV": "development",
             "API_PREFIX": "/api",
             "APP_NAME": "AI智能网络故障分析平台",
-            "APP_VERSION": "0.1.0",
+            "APP_VERSION": "0.2.1",
             "SECRET_KEY": "test-secret-key",
             "JWT_ALGORITHM": "HS256",
             "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": "30",
@@ -75,7 +75,7 @@ def test_run_uses_env_file_and_passes_arguments_to_uvicorn(tmp_path):
             APP_ENV=test
             API_PREFIX=/api
             APP_NAME=AI智能网络故障分析平台
-            APP_VERSION=0.1.0
+            APP_VERSION=0.2.1
             SECRET_KEY=test-secret-key
             JWT_ALGORITHM=HS256
             JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30

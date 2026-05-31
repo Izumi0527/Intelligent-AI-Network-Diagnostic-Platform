@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ai-network-platform"
-version = "1.0.0"
+version = "0.2.1"
 description = "AI智能网络故障分析平台"
 readme = "../README.md"
 requires-python = ">=3.9,<3.13"

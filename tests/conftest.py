@@ -5,7 +5,7 @@ DEFAULT_TEST_ENV = {
     "APP_ENV": "test",
     "API_PREFIX": "/api",
     "APP_NAME": "AI智能网络故障分析平台",
-    "APP_VERSION": "0.1.0",
+    "APP_VERSION": "0.2.1",
     "SECRET_KEY": "test-secret-key",
     "JWT_ALGORITHM": "HS256",
     "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": "30",
